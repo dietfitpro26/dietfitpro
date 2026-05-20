@@ -1,0 +1,45 @@
+{
+  "app": {
+    "name": "DietFitPro",
+    "tagline": "Pas de régime, juste de meilleures habitudes"
+  },
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue"
+  },
+  "auth": {
+    "login": "Connexion",
+    "logout": "Déconnexion",
+    "signup": "Inscription",
+    "email": "Email",
+    "password": "Mot de passe",
+    "invitationCode": "Code d'invitation"
+  },
+  "roles": {
+    "pro": "Coach",
+    "patient": "Patient",
+    "subscriber": "Abonné"
+  },
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "patients": "Mes Patients",
+    "nutrition": "Programmes Nutrition",
+    "recipes": "Mes Recettes",
+    "sport": "Programmes Sport",
+    "messages": "Messagerie",
+    "calendar": "Agenda",
+    "visio": "Visios",
+    "notifications": "Notifications",
+    "feed": "Feed",
+    "subscribers": "Abonnés",
+    "stats": "Statistiques",
+    "settings": "Paramètres",
+    "home": "Accueil",
+    "journal": "Mon Journal",
+    "programs": "Mes Programmes",
+    "progress": "Ma Progression",
+    "aiCoach": "Coach IA"
+  }
+}
