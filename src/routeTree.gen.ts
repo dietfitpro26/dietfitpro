@@ -18,6 +18,7 @@ import { Route as ProRecipesRouteImport } from './routes/pro.recipes'
 import { Route as ProPatientsRouteImport } from './routes/pro.patients'
 import { Route as ProNutritionRouteImport } from './routes/pro.nutrition'
 import { Route as ProDashboardRouteImport } from './routes/pro.dashboard'
+import { Route as ProConsultationsRouteImport } from './routes/pro.consultations'
 import { Route as PatientHomeRouteImport } from './routes/patient.home'
 import { Route as ProSportProgramIdRouteImport } from './routes/pro.sport.$programId'
 import { Route as ProRecipesNewRouteImport } from './routes/pro.recipes.new'
@@ -69,6 +70,11 @@ const ProDashboardRoute = ProDashboardRouteImport.update({
   path: '/pro/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProConsultationsRoute = ProConsultationsRouteImport.update({
+  id: '/pro/consultations',
+  path: '/pro/consultations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PatientHomeRoute = PatientHomeRouteImport.update({
   id: '/patient/home',
   path: '/patient/home',
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/patient/home': typeof PatientHomeRoute
+  '/pro/consultations': typeof ProConsultationsRoute
   '/pro/dashboard': typeof ProDashboardRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/patient/home': typeof PatientHomeRoute
+  '/pro/consultations': typeof ProConsultationsRoute
   '/pro/dashboard': typeof ProDashboardRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
@@ -134,6 +142,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/patient/home': typeof PatientHomeRoute
+  '/pro/consultations': typeof ProConsultationsRoute
   '/pro/dashboard': typeof ProDashboardRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
@@ -152,6 +161,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/patient/home'
+    | '/pro/consultations'
     | '/pro/dashboard'
     | '/pro/nutrition'
     | '/pro/patients'
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/patient/home'
+    | '/pro/consultations'
     | '/pro/dashboard'
     | '/pro/nutrition'
     | '/pro/patients'
@@ -184,6 +195,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/patient/home'
+    | '/pro/consultations'
     | '/pro/dashboard'
     | '/pro/nutrition'
     | '/pro/patients'
@@ -201,6 +213,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   PatientHomeRoute: typeof PatientHomeRoute
+  ProConsultationsRoute: typeof ProConsultationsRoute
   ProDashboardRoute: typeof ProDashboardRoute
   ProNutritionRoute: typeof ProNutritionRouteWithChildren
   ProPatientsRoute: typeof ProPatientsRouteWithChildren
@@ -271,6 +284,13 @@ declare module '@tanstack/react-router' {
       path: '/pro/dashboard'
       fullPath: '/pro/dashboard'
       preLoaderRoute: typeof ProDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pro/consultations': {
+      id: '/pro/consultations'
+      path: '/pro/consultations'
+      fullPath: '/pro/consultations'
+      preLoaderRoute: typeof ProConsultationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/patient/home': {
@@ -365,6 +385,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   PatientHomeRoute: PatientHomeRoute,
+  ProConsultationsRoute: ProConsultationsRoute,
   ProDashboardRoute: ProDashboardRoute,
   ProNutritionRoute: ProNutritionRouteWithChildren,
   ProPatientsRoute: ProPatientsRouteWithChildren,
@@ -374,3 +395,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
