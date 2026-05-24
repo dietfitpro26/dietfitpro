@@ -2,45 +2,21 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Client Supabase typé pour DietFitPro.
- * Vérifie que les variables d'environnement sont présentes
- * et affiche un message d'erreur explicite si elles manquent.
+ * Valeurs hardcodées pour le projet Supabase connecté.
  */
 
-function getEnvVar(name: string): string | undefined {
-  const value = import.meta.env[name];
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
+const supabaseUrl = "https://jafjqbbzzbanpgsfbopm.supabase.co";
+const supabaseAnonKey = "sb_publishable_5Qh1IIHaVswL0-beqjllsA_AHNtE-U4";
 
-const supabaseUrl = getEnvVar("VITE_SUPABASE_URL");
-const supabaseAnonKey = getEnvVar("VITE_SUPABASE_ANON_KEY");
+export const isSupabaseConfigured = true;
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
-
-if (!isSupabaseConfigured && typeof window !== "undefined") {
-  // eslint-disable-next-line no-console
-  console.warn(
-    "[DietFitPro] Supabase non configuré. Créez un .env à partir de .env.example " +
-      "(VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY). " +
-      "L'UI s'affiche mais les appels auth/DB seront désactivés."
-  );
-}
-
-/**
- * Instance unique du client Supabase (browser).
- * Si les variables manquent, on utilise des placeholders pour permettre à l'UI
- * de se rendre — les appels réseau échoueront proprement à l'usage.
- */
-export const supabase: SupabaseClient = createClient(
-  supabaseUrl ?? "https://placeholder.supabase.co",
-  supabaseAnonKey ?? "placeholder-anon-key",
-  {
-    auth: {
-      persistSession: isSupabaseConfigured,
-      autoRefreshToken: isSupabaseConfigured,
-      detectSessionInUrl: isSupabaseConfigured,
-    },
-  }
-);
+export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
 
 /**
  * Type utilitaire pour les réponses Supabase avec gestion d'erreur.
