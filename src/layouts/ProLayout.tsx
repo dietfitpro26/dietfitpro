@@ -96,8 +96,11 @@ export function ProLayout({ children }: { children: ReactNode }) {
           <p className="text-sm font-medium truncate">
             {profile?.full_name ?? profile?.email ?? "Pro"}
           </p>
-          <p className="text-xs text-white/50 truncate">Coach</p>
+          <span className="inline-block mt-0.5 rounded-full bg-[#6DB33F] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+            Pro
+          </span>
         </div>
+
         <Button
           variant="ghost"
           size="icon"
