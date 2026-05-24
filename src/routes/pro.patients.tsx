@@ -306,7 +306,7 @@ function NewPatientDialog({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [birthDate, setBirthDate] = useState("");
-  const [goal, setGoal] = useState<string>("weight_loss");
+  const [goal, setGoal] = useState<string>("perte_de_poids");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -316,7 +316,7 @@ function NewPatientDialog({
     setEmail("");
     setPhone("");
     setBirthDate("");
-    setGoal("weight_loss");
+    setGoal("perte_de_poids");
     setNotes("");
   };
 
