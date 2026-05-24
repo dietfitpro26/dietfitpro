@@ -389,10 +389,10 @@ function NewPatientDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="weight_loss">Perte de poids</SelectItem>
-                <SelectItem value="muscle_gain">Prise de masse</SelectItem>
-                <SelectItem value="maintenance">Maintien</SelectItem>
-                <SelectItem value="other">Autre</SelectItem>
+                <SelectItem value="perte_de_poids">Perte de poids</SelectItem>
+                <SelectItem value="prise_de_masse">Prise de masse</SelectItem>
+                <SelectItem value="maintien">Maintien</SelectItem>
+                <SelectItem value="autre">Autre</SelectItem>
               </SelectContent>
             </Select>
           </div>
