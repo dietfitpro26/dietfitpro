@@ -20,6 +20,7 @@ import { Route as ProNutritionRouteImport } from './routes/pro.nutrition'
 import { Route as ProDashboardRouteImport } from './routes/pro.dashboard'
 import { Route as PatientHomeRouteImport } from './routes/patient.home'
 import { Route as ProSportProgramIdRouteImport } from './routes/pro.sport.$programId'
+import { Route as ProRecipesNewRouteImport } from './routes/pro.recipes.new'
 import { Route as ProPatientsPatientIdRouteImport } from './routes/pro.patients.$patientId'
 import { Route as ProNutritionProgramIdRouteImport } from './routes/pro.nutrition.$programId'
 
@@ -78,6 +79,11 @@ const ProSportProgramIdRoute = ProSportProgramIdRouteImport.update({
   path: '/$programId',
   getParentRoute: () => ProSportRoute,
 } as any)
+const ProRecipesNewRoute = ProRecipesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => ProRecipesRoute,
+} as any)
 const ProPatientsPatientIdRoute = ProPatientsPatientIdRouteImport.update({
   id: '/$patientId',
   path: '/$patientId',
@@ -98,10 +104,11 @@ export interface FileRoutesByFullPath {
   '/pro/dashboard': typeof ProDashboardRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
-  '/pro/recipes': typeof ProRecipesRoute
+  '/pro/recipes': typeof ProRecipesRouteWithChildren
   '/pro/sport': typeof ProSportRouteWithChildren
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
   '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
+  '/pro/recipes/new': typeof ProRecipesNewRoute
   '/pro/sport/$programId': typeof ProSportProgramIdRoute
 }
 export interface FileRoutesByTo {
@@ -113,10 +120,11 @@ export interface FileRoutesByTo {
   '/pro/dashboard': typeof ProDashboardRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
-  '/pro/recipes': typeof ProRecipesRoute
+  '/pro/recipes': typeof ProRecipesRouteWithChildren
   '/pro/sport': typeof ProSportRouteWithChildren
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
   '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
+  '/pro/recipes/new': typeof ProRecipesNewRoute
   '/pro/sport/$programId': typeof ProSportProgramIdRoute
 }
 export interface FileRoutesById {
@@ -129,10 +137,11 @@ export interface FileRoutesById {
   '/pro/dashboard': typeof ProDashboardRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
-  '/pro/recipes': typeof ProRecipesRoute
+  '/pro/recipes': typeof ProRecipesRouteWithChildren
   '/pro/sport': typeof ProSportRouteWithChildren
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
   '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
+  '/pro/recipes/new': typeof ProRecipesNewRoute
   '/pro/sport/$programId': typeof ProSportProgramIdRoute
 }
 export interface FileRouteTypes {
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
     | '/pro/sport'
     | '/pro/nutrition/$programId'
     | '/pro/patients/$patientId'
+    | '/pro/recipes/new'
     | '/pro/sport/$programId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -165,6 +175,7 @@ export interface FileRouteTypes {
     | '/pro/sport'
     | '/pro/nutrition/$programId'
     | '/pro/patients/$patientId'
+    | '/pro/recipes/new'
     | '/pro/sport/$programId'
   id:
     | '__root__'
@@ -180,6 +191,7 @@ export interface FileRouteTypes {
     | '/pro/sport'
     | '/pro/nutrition/$programId'
     | '/pro/patients/$patientId'
+    | '/pro/recipes/new'
     | '/pro/sport/$programId'
   fileRoutesById: FileRoutesById
 }
@@ -192,7 +204,7 @@ export interface RootRouteChildren {
   ProDashboardRoute: typeof ProDashboardRoute
   ProNutritionRoute: typeof ProNutritionRouteWithChildren
   ProPatientsRoute: typeof ProPatientsRouteWithChildren
-  ProRecipesRoute: typeof ProRecipesRoute
+  ProRecipesRoute: typeof ProRecipesRouteWithChildren
   ProSportRoute: typeof ProSportRouteWithChildren
 }
 
@@ -275,6 +287,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProSportProgramIdRouteImport
       parentRoute: typeof ProSportRoute
     }
+    '/pro/recipes/new': {
+      id: '/pro/recipes/new'
+      path: '/new'
+      fullPath: '/pro/recipes/new'
+      preLoaderRoute: typeof ProRecipesNewRouteImport
+      parentRoute: typeof ProRecipesRoute
+    }
     '/pro/patients/$patientId': {
       id: '/pro/patients/$patientId'
       path: '/$patientId'
@@ -316,6 +335,18 @@ const ProPatientsRouteWithChildren = ProPatientsRoute._addFileChildren(
   ProPatientsRouteChildren,
 )
 
+interface ProRecipesRouteChildren {
+  ProRecipesNewRoute: typeof ProRecipesNewRoute
+}
+
+const ProRecipesRouteChildren: ProRecipesRouteChildren = {
+  ProRecipesNewRoute: ProRecipesNewRoute,
+}
+
+const ProRecipesRouteWithChildren = ProRecipesRoute._addFileChildren(
+  ProRecipesRouteChildren,
+)
+
 interface ProSportRouteChildren {
   ProSportProgramIdRoute: typeof ProSportProgramIdRoute
 }
@@ -337,7 +368,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProDashboardRoute: ProDashboardRoute,
   ProNutritionRoute: ProNutritionRouteWithChildren,
   ProPatientsRoute: ProPatientsRouteWithChildren,
-  ProRecipesRoute: ProRecipesRoute,
+  ProRecipesRoute: ProRecipesRouteWithChildren,
   ProSportRoute: ProSportRouteWithChildren,
 }
 export const routeTree = rootRouteImport
