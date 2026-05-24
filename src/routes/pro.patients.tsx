@@ -90,7 +90,7 @@ function PatientsContent() {
     setError(null);
     const { data, error: err } = await supabase
       .from("patients")
-      .select("id, first_name, last_name, email, preferences, updated_at, user_id")
+      .select("id, first_name, last_name, email, goal, is_active, updated_at, user_id")
       .eq("pro_id", user.id)
       .order("updated_at", { ascending: false });
 
