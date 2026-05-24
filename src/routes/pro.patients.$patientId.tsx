@@ -38,7 +38,8 @@ interface Patient {
   target_weight_kg: number | null;
   medical_notes: string | null;
   allergies: string[] | null;
-  preferences: { goal?: string } | null;
+  goal: string | null;
+  is_active: boolean;
   created_at: string;
 }
 
