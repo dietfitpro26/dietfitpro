@@ -74,10 +74,10 @@ interface Appointment {
 }
 
 const GOAL_LABEL: Record<string, string> = {
-  weight_loss: "Perte de poids",
-  muscle_gain: "Prise de masse",
-  maintenance: "Maintien",
-  other: "Autre",
+  perte_de_poids: "Perte de poids",
+  prise_de_masse: "Prise de masse",
+  maintien: "Maintien",
+  autre: "Autre",
 };
 
 function PatientDetailPage() {
