@@ -9,7 +9,7 @@ export const Route = createFileRoute("/patient/home")({
 
 function PatientHomePage() {
   return (
-    <ProtectedRoute allow={["patient"]}>
+    <ProtectedRoute allow={["patient", "pro"]}>
       <PatientLayout>
         <div className="p-6">
           <h1 className="text-2xl font-bold">Accueil Patient — étape suivante</h1>
