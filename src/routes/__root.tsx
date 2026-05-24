@@ -8,6 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -119,7 +120,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <ErrorBoundary>
+        <Outlet />
+      </ErrorBoundary>
     </QueryClientProvider>
   );
 }
