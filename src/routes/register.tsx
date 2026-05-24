@@ -39,7 +39,7 @@ function RegisterPage() {
     try {
       await signUp(email, password, { full_name: fullName, role: "subscriber" });
       setSuccess(true);
-      setTimeout(() => void navigate({ to: "/home" }), 1500);
+      setTimeout(() => void navigate({ to: "/home" as never }), 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur d'inscription");
     } finally {

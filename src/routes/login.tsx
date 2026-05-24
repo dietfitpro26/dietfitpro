@@ -90,7 +90,7 @@ function LoginPage() {
         .eq("id", uid);
       if (profErr) throw profErr;
 
-      void navigate({ to: "/patient/home" });
+      void navigate({ to: "/patient/home" as never });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur");
     } finally {
