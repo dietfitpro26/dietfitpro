@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProSportRouteImport } from './routes/pro.sport'
+import { Route as ProRecipesRouteImport } from './routes/pro.recipes'
 import { Route as ProPatientsRouteImport } from './routes/pro.patients'
 import { Route as ProNutritionRouteImport } from './routes/pro.nutrition'
 import { Route as ProDashboardRouteImport } from './routes/pro.dashboard'
@@ -45,6 +46,11 @@ const IndexRoute = IndexRouteImport.update({
 const ProSportRoute = ProSportRouteImport.update({
   id: '/pro/sport',
   path: '/pro/sport',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProRecipesRoute = ProRecipesRouteImport.update({
+  id: '/pro/recipes',
+  path: '/pro/recipes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProPatientsRoute = ProPatientsRouteImport.update({
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/pro/dashboard': typeof ProDashboardRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
+  '/pro/recipes': typeof ProRecipesRoute
   '/pro/sport': typeof ProSportRouteWithChildren
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
   '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
@@ -106,6 +113,7 @@ export interface FileRoutesByTo {
   '/pro/dashboard': typeof ProDashboardRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
+  '/pro/recipes': typeof ProRecipesRoute
   '/pro/sport': typeof ProSportRouteWithChildren
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
   '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
@@ -121,6 +129,7 @@ export interface FileRoutesById {
   '/pro/dashboard': typeof ProDashboardRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
+  '/pro/recipes': typeof ProRecipesRoute
   '/pro/sport': typeof ProSportRouteWithChildren
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
   '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
@@ -137,6 +146,7 @@ export interface FileRouteTypes {
     | '/pro/dashboard'
     | '/pro/nutrition'
     | '/pro/patients'
+    | '/pro/recipes'
     | '/pro/sport'
     | '/pro/nutrition/$programId'
     | '/pro/patients/$patientId'
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/pro/dashboard'
     | '/pro/nutrition'
     | '/pro/patients'
+    | '/pro/recipes'
     | '/pro/sport'
     | '/pro/nutrition/$programId'
     | '/pro/patients/$patientId'
@@ -165,6 +176,7 @@ export interface FileRouteTypes {
     | '/pro/dashboard'
     | '/pro/nutrition'
     | '/pro/patients'
+    | '/pro/recipes'
     | '/pro/sport'
     | '/pro/nutrition/$programId'
     | '/pro/patients/$patientId'
@@ -180,6 +192,7 @@ export interface RootRouteChildren {
   ProDashboardRoute: typeof ProDashboardRoute
   ProNutritionRoute: typeof ProNutritionRouteWithChildren
   ProPatientsRoute: typeof ProPatientsRouteWithChildren
+  ProRecipesRoute: typeof ProRecipesRoute
   ProSportRoute: typeof ProSportRouteWithChildren
 }
 
@@ -218,6 +231,13 @@ declare module '@tanstack/react-router' {
       path: '/pro/sport'
       fullPath: '/pro/sport'
       preLoaderRoute: typeof ProSportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pro/recipes': {
+      id: '/pro/recipes'
+      path: '/pro/recipes'
+      fullPath: '/pro/recipes'
+      preLoaderRoute: typeof ProRecipesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pro/patients': {
@@ -317,8 +337,19 @@ const rootRouteChildren: RootRouteChildren = {
   ProDashboardRoute: ProDashboardRoute,
   ProNutritionRoute: ProNutritionRouteWithChildren,
   ProPatientsRoute: ProPatientsRouteWithChildren,
+  ProRecipesRoute: ProRecipesRoute,
   ProSportRoute: ProSportRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
