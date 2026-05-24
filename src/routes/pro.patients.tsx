@@ -46,7 +46,8 @@ interface PatientRow {
   first_name: string;
   last_name: string;
   email: string | null;
-  preferences: Record<string, unknown> | null;
+  goal: string | null;
+  is_active: boolean;
   updated_at: string;
   user_id: string | null;
   lastAppointment?: string | null;
@@ -55,21 +56,14 @@ interface PatientRow {
 type StatusFilter = "all" | "active" | "inactive";
 
 const GOAL_LABEL: Record<string, string> = {
-  weight_loss: "Perte de poids",
-  muscle_gain: "Prise de masse",
-  maintenance: "Maintien",
-  other: "Autre",
+  perte_de_poids: "Perte de poids",
+  prise_de_masse: "Prise de masse",
+  maintien: "Maintien",
+  autre: "Autre",
 };
 
 function getGoal(p: PatientRow): string {
-  const g = (p.preferences as { goal?: string } | null)?.goal;
-  return (g && GOAL_LABEL[g]) || "—";
-}
-
-function isActive(p: PatientRow): boolean {
-  const ref = p.lastAppointment ?? p.updated_at;
-  if (!ref) return false;
-  return Date.now() - new Date(ref).getTime() < 90 * 24 * 60 * 60 * 1000;
+  return (p.goal && GOAL_LABEL[p.goal]) || "—";
 }
 
 function PatientsPage() {
