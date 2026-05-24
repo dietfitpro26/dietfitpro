@@ -13,8 +13,10 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ProPatientsRouteImport } from './routes/pro.patients'
 import { Route as ProDashboardRouteImport } from './routes/pro.dashboard'
 import { Route as PatientHomeRouteImport } from './routes/patient.home'
+import { Route as ProPatientsPatientIdRouteImport } from './routes/pro.patients.$patientId'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -36,6 +38,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProPatientsRoute = ProPatientsRouteImport.update({
+  id: '/pro/patients',
+  path: '/pro/patients',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProDashboardRoute = ProDashboardRouteImport.update({
   id: '/pro/dashboard',
   path: '/pro/dashboard',
@@ -46,6 +53,11 @@ const PatientHomeRoute = PatientHomeRouteImport.update({
   path: '/patient/home',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProPatientsPatientIdRoute = ProPatientsPatientIdRouteImport.update({
+  id: '/$patientId',
+  path: '/$patientId',
+  getParentRoute: () => ProPatientsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +66,8 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/patient/home': typeof PatientHomeRoute
   '/pro/dashboard': typeof ProDashboardRoute
+  '/pro/patients': typeof ProPatientsRouteWithChildren
+  '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +76,8 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/patient/home': typeof PatientHomeRoute
   '/pro/dashboard': typeof ProDashboardRoute
+  '/pro/patients': typeof ProPatientsRouteWithChildren
+  '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +87,8 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/patient/home': typeof PatientHomeRoute
   '/pro/dashboard': typeof ProDashboardRoute
+  '/pro/patients': typeof ProPatientsRouteWithChildren
+  '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +99,8 @@ export interface FileRouteTypes {
     | '/register'
     | '/patient/home'
     | '/pro/dashboard'
+    | '/pro/patients'
+    | '/pro/patients/$patientId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +109,8 @@ export interface FileRouteTypes {
     | '/register'
     | '/patient/home'
     | '/pro/dashboard'
+    | '/pro/patients'
+    | '/pro/patients/$patientId'
   id:
     | '__root__'
     | '/'
@@ -97,6 +119,8 @@ export interface FileRouteTypes {
     | '/register'
     | '/patient/home'
     | '/pro/dashboard'
+    | '/pro/patients'
+    | '/pro/patients/$patientId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +130,7 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   PatientHomeRoute: typeof PatientHomeRoute
   ProDashboardRoute: typeof ProDashboardRoute
+  ProPatientsRoute: typeof ProPatientsRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -138,6 +163,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pro/patients': {
+      id: '/pro/patients'
+      path: '/pro/patients'
+      fullPath: '/pro/patients'
+      preLoaderRoute: typeof ProPatientsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pro/dashboard': {
       id: '/pro/dashboard'
       path: '/pro/dashboard'
@@ -152,8 +184,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PatientHomeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pro/patients/$patientId': {
+      id: '/pro/patients/$patientId'
+      path: '/$patientId'
+      fullPath: '/pro/patients/$patientId'
+      preLoaderRoute: typeof ProPatientsPatientIdRouteImport
+      parentRoute: typeof ProPatientsRoute
+    }
   }
 }
+
+interface ProPatientsRouteChildren {
+  ProPatientsPatientIdRoute: typeof ProPatientsPatientIdRoute
+}
+
+const ProPatientsRouteChildren: ProPatientsRouteChildren = {
+  ProPatientsPatientIdRoute: ProPatientsPatientIdRoute,
+}
+
+const ProPatientsRouteWithChildren = ProPatientsRoute._addFileChildren(
+  ProPatientsRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -162,7 +213,18 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   PatientHomeRoute: PatientHomeRoute,
   ProDashboardRoute: ProDashboardRoute,
+  ProPatientsRoute: ProPatientsRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
