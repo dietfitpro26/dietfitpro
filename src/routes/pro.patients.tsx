@@ -336,7 +336,8 @@ function NewPatientDialog({
       phone: phone.trim() || null,
       birth_date: birthDate || null,
       medical_notes: notes.trim() || null,
-      preferences: { goal },
+      goal,
+      is_active: true,
     });
     setSubmitting(false);
     if (error) {
