@@ -13,10 +13,14 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ProSportRouteImport } from './routes/pro.sport'
 import { Route as ProPatientsRouteImport } from './routes/pro.patients'
+import { Route as ProNutritionRouteImport } from './routes/pro.nutrition'
 import { Route as ProDashboardRouteImport } from './routes/pro.dashboard'
 import { Route as PatientHomeRouteImport } from './routes/patient.home'
+import { Route as ProSportProgramIdRouteImport } from './routes/pro.sport.$programId'
 import { Route as ProPatientsPatientIdRouteImport } from './routes/pro.patients.$patientId'
+import { Route as ProNutritionProgramIdRouteImport } from './routes/pro.nutrition.$programId'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -38,9 +42,19 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProSportRoute = ProSportRouteImport.update({
+  id: '/pro/sport',
+  path: '/pro/sport',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProPatientsRoute = ProPatientsRouteImport.update({
   id: '/pro/patients',
   path: '/pro/patients',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProNutritionRoute = ProNutritionRouteImport.update({
+  id: '/pro/nutrition',
+  path: '/pro/nutrition',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProDashboardRoute = ProDashboardRouteImport.update({
@@ -53,10 +67,20 @@ const PatientHomeRoute = PatientHomeRouteImport.update({
   path: '/patient/home',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProSportProgramIdRoute = ProSportProgramIdRouteImport.update({
+  id: '/$programId',
+  path: '/$programId',
+  getParentRoute: () => ProSportRoute,
+} as any)
 const ProPatientsPatientIdRoute = ProPatientsPatientIdRouteImport.update({
   id: '/$patientId',
   path: '/$patientId',
   getParentRoute: () => ProPatientsRoute,
+} as any)
+const ProNutritionProgramIdRoute = ProNutritionProgramIdRouteImport.update({
+  id: '/$programId',
+  path: '/$programId',
+  getParentRoute: () => ProNutritionRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -66,8 +90,12 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/patient/home': typeof PatientHomeRoute
   '/pro/dashboard': typeof ProDashboardRoute
+  '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
+  '/pro/sport': typeof ProSportRouteWithChildren
+  '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
   '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
+  '/pro/sport/$programId': typeof ProSportProgramIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -76,8 +104,12 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/patient/home': typeof PatientHomeRoute
   '/pro/dashboard': typeof ProDashboardRoute
+  '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
+  '/pro/sport': typeof ProSportRouteWithChildren
+  '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
   '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
+  '/pro/sport/$programId': typeof ProSportProgramIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -87,8 +119,12 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/patient/home': typeof PatientHomeRoute
   '/pro/dashboard': typeof ProDashboardRoute
+  '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
+  '/pro/sport': typeof ProSportRouteWithChildren
+  '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
   '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
+  '/pro/sport/$programId': typeof ProSportProgramIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -99,8 +135,12 @@ export interface FileRouteTypes {
     | '/register'
     | '/patient/home'
     | '/pro/dashboard'
+    | '/pro/nutrition'
     | '/pro/patients'
+    | '/pro/sport'
+    | '/pro/nutrition/$programId'
     | '/pro/patients/$patientId'
+    | '/pro/sport/$programId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -109,8 +149,12 @@ export interface FileRouteTypes {
     | '/register'
     | '/patient/home'
     | '/pro/dashboard'
+    | '/pro/nutrition'
     | '/pro/patients'
+    | '/pro/sport'
+    | '/pro/nutrition/$programId'
     | '/pro/patients/$patientId'
+    | '/pro/sport/$programId'
   id:
     | '__root__'
     | '/'
@@ -119,8 +163,12 @@ export interface FileRouteTypes {
     | '/register'
     | '/patient/home'
     | '/pro/dashboard'
+    | '/pro/nutrition'
     | '/pro/patients'
+    | '/pro/sport'
+    | '/pro/nutrition/$programId'
     | '/pro/patients/$patientId'
+    | '/pro/sport/$programId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -130,7 +178,9 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   PatientHomeRoute: typeof PatientHomeRoute
   ProDashboardRoute: typeof ProDashboardRoute
+  ProNutritionRoute: typeof ProNutritionRouteWithChildren
   ProPatientsRoute: typeof ProPatientsRouteWithChildren
+  ProSportRoute: typeof ProSportRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -163,11 +213,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pro/sport': {
+      id: '/pro/sport'
+      path: '/pro/sport'
+      fullPath: '/pro/sport'
+      preLoaderRoute: typeof ProSportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pro/patients': {
       id: '/pro/patients'
       path: '/pro/patients'
       fullPath: '/pro/patients'
       preLoaderRoute: typeof ProPatientsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pro/nutrition': {
+      id: '/pro/nutrition'
+      path: '/pro/nutrition'
+      fullPath: '/pro/nutrition'
+      preLoaderRoute: typeof ProNutritionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pro/dashboard': {
@@ -184,6 +248,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PatientHomeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pro/sport/$programId': {
+      id: '/pro/sport/$programId'
+      path: '/$programId'
+      fullPath: '/pro/sport/$programId'
+      preLoaderRoute: typeof ProSportProgramIdRouteImport
+      parentRoute: typeof ProSportRoute
+    }
     '/pro/patients/$patientId': {
       id: '/pro/patients/$patientId'
       path: '/$patientId'
@@ -191,8 +262,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProPatientsPatientIdRouteImport
       parentRoute: typeof ProPatientsRoute
     }
+    '/pro/nutrition/$programId': {
+      id: '/pro/nutrition/$programId'
+      path: '/$programId'
+      fullPath: '/pro/nutrition/$programId'
+      preLoaderRoute: typeof ProNutritionProgramIdRouteImport
+      parentRoute: typeof ProNutritionRoute
+    }
   }
 }
+
+interface ProNutritionRouteChildren {
+  ProNutritionProgramIdRoute: typeof ProNutritionProgramIdRoute
+}
+
+const ProNutritionRouteChildren: ProNutritionRouteChildren = {
+  ProNutritionProgramIdRoute: ProNutritionProgramIdRoute,
+}
+
+const ProNutritionRouteWithChildren = ProNutritionRoute._addFileChildren(
+  ProNutritionRouteChildren,
+)
 
 interface ProPatientsRouteChildren {
   ProPatientsPatientIdRoute: typeof ProPatientsPatientIdRoute
@@ -206,6 +296,18 @@ const ProPatientsRouteWithChildren = ProPatientsRoute._addFileChildren(
   ProPatientsRouteChildren,
 )
 
+interface ProSportRouteChildren {
+  ProSportProgramIdRoute: typeof ProSportProgramIdRoute
+}
+
+const ProSportRouteChildren: ProSportRouteChildren = {
+  ProSportProgramIdRoute: ProSportProgramIdRoute,
+}
+
+const ProSportRouteWithChildren = ProSportRoute._addFileChildren(
+  ProSportRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HomeRoute: HomeRoute,
@@ -213,7 +315,9 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   PatientHomeRoute: PatientHomeRoute,
   ProDashboardRoute: ProDashboardRoute,
+  ProNutritionRoute: ProNutritionRouteWithChildren,
   ProPatientsRoute: ProPatientsRouteWithChildren,
+  ProSportRoute: ProSportRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
