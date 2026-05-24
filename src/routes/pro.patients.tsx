@@ -228,7 +228,7 @@ function PatientsContent() {
                     </TableRow>
                   )
                   : filtered.map((p) => {
-                      const active = isActive(p);
+                      const active = p.is_active;
                       const initials = `${p.first_name[0] ?? ""}${p.last_name[0] ?? ""}`.toUpperCase();
                       return (
                         <TableRow
