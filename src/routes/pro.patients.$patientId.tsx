@@ -194,7 +194,7 @@ function PatientDetailContent() {
   }
 
   const initials = `${patient.first_name[0] ?? ""}${patient.last_name[0] ?? ""}`.toUpperCase();
-  const goal = patient.preferences?.goal ? (GOAL_LABEL[patient.preferences.goal] ?? "—") : "—";
+  const goal = patient.goal ? (GOAL_LABEL[patient.goal] ?? "—") : "—";
 
   return (
     <div className="flex flex-col">
