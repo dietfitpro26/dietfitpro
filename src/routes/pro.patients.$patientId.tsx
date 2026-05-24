@@ -38,7 +38,8 @@ interface Patient {
   target_weight_kg: number | null;
   medical_notes: string | null;
   allergies: string[] | null;
-  preferences: { goal?: string } | null;
+  goal: string | null;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -73,10 +74,10 @@ interface Appointment {
 }
 
 const GOAL_LABEL: Record<string, string> = {
-  weight_loss: "Perte de poids",
-  muscle_gain: "Prise de masse",
-  maintenance: "Maintien",
-  other: "Autre",
+  perte_de_poids: "Perte de poids",
+  prise_de_masse: "Prise de masse",
+  maintien: "Maintien",
+  autre: "Autre",
 };
 
 function PatientDetailPage() {
@@ -193,7 +194,7 @@ function PatientDetailContent() {
   }
 
   const initials = `${patient.first_name[0] ?? ""}${patient.last_name[0] ?? ""}`.toUpperCase();
-  const goal = patient.preferences?.goal ? (GOAL_LABEL[patient.preferences.goal] ?? "—") : "—";
+  const goal = patient.goal ? (GOAL_LABEL[patient.goal] ?? "—") : "—";
 
   return (
     <div className="flex flex-col">

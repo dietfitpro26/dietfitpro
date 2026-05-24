@@ -46,7 +46,8 @@ interface PatientRow {
   first_name: string;
   last_name: string;
   email: string | null;
-  preferences: Record<string, unknown> | null;
+  goal: string | null;
+  is_active: boolean;
   updated_at: string;
   user_id: string | null;
   lastAppointment?: string | null;
@@ -55,21 +56,14 @@ interface PatientRow {
 type StatusFilter = "all" | "active" | "inactive";
 
 const GOAL_LABEL: Record<string, string> = {
-  weight_loss: "Perte de poids",
-  muscle_gain: "Prise de masse",
-  maintenance: "Maintien",
-  other: "Autre",
+  perte_de_poids: "Perte de poids",
+  prise_de_masse: "Prise de masse",
+  maintien: "Maintien",
+  autre: "Autre",
 };
 
 function getGoal(p: PatientRow): string {
-  const g = (p.preferences as { goal?: string } | null)?.goal;
-  return (g && GOAL_LABEL[g]) || "—";
-}
-
-function isActive(p: PatientRow): boolean {
-  const ref = p.lastAppointment ?? p.updated_at;
-  if (!ref) return false;
-  return Date.now() - new Date(ref).getTime() < 90 * 24 * 60 * 60 * 1000;
+  return (p.goal && GOAL_LABEL[p.goal]) || "—";
 }
 
 function PatientsPage() {
@@ -96,7 +90,7 @@ function PatientsContent() {
     setError(null);
     const { data, error: err } = await supabase
       .from("patients")
-      .select("id, first_name, last_name, email, preferences, updated_at, user_id")
+      .select("id, first_name, last_name, email, goal, is_active, updated_at, user_id")
       .eq("pro_id", user.id)
       .order("updated_at", { ascending: false });
 
@@ -140,7 +134,7 @@ function PatientsContent() {
         !q ||
         `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
         (p.email ?? "").toLowerCase().includes(q);
-      const active = isActive(p);
+      const active = p.is_active;
       const matchStatus =
         status === "all" || (status === "active" ? active : !active);
       return matchQ && matchStatus;
@@ -234,7 +228,7 @@ function PatientsContent() {
                     </TableRow>
                   )
                   : filtered.map((p) => {
-                      const active = isActive(p);
+                      const active = p.is_active;
                       const initials = `${p.first_name[0] ?? ""}${p.last_name[0] ?? ""}`.toUpperCase();
                       return (
                         <TableRow
@@ -312,7 +306,7 @@ function NewPatientDialog({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [birthDate, setBirthDate] = useState("");
-  const [goal, setGoal] = useState<string>("weight_loss");
+  const [goal, setGoal] = useState<string>("perte_de_poids");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -322,7 +316,7 @@ function NewPatientDialog({
     setEmail("");
     setPhone("");
     setBirthDate("");
-    setGoal("weight_loss");
+    setGoal("perte_de_poids");
     setNotes("");
   };
 
@@ -342,7 +336,8 @@ function NewPatientDialog({
       phone: phone.trim() || null,
       birth_date: birthDate || null,
       medical_notes: notes.trim() || null,
-      preferences: { goal },
+      goal,
+      is_active: true,
     });
     setSubmitting(false);
     if (error) {
@@ -394,10 +389,10 @@ function NewPatientDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="weight_loss">Perte de poids</SelectItem>
-                <SelectItem value="muscle_gain">Prise de masse</SelectItem>
-                <SelectItem value="maintenance">Maintien</SelectItem>
-                <SelectItem value="other">Autre</SelectItem>
+                <SelectItem value="perte_de_poids">Perte de poids</SelectItem>
+                <SelectItem value="prise_de_masse">Prise de masse</SelectItem>
+                <SelectItem value="maintien">Maintien</SelectItem>
+                <SelectItem value="autre">Autre</SelectItem>
               </SelectContent>
             </Select>
           </div>
