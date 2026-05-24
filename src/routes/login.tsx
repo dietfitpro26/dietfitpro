@@ -31,8 +31,10 @@ function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!loading && user && role) {
-      void navigate({ to: ROLE_HOME[role] });
+    if (!loading && user) {
+      // Redirige selon le rôle ; rôle null/inconnu → /home par défaut
+      const target = role ? ROLE_HOME[role] : "/home";
+      void navigate({ to: target });
     }
   }, [user, role, loading, navigate]);
 
