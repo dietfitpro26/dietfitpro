@@ -11,10 +11,10 @@ function getEnvVar(name: string): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-const supabaseUrl = getEnvVar("https://jafjqbbzzbanpgsfbopm.supabase.co");
-const supabaseAnonKey = getEnvVar("sb_publishable_5Qh1IIHaVswL0-beqjllsA_AHNtE-U4");
+const supabaseUrl = "https://jafjqbbzzbanpgsfbopm.supabase.co";
+const supabaseAnonKey = "sb_publishable_5Qh1IIHaVswL0-beqjllsA_AHNtE-U4";
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isSupabaseConfigured = true;
 
 if (!isSupabaseConfigured && typeof window !== "undefined") {
   // eslint-disable-next-line no-console
