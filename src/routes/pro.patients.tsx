@@ -134,7 +134,7 @@ function PatientsContent() {
         !q ||
         `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
         (p.email ?? "").toLowerCase().includes(q);
-      const active = isActive(p);
+      const active = p.is_active;
       const matchStatus =
         status === "all" || (status === "active" ? active : !active);
       return matchQ && matchStatus;
