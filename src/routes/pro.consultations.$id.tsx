@@ -96,20 +96,31 @@ function Content() {
     const hoursUntil = (new Date(c.scheduled_at).getTime() - Date.now()) / 3600000;
     const within24h = hoursUntil < 24;
     const confirmMsg = within24h
-      ? "Moins de 24h avant la consultation : 5 € de frais retenus, remboursement manuel à effectuer. Confirmer ?"
-      : "Plus de 24h avant : remboursement automatique prévu. Confirmer l'annulation ?";
+      ? "Moins de 24h avant la consultation : 5 € de frais retenus, remboursement partiel via Stripe. Confirmer ?"
+      : "Plus de 24h avant : remboursement total automatique via Stripe. Confirmer l'annulation ?";
     if (!window.confirm(confirmMsg)) return;
     setBusy(true);
-    const updates: Record<string, unknown> = {
-      status: "cancelled",
-      cancellation_fee_cents: within24h ? 500 : 0,
-      payment_status: within24h ? "partial_refund" : "refunded",
-    };
-    const { error } = await supabase.from("visio_consultations").update(updates).eq("id", c.id);
-    setBusy(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success(within24h ? "Annulée — remboursement manuel requis" : "Annulée — remboursement automatique");
-    void load();
+    try {
+      if (c.payment_status === "paid") {
+        const { error } = await supabase.functions.invoke("refund-consultation", {
+          body: { consultation_id: c.id },
+        });
+        if (error) throw error;
+        toast.success(within24h ? "Annulée — remboursement partiel effectué" : "Annulée — remboursement total effectué");
+      } else {
+        const { error } = await supabase.from("visio_consultations").update({
+          status: "cancelled",
+          cancellation_fee_cents: within24h ? 500 : 0,
+        }).eq("id", c.id);
+        if (error) throw error;
+        toast.success("Consultation annulée");
+      }
+      void load();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const startVideo = () => {

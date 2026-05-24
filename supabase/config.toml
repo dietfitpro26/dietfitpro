@@ -1,0 +1,7 @@
+project_id = "jafjqbbzzbanpgsfbopm"
+
+[functions.create-payment-intent]
+verify_jwt = true
+
+[functions.refund-consultation]
+verify_jwt = true
