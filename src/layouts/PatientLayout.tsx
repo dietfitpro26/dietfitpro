@@ -1,16 +1,14 @@
 import type { ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, NotebookPen, ClipboardList, TrendingUp, MessageSquare, Flame } from "lucide-react";
+import { LayoutDashboard, Video, User, Flame } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { to: "/patient/home", label: "Accueil", icon: Home },
-  { to: "/patient/journal", label: "Mon Journal", icon: NotebookPen },
-  { to: "/patient/programs", label: "Mes Programmes", icon: ClipboardList },
-  { to: "/patient/progress", label: "Ma Progression", icon: TrendingUp },
-  { to: "/patient/messages", label: "Messages", icon: MessageSquare },
+  { to: "/patient/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/patient/consultations", label: "Consultations", icon: Video },
+  { to: "/patient/profil", label: "Mon profil", icon: User },
 ] as const;
 
 export function PatientLayout({ children, streak = 0 }: { children: ReactNode; streak?: number }) {

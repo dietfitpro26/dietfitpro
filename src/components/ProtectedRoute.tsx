@@ -4,7 +4,7 @@ import { useAuth, type AppRole } from "@/hooks/useAuth";
 
 const ROLE_HOME: Record<AppRole, string> = {
   pro: "/pro/dashboard",
-  patient: "/patient/home",
+  patient: "/patient/dashboard",
   subscriber: "/home",
 };
 
