@@ -33,6 +33,7 @@ const PAYMENT_LABEL: Record<PaymentStatus, string> = {
 interface Consultation {
   id: string;
   patient_id: string | null;
+  patient_user_id: string | null;
   scheduled_at: string | null;
   duration_min: number | null;
   status: Status;
@@ -65,7 +66,7 @@ function Content() {
     setLoading(true);
     const { data } = await supabase
       .from("visio_consultations")
-      .select("id, patient_id, scheduled_at, duration_min, status, payment_status, amount_cents, cancellation_fee_cents, room_url, notes")
+      .select("id, patient_id, patient_user_id, scheduled_at, duration_min, status, payment_status, amount_cents, cancellation_fee_cents, room_url, notes")
       .eq("id", id).eq("pro_id", user.id).maybeSingle();
     if (!data) { setLoading(false); return; }
     const cons = data as Consultation;
