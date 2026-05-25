@@ -1,15 +1,18 @@
 import type { ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Video, User, Flame } from "lucide-react";
+import { LayoutDashboard, Video, User, Flame, MessageSquare } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { NotificationBell } from "@/components/NotificationBell";
+import { MessagesBell } from "@/components/MessagesBell";
 import { UpcomingConsultationReminder } from "@/components/UpcomingConsultationReminder";
 import { useAuth } from "@/hooks/useAuth";
+import { useConversations } from "@/hooks/useMessages";
 import { cn } from "@/lib/utils";
 
 const TABS = [
   { to: "/patient/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/patient/consultations", label: "Consultations", icon: Video },
+  { to: "/patient/messages", label: "Messages", icon: MessageSquare },
   { to: "/patient/profil", label: "Mon profil", icon: User },
 ] as const;
 
