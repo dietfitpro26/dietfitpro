@@ -31,6 +31,7 @@ export function PatientLayout({ children, streak = 0 }: { children: ReactNode; s
           <span className="flex items-center gap-1 text-[#6DB33F] font-semibold">
             <Flame className="h-4 w-4" /> {streak}
           </span>
+          <MessagesBell to="/patient/messages" />
           <NotificationBell to="/patient/notifications" />
         </div>
       </header>
