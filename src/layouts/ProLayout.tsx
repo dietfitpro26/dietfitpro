@@ -24,6 +24,7 @@ import { UpcomingConsultationReminder } from "@/components/UpcomingConsultationR
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useConversations } from "@/hooks/useMessages";
 import { cn } from "@/lib/utils";
 
 const NAV = [
