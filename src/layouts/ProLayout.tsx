@@ -118,6 +118,7 @@ export function ProLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
+      <UpcomingConsultationReminder />
       {/* Desktop sidebar */}
       <aside className="hidden md:block fixed inset-y-0 left-0 z-40">{SidebarInner}</aside>
 
@@ -135,7 +136,7 @@ export function ProLayout({ children }: { children: ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
           <Logo />
-          <div className="w-5" />
+          <NotificationBell to="/pro/notifications" />
         </header>
         <main className="flex-1">{children}</main>
       </div>
