@@ -42,16 +42,24 @@ export function PatientLayout({ children, streak = 0 }: { children: ReactNode; s
         {TABS.map((tab) => {
           const active = pathname === tab.to || pathname.startsWith(tab.to + "/");
           const Icon = tab.icon;
+          const isMessages = tab.to === "/patient/messages";
           return (
             <Link
               key={tab.to}
               to={tab.to}
               className={cn(
-                "flex flex-col items-center justify-center flex-1 gap-1 text-[11px]",
+                "flex flex-col items-center justify-center flex-1 gap-1 text-[11px] relative",
                 active ? "text-[#6DB33F]" : "text-muted-foreground",
               )}
             >
-              <Icon className="h-5 w-5" />
+              <div className="relative">
+                <Icon className="h-5 w-5" />
+                {isMessages && unread > 0 && (
+                  <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-[#6DB33F] text-white text-[10px] font-semibold flex items-center justify-center">
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
+              </div>
               <span className="truncate">{tab.label}</span>
             </Link>
           );
