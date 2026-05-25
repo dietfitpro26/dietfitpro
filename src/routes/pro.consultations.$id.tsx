@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { createNotification } from "@/lib/notifications";
 
 export const Route = createFileRoute("/pro/consultations/$id")({
   head: () => ({ meta: [{ title: "Consultation — DietFitPro" }] }),

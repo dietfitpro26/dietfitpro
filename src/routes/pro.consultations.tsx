@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { Bell, CalendarIcon, Plus } from "lucide-react";
+import { CalendarIcon, Plus } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
 import { toast } from "sonner";
 import { ProLayout } from "@/layouts/ProLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -121,7 +122,7 @@ function Content() {
       <header className="flex items-center justify-between border-b bg-white px-6 py-4">
         <h1 className="text-xl font-semibold">Téléconsultations</h1>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon"><Bell className="h-5 w-5" /></Button>
+          <NotificationBell to="/pro/notifications" />
           <Button className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white" onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4" /> Planifier une consultation
           </Button>
