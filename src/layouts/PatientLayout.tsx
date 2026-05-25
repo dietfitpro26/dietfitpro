@@ -20,6 +20,7 @@ export function PatientLayout({ children, streak = 0 }: { children: ReactNode; s
   const { profile } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const firstName = profile?.full_name?.split(" ")[0] ?? "";
+  const { totalUnread: unread } = useConversations();
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
