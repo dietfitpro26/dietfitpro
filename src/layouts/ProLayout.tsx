@@ -46,6 +46,7 @@ export function ProLayout({ children }: { children: ReactNode }) {
   const { profile, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { totalUnread: unreadMessages } = useConversations();
 
   const initials = (profile?.full_name ?? profile?.email ?? "?")
     .split(" ")
