@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { Video, Calendar as CalendarIcon, Target, FileText, Utensils } from "lucide-react";
+import { Video, Calendar as CalendarIcon, Target, Dumbbell, Utensils } from "lucide-react";
 import { PatientLayout } from "@/layouts/PatientLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -116,9 +116,9 @@ function DashboardContent() {
       </Card>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <QuickCard icon={Utensils} label="Mon plan nutritionnel" to="/patient/dashboard" />
+        <QuickCard icon={Utensils} label="Mon plan nutritionnel" to="/patient/nutrition" />
+        <QuickCard icon={Dumbbell} label="Mon programme sport" to="/patient/sport" />
         <QuickCard icon={Target} label="Mes objectifs" to="/patient/profil" />
-        <QuickCard icon={FileText} label="Mes documents" to="/patient/dashboard" />
       </div>
 
       <Card>
