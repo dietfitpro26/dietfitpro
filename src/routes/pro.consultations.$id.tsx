@@ -117,6 +117,26 @@ function Content() {
         if (error) throw error;
         toast.success("Consultation annulée");
       }
+      const patientName = c.patient ? `${c.patient.first_name} ${c.patient.last_name}` : "le patient";
+      const dateLabel = new Date(c.scheduled_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+      if (user) {
+        await createNotification({
+          userId: user.id,
+          type: "consultation_cancelled",
+          title: "Consultation annulée",
+          body: `Consultation avec ${patientName} du ${dateLabel} annulée.`,
+          link: `/pro/consultations/${c.id}`,
+        });
+      }
+      if (c.patient_user_id) {
+        await createNotification({
+          userId: c.patient_user_id,
+          type: "consultation_cancelled",
+          title: "Consultation annulée",
+          body: `Votre consultation du ${dateLabel} a été annulée.`,
+          link: "/patient/consultations",
+        });
+      }
       void load();
     } catch (err) {
       toast.error((err as Error).message);
