@@ -19,6 +19,8 @@ import {
   X,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { NotificationBell } from "@/components/NotificationBell";
+import { UpcomingConsultationReminder } from "@/components/UpcomingConsultationReminder";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
