@@ -18,10 +18,12 @@ import { Route as ProRecipesRouteImport } from './routes/pro.recipes'
 import { Route as ProPatientsRouteImport } from './routes/pro.patients'
 import { Route as ProNutritionRouteImport } from './routes/pro.nutrition'
 import { Route as ProNotificationsRouteImport } from './routes/pro.notifications'
+import { Route as ProMessagesRouteImport } from './routes/pro.messages'
 import { Route as ProDashboardRouteImport } from './routes/pro.dashboard'
 import { Route as ProConsultationsRouteImport } from './routes/pro.consultations'
 import { Route as PatientProfilRouteImport } from './routes/patient.profil'
 import { Route as PatientNotificationsRouteImport } from './routes/patient.notifications'
+import { Route as PatientMessagesRouteImport } from './routes/patient.messages'
 import { Route as PatientHomeRouteImport } from './routes/patient.home'
 import { Route as PatientDashboardRouteImport } from './routes/patient.dashboard'
 import { Route as PatientConsultationsRouteImport } from './routes/patient.consultations'
@@ -77,6 +79,11 @@ const ProNotificationsRoute = ProNotificationsRouteImport.update({
   path: '/pro/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProMessagesRoute = ProMessagesRouteImport.update({
+  id: '/pro/messages',
+  path: '/pro/messages',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProDashboardRoute = ProDashboardRouteImport.update({
   id: '/pro/dashboard',
   path: '/pro/dashboard',
@@ -95,6 +102,11 @@ const PatientProfilRoute = PatientProfilRouteImport.update({
 const PatientNotificationsRoute = PatientNotificationsRouteImport.update({
   id: '/patient/notifications',
   path: '/patient/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PatientMessagesRoute = PatientMessagesRouteImport.update({
+  id: '/patient/messages',
+  path: '/patient/messages',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PatientHomeRoute = PatientHomeRouteImport.update({
@@ -152,10 +164,12 @@ export interface FileRoutesByFullPath {
   '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
   '/patient/home': typeof PatientHomeRoute
+  '/patient/messages': typeof PatientMessagesRoute
   '/patient/notifications': typeof PatientNotificationsRoute
   '/patient/profil': typeof PatientProfilRoute
   '/pro/consultations': typeof ProConsultationsRouteWithChildren
   '/pro/dashboard': typeof ProDashboardRoute
+  '/pro/messages': typeof ProMessagesRoute
   '/pro/notifications': typeof ProNotificationsRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
@@ -176,10 +190,12 @@ export interface FileRoutesByTo {
   '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
   '/patient/home': typeof PatientHomeRoute
+  '/patient/messages': typeof PatientMessagesRoute
   '/patient/notifications': typeof PatientNotificationsRoute
   '/patient/profil': typeof PatientProfilRoute
   '/pro/consultations': typeof ProConsultationsRouteWithChildren
   '/pro/dashboard': typeof ProDashboardRoute
+  '/pro/messages': typeof ProMessagesRoute
   '/pro/notifications': typeof ProNotificationsRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
@@ -201,10 +217,12 @@ export interface FileRoutesById {
   '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
   '/patient/home': typeof PatientHomeRoute
+  '/patient/messages': typeof PatientMessagesRoute
   '/patient/notifications': typeof PatientNotificationsRoute
   '/patient/profil': typeof PatientProfilRoute
   '/pro/consultations': typeof ProConsultationsRouteWithChildren
   '/pro/dashboard': typeof ProDashboardRoute
+  '/pro/messages': typeof ProMessagesRoute
   '/pro/notifications': typeof ProNotificationsRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
@@ -227,10 +245,12 @@ export interface FileRouteTypes {
     | '/patient/consultations'
     | '/patient/dashboard'
     | '/patient/home'
+    | '/patient/messages'
     | '/patient/notifications'
     | '/patient/profil'
     | '/pro/consultations'
     | '/pro/dashboard'
+    | '/pro/messages'
     | '/pro/notifications'
     | '/pro/nutrition'
     | '/pro/patients'
@@ -251,10 +271,12 @@ export interface FileRouteTypes {
     | '/patient/consultations'
     | '/patient/dashboard'
     | '/patient/home'
+    | '/patient/messages'
     | '/patient/notifications'
     | '/patient/profil'
     | '/pro/consultations'
     | '/pro/dashboard'
+    | '/pro/messages'
     | '/pro/notifications'
     | '/pro/nutrition'
     | '/pro/patients'
@@ -275,10 +297,12 @@ export interface FileRouteTypes {
     | '/patient/consultations'
     | '/patient/dashboard'
     | '/patient/home'
+    | '/patient/messages'
     | '/patient/notifications'
     | '/patient/profil'
     | '/pro/consultations'
     | '/pro/dashboard'
+    | '/pro/messages'
     | '/pro/notifications'
     | '/pro/nutrition'
     | '/pro/patients'
@@ -300,10 +324,12 @@ export interface RootRouteChildren {
   PatientConsultationsRoute: typeof PatientConsultationsRoute
   PatientDashboardRoute: typeof PatientDashboardRoute
   PatientHomeRoute: typeof PatientHomeRoute
+  PatientMessagesRoute: typeof PatientMessagesRoute
   PatientNotificationsRoute: typeof PatientNotificationsRoute
   PatientProfilRoute: typeof PatientProfilRoute
   ProConsultationsRoute: typeof ProConsultationsRouteWithChildren
   ProDashboardRoute: typeof ProDashboardRoute
+  ProMessagesRoute: typeof ProMessagesRoute
   ProNotificationsRoute: typeof ProNotificationsRoute
   ProNutritionRoute: typeof ProNutritionRouteWithChildren
   ProPatientsRoute: typeof ProPatientsRouteWithChildren
@@ -377,6 +403,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pro/messages': {
+      id: '/pro/messages'
+      path: '/pro/messages'
+      fullPath: '/pro/messages'
+      preLoaderRoute: typeof ProMessagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pro/dashboard': {
       id: '/pro/dashboard'
       path: '/pro/dashboard'
@@ -403,6 +436,13 @@ declare module '@tanstack/react-router' {
       path: '/patient/notifications'
       fullPath: '/patient/notifications'
       preLoaderRoute: typeof PatientNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/patient/messages': {
+      id: '/patient/messages'
+      path: '/patient/messages'
+      fullPath: '/patient/messages'
+      preLoaderRoute: typeof PatientMessagesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/patient/home': {
@@ -538,10 +578,12 @@ const rootRouteChildren: RootRouteChildren = {
   PatientConsultationsRoute: PatientConsultationsRoute,
   PatientDashboardRoute: PatientDashboardRoute,
   PatientHomeRoute: PatientHomeRoute,
+  PatientMessagesRoute: PatientMessagesRoute,
   PatientNotificationsRoute: PatientNotificationsRoute,
   PatientProfilRoute: PatientProfilRoute,
   ProConsultationsRoute: ProConsultationsRouteWithChildren,
   ProDashboardRoute: ProDashboardRoute,
+  ProMessagesRoute: ProMessagesRoute,
   ProNotificationsRoute: ProNotificationsRoute,
   ProNutritionRoute: ProNutritionRouteWithChildren,
   ProPatientsRoute: ProPatientsRouteWithChildren,
@@ -552,3 +594,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
