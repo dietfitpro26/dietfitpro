@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { scheduleConsultationNotifications } from "@/lib/notifications";
 
 export const Route = createFileRoute("/pro/consultations")({
   head: () => ({ meta: [{ title: "Téléconsultations — DietFitPro" }] }),
@@ -230,7 +231,7 @@ function ScheduleDialog({
     scheduled.setHours(h ?? 10, m ?? 0, 0, 0);
     const patient = patients.find((p) => p.id === patientId);
     setSubmitting(true);
-    const { error } = await supabase.from("visio_consultations").insert({
+    const { data: created, error } = await supabase.from("visio_consultations").insert({
       pro_id: user.id,
       patient_id: patientId,
       patient_user_id: patient?.user_id ?? null,
@@ -240,9 +241,18 @@ function ScheduleDialog({
       status: "scheduled",
       payment_status: "pending",
       notes: notes.trim() || null,
-    });
+    }).select("id").single();
     setSubmitting(false);
     if (error) { toast.error(error.message); return; }
+    if (created) {
+      await scheduleConsultationNotifications({
+        consultationId: created.id,
+        proUserId: user.id,
+        patientUserId: patient?.user_id ?? null,
+        scheduledAt: scheduled,
+        patientName: patient ? `${patient.first_name} ${patient.last_name}` : undefined,
+      });
+    }
     toast.success("Consultation planifiée");
     setPatientId(""); setDate(undefined); setTime("10:00"); setDuration("30"); setPrice("40"); setNotes("");
     onCreated();
