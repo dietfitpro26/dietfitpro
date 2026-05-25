@@ -85,7 +85,12 @@ export function ProLayout({ children }: { children: ReactNode }) {
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              <span className="truncate">{item.label}</span>
+              <span className="truncate flex-1">{item.label}</span>
+              {item.to === "/pro/messages" && unreadMessages > 0 && (
+                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#6DB33F] text-white text-[10px] font-semibold flex items-center justify-center">
+                  {unreadMessages > 99 ? "99+" : unreadMessages}
+                </span>
+              )}
             </Link>
           );
         })}
