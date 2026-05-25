@@ -198,11 +198,35 @@ function CheckoutForm({
         return;
       }
       if (paymentIntent?.status === "succeeded") {
-        const { error: updateErr } = await supabase
+        const { data: cons, error: updateErr } = await supabase
           .from("visio_consultations")
           .update({ payment_status: "paid" })
-          .eq("id", consultationId);
+          .eq("id", consultationId)
+          .select("pro_id, patient_user_id, amount_cents")
+          .single();
         if (updateErr) console.error(updateErr);
+        if (cons) {
+          const amount = `${((cons.amount_cents ?? 0) / 100).toFixed(2)} €`;
+          const { createNotification } = await import("@/lib/notifications");
+          if (cons.patient_user_id) {
+            await createNotification({
+              userId: cons.patient_user_id,
+              type: "payment_confirmed",
+              title: "Paiement confirmé",
+              body: `Votre paiement de ${amount} a été confirmé.`,
+              link: "/patient/consultations",
+            });
+          }
+          if (cons.pro_id) {
+            await createNotification({
+              userId: cons.pro_id,
+              type: "payment_received",
+              title: "Paiement reçu",
+              body: `Vous avez reçu un paiement de ${amount}.`,
+              link: `/pro/consultations/${consultationId}`,
+            });
+          }
+        }
         toast.success("Paiement confirmé");
         onSuccess();
       } else {

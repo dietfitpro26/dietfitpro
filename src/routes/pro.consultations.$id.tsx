@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { createNotification } from "@/lib/notifications";
 
 export const Route = createFileRoute("/pro/consultations/$id")({
   head: () => ({ meta: [{ title: "Consultation — DietFitPro" }] }),
@@ -32,6 +33,7 @@ const PAYMENT_LABEL: Record<PaymentStatus, string> = {
 interface Consultation {
   id: string;
   patient_id: string | null;
+  patient_user_id: string | null;
   scheduled_at: string | null;
   duration_min: number | null;
   status: Status;
@@ -64,7 +66,7 @@ function Content() {
     setLoading(true);
     const { data } = await supabase
       .from("visio_consultations")
-      .select("id, patient_id, scheduled_at, duration_min, status, payment_status, amount_cents, cancellation_fee_cents, room_url, notes")
+      .select("id, patient_id, patient_user_id, scheduled_at, duration_min, status, payment_status, amount_cents, cancellation_fee_cents, room_url, notes")
       .eq("id", id).eq("pro_id", user.id).maybeSingle();
     if (!data) { setLoading(false); return; }
     const cons = data as Consultation;
@@ -114,6 +116,26 @@ function Content() {
         }).eq("id", c.id);
         if (error) throw error;
         toast.success("Consultation annulée");
+      }
+      const patientName = c.patient ? `${c.patient.first_name} ${c.patient.last_name}` : "le patient";
+      const dateLabel = new Date(c.scheduled_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+      if (user) {
+        await createNotification({
+          userId: user.id,
+          type: "consultation_cancelled",
+          title: "Consultation annulée",
+          body: `Consultation avec ${patientName} du ${dateLabel} annulée.`,
+          link: `/pro/consultations/${c.id}`,
+        });
+      }
+      if (c.patient_user_id) {
+        await createNotification({
+          userId: c.patient_user_id,
+          type: "consultation_cancelled",
+          title: "Consultation annulée",
+          body: `Votre consultation du ${dateLabel} a été annulée.`,
+          link: "/patient/consultations",
+        });
       }
       void load();
     } catch (err) {

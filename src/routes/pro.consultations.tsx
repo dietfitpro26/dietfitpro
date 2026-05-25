@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { Bell, CalendarIcon, Plus } from "lucide-react";
+import { CalendarIcon, Plus } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
 import { toast } from "sonner";
 import { ProLayout } from "@/layouts/ProLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -24,6 +25,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { scheduleConsultationNotifications } from "@/lib/notifications";
 
 export const Route = createFileRoute("/pro/consultations")({
   head: () => ({ meta: [{ title: "Téléconsultations — DietFitPro" }] }),
@@ -120,7 +122,7 @@ function Content() {
       <header className="flex items-center justify-between border-b bg-white px-6 py-4">
         <h1 className="text-xl font-semibold">Téléconsultations</h1>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon"><Bell className="h-5 w-5" /></Button>
+          <NotificationBell to="/pro/notifications" />
           <Button className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white" onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4" /> Planifier une consultation
           </Button>
@@ -230,7 +232,7 @@ function ScheduleDialog({
     scheduled.setHours(h ?? 10, m ?? 0, 0, 0);
     const patient = patients.find((p) => p.id === patientId);
     setSubmitting(true);
-    const { error } = await supabase.from("visio_consultations").insert({
+    const { data: created, error } = await supabase.from("visio_consultations").insert({
       pro_id: user.id,
       patient_id: patientId,
       patient_user_id: patient?.user_id ?? null,
@@ -240,9 +242,18 @@ function ScheduleDialog({
       status: "scheduled",
       payment_status: "pending",
       notes: notes.trim() || null,
-    });
+    }).select("id").single();
     setSubmitting(false);
     if (error) { toast.error(error.message); return; }
+    if (created) {
+      await scheduleConsultationNotifications({
+        consultationId: created.id,
+        proUserId: user.id,
+        patientUserId: patient?.user_id ?? null,
+        scheduledAt: scheduled,
+        patientName: patient ? `${patient.first_name} ${patient.last_name}` : undefined,
+      });
+    }
     toast.success("Consultation planifiée");
     setPatientId(""); setDate(undefined); setTime("10:00"); setDuration("30"); setPrice("40"); setNotes("");
     onCreated();

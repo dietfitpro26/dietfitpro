@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { LayoutDashboard, Video, User, Flame } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { NotificationBell } from "@/components/NotificationBell";
+import { UpcomingConsultationReminder } from "@/components/UpcomingConsultationReminder";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +20,7 @@ export function PatientLayout({ children, streak = 0 }: { children: ReactNode; s
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      <UpcomingConsultationReminder />
       <header className="h-14 flex items-center justify-between border-b px-4 bg-background sticky top-0 z-30">
         <Logo />
         <div className="flex items-center gap-3 text-sm">
@@ -25,6 +28,7 @@ export function PatientLayout({ children, streak = 0 }: { children: ReactNode; s
           <span className="flex items-center gap-1 text-[#6DB33F] font-semibold">
             <Flame className="h-4 w-4" /> {streak}
           </span>
+          <NotificationBell to="/patient/notifications" />
         </div>
       </header>
 

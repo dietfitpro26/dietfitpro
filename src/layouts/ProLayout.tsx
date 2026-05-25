@@ -19,6 +19,8 @@ import {
   X,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { NotificationBell } from "@/components/NotificationBell";
+import { UpcomingConsultationReminder } from "@/components/UpcomingConsultationReminder";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -116,6 +118,7 @@ export function ProLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
+      <UpcomingConsultationReminder />
       {/* Desktop sidebar */}
       <aside className="hidden md:block fixed inset-y-0 left-0 z-40">{SidebarInner}</aside>
 
@@ -133,7 +136,7 @@ export function ProLayout({ children }: { children: ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
           <Logo />
-          <div className="w-5" />
+          <NotificationBell to="/pro/notifications" />
         </header>
         <main className="flex-1">{children}</main>
       </div>
