@@ -22,6 +22,7 @@ import { Route as ProConsultationsRouteImport } from './routes/pro.consultations
 import { Route as PatientProfilRouteImport } from './routes/patient.profil'
 import { Route as PatientHomeRouteImport } from './routes/patient.home'
 import { Route as PatientDashboardRouteImport } from './routes/patient.dashboard'
+import { Route as PatientConsultationsRouteImport } from './routes/patient.consultations'
 import { Route as ProSportProgramIdRouteImport } from './routes/pro.sport.$programId'
 import { Route as ProRecipesNewRouteImport } from './routes/pro.recipes.new'
 import { Route as ProPatientsPatientIdRouteImport } from './routes/pro.patients.$patientId'
@@ -94,6 +95,11 @@ const PatientDashboardRoute = PatientDashboardRouteImport.update({
   path: '/patient/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PatientConsultationsRoute = PatientConsultationsRouteImport.update({
+  id: '/patient/consultations',
+  path: '/patient/consultations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProSportProgramIdRoute = ProSportProgramIdRouteImport.update({
   id: '/$programId',
   path: '/$programId',
@@ -131,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
   '/patient/home': typeof PatientHomeRoute
   '/patient/profil': typeof PatientProfilRoute
@@ -152,6 +159,7 @@ export interface FileRoutesByTo {
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
   '/patient/home': typeof PatientHomeRoute
   '/patient/profil': typeof PatientProfilRoute
@@ -174,6 +182,7 @@ export interface FileRoutesById {
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
   '/patient/home': typeof PatientHomeRoute
   '/patient/profil': typeof PatientProfilRoute
@@ -197,6 +206,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/login'
     | '/register'
+    | '/patient/consultations'
     | '/patient/dashboard'
     | '/patient/home'
     | '/patient/profil'
@@ -218,6 +228,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/login'
     | '/register'
+    | '/patient/consultations'
     | '/patient/dashboard'
     | '/patient/home'
     | '/patient/profil'
@@ -239,6 +250,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/login'
     | '/register'
+    | '/patient/consultations'
     | '/patient/dashboard'
     | '/patient/home'
     | '/patient/profil'
@@ -261,6 +273,7 @@ export interface RootRouteChildren {
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
+  PatientConsultationsRoute: typeof PatientConsultationsRoute
   PatientDashboardRoute: typeof PatientDashboardRoute
   PatientHomeRoute: typeof PatientHomeRoute
   PatientProfilRoute: typeof PatientProfilRoute
@@ -364,6 +377,13 @@ declare module '@tanstack/react-router' {
       path: '/patient/dashboard'
       fullPath: '/patient/dashboard'
       preLoaderRoute: typeof PatientDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/patient/consultations': {
+      id: '/patient/consultations'
+      path: '/patient/consultations'
+      fullPath: '/patient/consultations'
+      preLoaderRoute: typeof PatientConsultationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pro/sport/$programId': {
@@ -475,6 +495,7 @@ const rootRouteChildren: RootRouteChildren = {
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
+  PatientConsultationsRoute: PatientConsultationsRoute,
   PatientDashboardRoute: PatientDashboardRoute,
   PatientHomeRoute: PatientHomeRoute,
   PatientProfilRoute: PatientProfilRoute,
