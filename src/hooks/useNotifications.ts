@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import type { NotificationType } from "@/lib/notifications";
@@ -21,6 +21,7 @@ export interface AppNotification {
 export function useNotifications() {
   const { user } = useAuth();
   const [items, setItems] = useState<AppNotification[] | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -42,20 +43,32 @@ export function useNotifications() {
   useEffect(() => {
     if (!user) return;
     void load();
+
+    if (channelRef.current) {
+      void supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
     const channel = supabase
-      .channel(`notif:${user.id}`)
+      .channel(`notif:${user.id}:${Date.now()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "scheduled_notifications", filter: `user_id=eq.${user.id}` },
         () => void load(),
       )
       .subscribe();
+
+    channelRef.current = channel;
     const interval = setInterval(() => void load(), 60_000);
+
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        void supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
       clearInterval(interval);
     };
-  }, [user, load]);
+  }, [user]);
 
   const unreadCount = items?.filter((n) => !n.read_at).length ?? 0;
 

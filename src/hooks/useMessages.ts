@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -33,6 +33,7 @@ export function useConversations() {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -95,21 +96,29 @@ export function useConversations() {
     void load();
   }, [load]);
 
-  // Realtime
+  // Realtime — corrigé avec useRef pour éviter le double subscribe
   useEffect(() => {
     if (!user) return;
+    if (channelRef.current) {
+      void supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
     const channel = supabase
-      .channel(`messages_list:${user.id}`)
+      .channel(`messages_list:${user.id}:${Date.now()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "messages" },
         () => void load(),
       )
       .subscribe();
+    channelRef.current = channel;
     return () => {
-      void supabase.removeChannel(channel);
+      if (channelRef.current) {
+        void supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
-  }, [user, load]);
+  }, [user]);
 
   const totalUnread = conversations.reduce((acc, c) => acc + c.unreadCount, 0);
   return { conversations, loading, totalUnread, reload: load };
@@ -120,6 +129,7 @@ export function useConversation(partnerId: string | null) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const threadChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const load = useCallback(async () => {
     if (!user || !partnerId) return;
@@ -139,7 +149,6 @@ export function useConversation(partnerId: string | null) {
     }
     setMessages((data ?? []) as Message[]);
     setLoading(false);
-    // Mark as read
     await supabase
       .from("messages")
       .update({ read_at: new Date().toISOString() })
@@ -152,10 +161,15 @@ export function useConversation(partnerId: string | null) {
     void load();
   }, [load]);
 
+  // Realtime — corrigé avec useRef pour éviter le double subscribe
   useEffect(() => {
     if (!user || !partnerId) return;
+    if (threadChannelRef.current) {
+      void supabase.removeChannel(threadChannelRef.current);
+      threadChannelRef.current = null;
+    }
     const channel = supabase
-      .channel(`messages_thread:${user.id}:${partnerId}`)
+      .channel(`messages_thread:${user.id}:${partnerId}:${Date.now()}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
@@ -183,8 +197,12 @@ export function useConversation(partnerId: string | null) {
         },
       )
       .subscribe();
+    threadChannelRef.current = channel;
     return () => {
-      void supabase.removeChannel(channel);
+      if (threadChannelRef.current) {
+        void supabase.removeChannel(threadChannelRef.current);
+        threadChannelRef.current = null;
+      }
     };
   }, [user, partnerId]);
 

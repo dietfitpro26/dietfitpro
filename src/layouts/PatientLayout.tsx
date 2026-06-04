@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Video, User, Flame, MessageSquare } from "lucide-react";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { LayoutDashboard, Video, User, Flame, MessageSquare, LogOut } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { NotificationBell } from "@/components/NotificationBell";
 import { MessagesBell } from "@/components/MessagesBell";
@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useConversations } from "@/hooks/useMessages";
 import { cn } from "@/lib/utils";
 
+
 const TABS = [
   { to: "/patient/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/patient/consultations", label: "Consultations", icon: Video },
@@ -16,11 +17,18 @@ const TABS = [
   { to: "/patient/profil", label: "Mon profil", icon: User },
 ] as const;
 
+
 export function PatientLayout({ children, streak = 0 }: { children: ReactNode; streak?: number }) {
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
+  const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const firstName = profile?.full_name?.split(" ")[0] ?? "";
   const { totalUnread: unread } = useConversations();
+
+  const handleSignOut = async () => {
+    await signOut();
+    void navigate({ to: "/login" });
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -34,6 +42,13 @@ export function PatientLayout({ children, streak = 0 }: { children: ReactNode; s
           </span>
           <MessagesBell to="/patient/messages" />
           <NotificationBell to="/patient/notifications" />
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="Se déconnecter"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </header>
 

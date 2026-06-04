@@ -12,13 +12,17 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
+import { Route as BienvenueRouteImport } from './routes/bienvenue'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ProSubscribersRouteImport } from './routes/pro.subscribers'
 import { Route as ProSportRouteImport } from './routes/pro.sport'
+import { Route as ProSettingsRouteImport } from './routes/pro.settings'
 import { Route as ProRecipesRouteImport } from './routes/pro.recipes'
 import { Route as ProPatientsRouteImport } from './routes/pro.patients'
 import { Route as ProNutritionRouteImport } from './routes/pro.nutrition'
 import { Route as ProNotificationsRouteImport } from './routes/pro.notifications'
 import { Route as ProMessagesRouteImport } from './routes/pro.messages'
+import { Route as ProFeedRouteImport } from './routes/pro.feed'
 import { Route as ProDashboardRouteImport } from './routes/pro.dashboard'
 import { Route as ProConsultationsRouteImport } from './routes/pro.consultations'
 import { Route as ProAnalyticsRouteImport } from './routes/pro.analytics'
@@ -52,14 +56,29 @@ const HomeRoute = HomeRouteImport.update({
   path: '/home',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BienvenueRoute = BienvenueRouteImport.update({
+  id: '/bienvenue',
+  path: '/bienvenue',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProSubscribersRoute = ProSubscribersRouteImport.update({
+  id: '/pro/subscribers',
+  path: '/pro/subscribers',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProSportRoute = ProSportRouteImport.update({
   id: '/pro/sport',
   path: '/pro/sport',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProSettingsRoute = ProSettingsRouteImport.update({
+  id: '/pro/settings',
+  path: '/pro/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProRecipesRoute = ProRecipesRouteImport.update({
@@ -85,6 +104,11 @@ const ProNotificationsRoute = ProNotificationsRouteImport.update({
 const ProMessagesRoute = ProMessagesRouteImport.update({
   id: '/pro/messages',
   path: '/pro/messages',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProFeedRoute = ProFeedRouteImport.update({
+  id: '/pro/feed',
+  path: '/pro/feed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProDashboardRoute = ProDashboardRouteImport.update({
@@ -176,6 +200,7 @@ const PatientPayConsultationIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/bienvenue': typeof BienvenueRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -190,12 +215,15 @@ export interface FileRoutesByFullPath {
   '/pro/analytics': typeof ProAnalyticsRoute
   '/pro/consultations': typeof ProConsultationsRouteWithChildren
   '/pro/dashboard': typeof ProDashboardRoute
+  '/pro/feed': typeof ProFeedRoute
   '/pro/messages': typeof ProMessagesRoute
   '/pro/notifications': typeof ProNotificationsRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
   '/pro/recipes': typeof ProRecipesRouteWithChildren
+  '/pro/settings': typeof ProSettingsRoute
   '/pro/sport': typeof ProSportRouteWithChildren
+  '/pro/subscribers': typeof ProSubscribersRoute
   '/patient/pay/$consultationId': typeof PatientPayConsultationIdRoute
   '/pro/consultations/$id': typeof ProConsultationsIdRoute
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
@@ -205,6 +233,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/bienvenue': typeof BienvenueRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -219,12 +248,15 @@ export interface FileRoutesByTo {
   '/pro/analytics': typeof ProAnalyticsRoute
   '/pro/consultations': typeof ProConsultationsRouteWithChildren
   '/pro/dashboard': typeof ProDashboardRoute
+  '/pro/feed': typeof ProFeedRoute
   '/pro/messages': typeof ProMessagesRoute
   '/pro/notifications': typeof ProNotificationsRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
   '/pro/recipes': typeof ProRecipesRouteWithChildren
+  '/pro/settings': typeof ProSettingsRoute
   '/pro/sport': typeof ProSportRouteWithChildren
+  '/pro/subscribers': typeof ProSubscribersRoute
   '/patient/pay/$consultationId': typeof PatientPayConsultationIdRoute
   '/pro/consultations/$id': typeof ProConsultationsIdRoute
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
@@ -235,6 +267,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/bienvenue': typeof BienvenueRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -249,12 +282,15 @@ export interface FileRoutesById {
   '/pro/analytics': typeof ProAnalyticsRoute
   '/pro/consultations': typeof ProConsultationsRouteWithChildren
   '/pro/dashboard': typeof ProDashboardRoute
+  '/pro/feed': typeof ProFeedRoute
   '/pro/messages': typeof ProMessagesRoute
   '/pro/notifications': typeof ProNotificationsRoute
   '/pro/nutrition': typeof ProNutritionRouteWithChildren
   '/pro/patients': typeof ProPatientsRouteWithChildren
   '/pro/recipes': typeof ProRecipesRouteWithChildren
+  '/pro/settings': typeof ProSettingsRoute
   '/pro/sport': typeof ProSportRouteWithChildren
+  '/pro/subscribers': typeof ProSubscribersRoute
   '/patient/pay/$consultationId': typeof PatientPayConsultationIdRoute
   '/pro/consultations/$id': typeof ProConsultationsIdRoute
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
@@ -266,6 +302,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/bienvenue'
     | '/home'
     | '/login'
     | '/register'
@@ -280,12 +317,15 @@ export interface FileRouteTypes {
     | '/pro/analytics'
     | '/pro/consultations'
     | '/pro/dashboard'
+    | '/pro/feed'
     | '/pro/messages'
     | '/pro/notifications'
     | '/pro/nutrition'
     | '/pro/patients'
     | '/pro/recipes'
+    | '/pro/settings'
     | '/pro/sport'
+    | '/pro/subscribers'
     | '/patient/pay/$consultationId'
     | '/pro/consultations/$id'
     | '/pro/nutrition/$programId'
@@ -295,6 +335,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/bienvenue'
     | '/home'
     | '/login'
     | '/register'
@@ -309,12 +350,15 @@ export interface FileRouteTypes {
     | '/pro/analytics'
     | '/pro/consultations'
     | '/pro/dashboard'
+    | '/pro/feed'
     | '/pro/messages'
     | '/pro/notifications'
     | '/pro/nutrition'
     | '/pro/patients'
     | '/pro/recipes'
+    | '/pro/settings'
     | '/pro/sport'
+    | '/pro/subscribers'
     | '/patient/pay/$consultationId'
     | '/pro/consultations/$id'
     | '/pro/nutrition/$programId'
@@ -324,6 +368,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/bienvenue'
     | '/home'
     | '/login'
     | '/register'
@@ -338,12 +383,15 @@ export interface FileRouteTypes {
     | '/pro/analytics'
     | '/pro/consultations'
     | '/pro/dashboard'
+    | '/pro/feed'
     | '/pro/messages'
     | '/pro/notifications'
     | '/pro/nutrition'
     | '/pro/patients'
     | '/pro/recipes'
+    | '/pro/settings'
     | '/pro/sport'
+    | '/pro/subscribers'
     | '/patient/pay/$consultationId'
     | '/pro/consultations/$id'
     | '/pro/nutrition/$programId'
@@ -354,6 +402,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BienvenueRoute: typeof BienvenueRoute
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
@@ -368,12 +417,15 @@ export interface RootRouteChildren {
   ProAnalyticsRoute: typeof ProAnalyticsRoute
   ProConsultationsRoute: typeof ProConsultationsRouteWithChildren
   ProDashboardRoute: typeof ProDashboardRoute
+  ProFeedRoute: typeof ProFeedRoute
   ProMessagesRoute: typeof ProMessagesRoute
   ProNotificationsRoute: typeof ProNotificationsRoute
   ProNutritionRoute: typeof ProNutritionRouteWithChildren
   ProPatientsRoute: typeof ProPatientsRouteWithChildren
   ProRecipesRoute: typeof ProRecipesRouteWithChildren
+  ProSettingsRoute: typeof ProSettingsRoute
   ProSportRoute: typeof ProSportRouteWithChildren
+  ProSubscribersRoute: typeof ProSubscribersRoute
   PatientPayConsultationIdRoute: typeof PatientPayConsultationIdRoute
 }
 
@@ -400,6 +452,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HomeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/bienvenue': {
+      id: '/bienvenue'
+      path: '/bienvenue'
+      fullPath: '/bienvenue'
+      preLoaderRoute: typeof BienvenueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -407,11 +466,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pro/subscribers': {
+      id: '/pro/subscribers'
+      path: '/pro/subscribers'
+      fullPath: '/pro/subscribers'
+      preLoaderRoute: typeof ProSubscribersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pro/sport': {
       id: '/pro/sport'
       path: '/pro/sport'
       fullPath: '/pro/sport'
       preLoaderRoute: typeof ProSportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pro/settings': {
+      id: '/pro/settings'
+      path: '/pro/settings'
+      fullPath: '/pro/settings'
+      preLoaderRoute: typeof ProSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pro/recipes': {
@@ -447,6 +520,13 @@ declare module '@tanstack/react-router' {
       path: '/pro/messages'
       fullPath: '/pro/messages'
       preLoaderRoute: typeof ProMessagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pro/feed': {
+      id: '/pro/feed'
+      path: '/pro/feed'
+      fullPath: '/pro/feed'
+      preLoaderRoute: typeof ProFeedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pro/dashboard': {
@@ -632,6 +712,7 @@ const ProSportRouteWithChildren = ProSportRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BienvenueRoute: BienvenueRoute,
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
@@ -646,12 +727,15 @@ const rootRouteChildren: RootRouteChildren = {
   ProAnalyticsRoute: ProAnalyticsRoute,
   ProConsultationsRoute: ProConsultationsRouteWithChildren,
   ProDashboardRoute: ProDashboardRoute,
+  ProFeedRoute: ProFeedRoute,
   ProMessagesRoute: ProMessagesRoute,
   ProNotificationsRoute: ProNotificationsRoute,
   ProNutritionRoute: ProNutritionRouteWithChildren,
   ProPatientsRoute: ProPatientsRouteWithChildren,
   ProRecipesRoute: ProRecipesRouteWithChildren,
+  ProSettingsRoute: ProSettingsRoute,
   ProSportRoute: ProSportRouteWithChildren,
+  ProSubscribersRoute: ProSubscribersRoute,
   PatientPayConsultationIdRoute: PatientPayConsultationIdRoute,
 }
 export const routeTree = rootRouteImport

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Outlet } from "@tanstack/react-router";
 import { Search, UserPlus, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { ProLayout } from "@/layouts/ProLayout";
@@ -36,10 +36,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 
+
 export const Route = createFileRoute("/pro/patients")({
   head: () => ({ meta: [{ title: "Mes patients — DietFitPro" }] }),
   component: PatientsPage,
 });
+
 
 interface PatientRow {
   id: string;
@@ -53,7 +55,9 @@ interface PatientRow {
   lastAppointment?: string | null;
 }
 
+
 type StatusFilter = "all" | "active" | "inactive";
+
 
 const GOAL_LABEL: Record<string, string> = {
   perte_de_poids: "Perte de poids",
@@ -62,19 +66,23 @@ const GOAL_LABEL: Record<string, string> = {
   autre: "Autre",
 };
 
+
 function getGoal(p: PatientRow): string {
   return (p.goal && GOAL_LABEL[p.goal]) || "—";
 }
+
 
 function PatientsPage() {
   return (
     <ProtectedRoute allow={["pro"]}>
       <ProLayout>
         <PatientsContent />
+        <Outlet />
       </ProLayout>
     </ProtectedRoute>
   );
 }
+
 
 function PatientsContent() {
   const { user } = useAuth();
@@ -85,6 +93,7 @@ function PatientsContent() {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [modalOpen, setModalOpen] = useState(false);
 
+
   const load = async () => {
     if (!user) return;
     setError(null);
@@ -94,12 +103,14 @@ function PatientsContent() {
       .eq("pro_id", user.id)
       .order("updated_at", { ascending: false });
 
+
     if (err) {
       console.error("[patients] load error", err);
       setError(err.message);
       setPatients([]);
       return;
     }
+
 
     const rows = (data ?? []) as PatientRow[];
     const userIds = rows.map((r) => r.user_id).filter((x): x is string => Boolean(x));
@@ -121,10 +132,12 @@ function PatientsContent() {
     setPatients(rows);
   };
 
+
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
 
   const filtered = useMemo(() => {
     if (!patients) return null;
@@ -140,6 +153,7 @@ function PatientsContent() {
       return matchQ && matchStatus;
     });
   }, [patients, search, status]);
+
 
   return (
     <div className="flex flex-col">
@@ -157,6 +171,7 @@ function PatientsContent() {
           </Button>
         </div>
       </header>
+
 
       <div className="p-6 space-y-4">
         <div className="flex flex-col sm:flex-row gap-3">
@@ -181,11 +196,13 @@ function PatientsContent() {
           </Select>
         </div>
 
+
         {error && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
             {error}
           </div>
         )}
+
 
         <div className="rounded-lg border bg-white overflow-hidden">
           <Table>
@@ -279,6 +296,7 @@ function PatientsContent() {
         </div>
       </div>
 
+
       <NewPatientDialog
         open={modalOpen}
         onOpenChange={setModalOpen}
@@ -290,6 +308,7 @@ function PatientsContent() {
     </div>
   );
 }
+
 
 function NewPatientDialog({
   open,
@@ -310,6 +329,7 @@ function NewPatientDialog({
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+
   const reset = () => {
     setFirstName("");
     setLastName("");
@@ -319,6 +339,7 @@ function NewPatientDialog({
     setGoal("perte_de_poids");
     setNotes("");
   };
+
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -349,6 +370,7 @@ function NewPatientDialog({
     reset();
     onCreated();
   };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

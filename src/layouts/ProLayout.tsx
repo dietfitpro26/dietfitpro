@@ -7,7 +7,6 @@ import {
   BookOpen,
   Dumbbell,
   MessageSquare,
-  Calendar,
   Video,
   Bell,
   Rss,
@@ -34,8 +33,7 @@ const NAV = [
   { to: "/pro/recipes", label: "Mes Recettes", icon: BookOpen },
   { to: "/pro/sport", label: "Programmes Sport", icon: Dumbbell },
   { to: "/pro/messages", label: "Messagerie", icon: MessageSquare },
-  { to: "/pro/calendar", label: "Agenda", icon: Calendar },
-  { to: "/pro/visio", label: "Visios", icon: Video },
+  { to: "/pro/consultations", label: "Consultations", icon: Video },
   { to: "/pro/notifications", label: "Notifications", icon: Bell },
   { to: "/pro/feed", label: "Feed", icon: Rss },
   { to: "/pro/subscribers", label: "Abonnés", icon: UserCheck },
@@ -109,7 +107,6 @@ export function ProLayout({ children }: { children: ReactNode }) {
             Pro
           </span>
         </div>
-
         <Button
           variant="ghost"
           size="icon"
@@ -126,17 +123,13 @@ export function ProLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-background">
       <UpcomingConsultationReminder />
-      {/* Desktop sidebar */}
       <aside className="hidden md:block fixed inset-y-0 left-0 z-40">{SidebarInner}</aside>
-
-      {/* Mobile drawer */}
       {open && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
           <div className="relative">{SidebarInner}</div>
         </div>
       )}
-
       <div className="flex-1 md:ml-60 flex flex-col">
         <header className="md:hidden h-14 flex items-center justify-between border-b px-4 bg-background">
           <button onClick={() => setOpen(true)} aria-label="Ouvrir le menu">

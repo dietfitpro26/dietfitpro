@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   Home,
   NotebookPen,
@@ -8,6 +8,7 @@ import {
   Rss,
   MessageSquare,
   Flame,
+  LogOut,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,12 +32,18 @@ export function SubscriberLayout({
   children: ReactNode;
   streak?: number;
 }) {
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
   const { rights } = useAccessRights();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
   const firstName = profile?.full_name?.split(" ")[0] ?? "";
 
   const tabs = rights?.messaging ? [...BASE_TABS, MESSAGES_TAB] : BASE_TABS;
+
+  const handleSignOut = async () => {
+    await signOut();
+    void navigate({ to: "/login" });
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -47,6 +54,13 @@ export function SubscriberLayout({
           <span className="flex items-center gap-1 text-[#6DB33F] font-semibold">
             <Flame className="h-4 w-4" /> {streak}
           </span>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="Se déconnecter"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </header>
 

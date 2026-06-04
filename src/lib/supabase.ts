@@ -11,17 +11,15 @@ function getEnvVar(name: string): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-const supabaseUrl = "https://jafjqbbzzbanpgsfbopm.supabase.co";
-const supabaseAnonKey = "sb_publishable_5Qh1IIHaVswL0-beqjllsA_AHNtE-U4";
+const supabaseUrl = getEnvVar("VITE_SUPABASE_URL");
+const supabaseAnonKey = getEnvVar("VITE_SUPABASE_ANON_KEY");
 
-export const isSupabaseConfigured = true;
+export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
 
 if (!isSupabaseConfigured && typeof window !== "undefined") {
-  // eslint-disable-next-line no-console
   console.warn(
-    "[DietFitPro] Supabase non configuré. Créez un .env à partir de .env.example " +
-      "(VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY). " +
-      "L'UI s'affiche mais les appels auth/DB seront désactivés.",
+    "[DietFitPro] Supabase non configuré. Créez un .env.local " +
+    "(VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY)."
   );
 }
 
@@ -45,14 +43,21 @@ export const supabase: SupabaseClient = createClient(
 /**
  * Type utilitaire pour les réponses Supabase avec gestion d'erreur.
  */
-export function handleSupabaseError<T>(result: { data: T | null; error: Error | null }, context?: string): T {
+export function handleSupabaseError<T>(
+  result: { data: T | null; error: Error | null },
+  context?: string
+): T {
   if (result.error) {
-    const msg = context ? `[Supabase — ${context}] ${result.error.message}` : `[Supabase] ${result.error.message}`;
+    const msg = context
+      ? `[Supabase — ${context}] ${result.error.message}`
+      : `[Supabase] ${result.error.message}`;
     throw new Error(msg);
   }
   if (result.data === null) {
     throw new Error(
-      context ? `[Supabase — ${context}] Aucune donnée retournée.` : "[Supabase] Aucune donnée retournée.",
+      context
+        ? `[Supabase — ${context}] Aucune donnée retournée.`
+        : "[Supabase] Aucune donnée retournée."
     );
   }
   return result.data;
