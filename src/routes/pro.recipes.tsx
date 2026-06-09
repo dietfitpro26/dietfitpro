@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Bell, Plus, Search, Clock, Flame, Drumstick } from "lucide-react";
+import { Bell, Plus, Search, Clock, Flame, Drumstick, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ProLayout } from "@/layouts/ProLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -13,7 +13,7 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
@@ -71,6 +71,9 @@ function Content() {
   const [category, setCategory] = useState<MealType | "all">("all");
   const [source, setSource] = useState<Source>("all");
   const [selected, setSelected] = useState<Recipe | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteName, setDeleteName] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     if (!user) return;
@@ -99,6 +102,18 @@ function Content() {
       return true;
     });
   }, [recipes, search, category, source, user]);
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setDeleting(true);
+    const { error } = await supabase.from("recipes").delete().eq("id", deleteId);
+    setDeleting(false);
+    if (error) { toast.error(error.message); return; }
+    setRecipes((prev) => prev?.filter((x) => x.id !== deleteId) ?? null);
+    toast.success("Recette supprimée");
+    setDeleteId(null);
+    setDeleteName("");
+  };
 
   return (
     <div className="flex flex-col">
@@ -148,7 +163,21 @@ function Content() {
                 {filtered.map((r) => {
                   const mine = r.created_by === user?.id;
                   return (
-                    <Card key={r.id} className="cursor-pointer overflow-hidden hover:shadow-md transition" onClick={() => setSelected(r)}>
+                    <Card key={r.id} className="relative cursor-pointer overflow-hidden hover:shadow-md transition" onClick={() => setSelected(r)}>
+                      {/* Bouton supprimer — visible seulement sur ses propres recettes */}
+                      {mine && (
+                        <button
+                          className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-destructive shadow hover:bg-destructive hover:text-white transition"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteId(r.id);
+                            setDeleteName(r.name);
+                          }}
+                          aria-label="Supprimer la recette"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       <div className="aspect-video bg-muted overflow-hidden">
                         {r.image_url
                           ? <img src={r.image_url} alt={r.name} className="h-full w-full object-cover" loading="lazy" />
@@ -173,6 +202,24 @@ function Content() {
                 })}
               </div>)}
       </div>
+
+      {/* Modal confirmation suppression */}
+      <Dialog open={!!deleteId} onOpenChange={(v) => { if (!v) { setDeleteId(null); setDeleteName(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Supprimer la recette ?</DialogTitle>
+            <DialogDescription>
+              Vous êtes sur le point de supprimer <strong>"{deleteName}"</strong>. Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setDeleteId(null); setDeleteName(""); }}>Annuler</Button>
+            <Button variant="destructive" disabled={deleting} onClick={handleDelete}>
+              {deleting ? "Suppression…" : "Supprimer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <RecipeDetailDialog recipe={selected} onClose={() => setSelected(null)} />
     </div>

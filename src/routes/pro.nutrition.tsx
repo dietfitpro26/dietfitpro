@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Bell, Plus, Search } from "lucide-react";
+import { Bell, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ProLayout } from "@/layouts/ProLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -61,6 +61,9 @@ function Content() {
   const [patients, setPatients] = useState<PatientLite[]>([]);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteName, setDeleteName] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     if (!user) return;
@@ -92,6 +95,18 @@ function Content() {
     });
   }, [rows, search]);
 
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setDeleting(true);
+    const { error } = await supabase.from("nutrition_programs").delete().eq("id", deleteId);
+    setDeleting(false);
+    if (error) { toast.error(error.message); return; }
+    setRows((prev) => prev?.filter((x) => x.id !== deleteId) ?? null);
+    toast.success("Programme supprimé");
+    setDeleteId(null);
+    setDeleteName("");
+  };
+
   return (
     <div className="flex flex-col">
       <header className="flex items-center justify-between border-b bg-white px-6 py-4">
@@ -120,17 +135,18 @@ function Content() {
                 <TableHead>Durée</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Créé le</TableHead>
+                <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered === null
                 ? Array.from({ length: 4 }).map((_, i) => (
-                    <TableRow key={i}>{Array.from({ length: 6 }).map((__, j) => (
+                    <TableRow key={i}>{Array.from({ length: 7 }).map((__, j) => (
                       <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
                     ))}</TableRow>
                   ))
                 : filtered.length === 0
-                  ? (<TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground">Aucun programme.</TableCell></TableRow>)
+                  ? (<TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Aucun programme.</TableCell></TableRow>)
                   : filtered.map((r) => (
                     <TableRow key={r.id} className="cursor-pointer hover:bg-muted/40"
                       onClick={() => navigate({ to: "/pro/nutrition/$programId", params: { programId: r.id } })}>
@@ -144,12 +160,45 @@ function Content() {
                         </span>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{new Date(r.created_at).toLocaleDateString("fr-FR")}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteId(r.id);
+                            setDeleteName(r.name);
+                          }}
+                          aria-label="Supprimer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
             </TableBody>
           </Table>
         </div>
       </div>
+
+      {/* Modal confirmation suppression */}
+      <Dialog open={!!deleteId} onOpenChange={(v) => { if (!v) { setDeleteId(null); setDeleteName(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Supprimer le programme ?</DialogTitle>
+            <DialogDescription>
+              Vous êtes sur le point de supprimer <strong>"{deleteName}"</strong>. Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setDeleteId(null); setDeleteName(""); }}>Annuler</Button>
+            <Button variant="destructive" disabled={deleting} onClick={handleDelete}>
+              {deleting ? "Suppression…" : "Supprimer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <NewProgramDialog
         open={modalOpen}

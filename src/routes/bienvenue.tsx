@@ -15,37 +15,49 @@ function BienvenuePage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-  // Vérifie si une session existe déjà au chargement
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    if (session) setStep("form");
-  });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setStep("form");
+    });
 
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    async (event, session) => {
-      if (event === "SIGNED_IN" && session) {
-        setStep("form");
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "SIGNED_IN" && session) {
+          setStep("form");
+        }
       }
-      if (event === "USER_UPDATED" && session) {
-        await supabase.rpc("link_patient_account", {
-          p_user_id: session.user.id,
-          p_email: session.user.email ?? "",
-        });
-        setStep("done");
-        setTimeout(() => navigate({ to: "/patient/dashboard" }), 2000);
-      }
-    }
-  );
-  return () => subscription.unsubscribe();
- }, []);
+    );
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.length < 8) { setError("8 caractères minimum."); return; }
     if (password !== confirm) { setError("Les mots de passe ne correspondent pas."); return; }
+
     setSaving(true);
+    setError("");
+
+    const { data: { session } } = await supabase.auth.getSession();
+
     const { error: err } = await supabase.auth.updateUser({ password });
+
+    if (err) {
+      setSaving(false);
+      setError(err.message);
+      return;
+    }
+
+    // Lier le compte patient
+    if (session?.user) {
+      await supabase.rpc("link_patient_account", {
+        p_user_id: session.user.id,
+        p_email: session.user.email ?? "",
+      });
+    }
+
     setSaving(false);
-    if (err) { setError(err.message); }
+    setStep("done");
+    setTimeout(() => navigate({ to: "/patient/dashboard" }), 2000);
   };
 
   return (
@@ -80,7 +92,7 @@ function BienvenuePage() {
             </div>
             {error && <p style={{ color: "#e53e3e", fontSize: "0.85rem", marginBottom: "0.75rem" }}>⚠️ {error}</p>}
             <button type="submit" disabled={saving}
-              style={{ width: "100%", padding: "0.65rem", background: "#6DB33F", color: "white", border: "none", borderRadius: "0.5rem", fontWeight: 600, fontSize: "1rem", cursor: "pointer" }}>
+              style={{ width: "100%", padding: "0.65rem", background: saving ? "#aaa" : "#6DB33F", color: "white", border: "none", borderRadius: "0.5rem", fontWeight: 600, fontSize: "1rem", cursor: saving ? "not-allowed" : "pointer" }}>
               {saving ? "Enregistrement…" : "Accéder à mon espace"}
             </button>
           </form>

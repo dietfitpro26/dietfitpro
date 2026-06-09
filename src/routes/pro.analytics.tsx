@@ -1,15 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { format, subWeeks, startOfWeek, endOfWeek, isWithinInterval, parseISO, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, subWeeks, startOfWeek, endOfWeek, isWithinInterval, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
-  Users,
-  CalendarCheck,
-  TrendingUp,
-  Ban,
-  ArrowUpRight,
-  ArrowDownRight,
-  Euro,
+  Users, CalendarCheck, TrendingUp, Ban, ArrowUpRight, ArrowDownRight, Euro, UserCheck,
 } from "lucide-react";
 import { ProLayout } from "@/layouts/ProLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -18,17 +12,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +36,7 @@ interface Consultation {
 
 interface AnalyticsData {
   activePatients: number;
+  activeSubscribers: number;
   consultationsThisMonth: number;
   consultationsLastMonth: number;
   revenueThisMonthCents: number;
@@ -64,9 +50,7 @@ interface AnalyticsData {
 function Page() {
   return (
     <ProtectedRoute allow={["pro"]}>
-      <ProLayout>
-        <AnalyticsContent />
-      </ProLayout>
+      <ProLayout><AnalyticsContent /></ProLayout>
     </ProtectedRoute>
   );
 }
@@ -91,17 +75,25 @@ function AnalyticsContent() {
         const lastMonthStart = startOfMonth(subMonths(now, 1));
         const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
-        const fourWeeksAgo = subWeeks(now, 4);
-
-        const [
-          patientsRes,
-          consultsRes,
-        ] = await Promise.all([
+        const [patientsRes, subscribersRes, consultsRes] = await Promise.all([
           supabase
             .from("patients")
             .select("*", { count: "exact", head: true })
             .eq("pro_id", user.id)
             .eq("is_active", true),
+          // Abonnés actifs liés au pro via invitation_codes
+          supabase
+            .from("profiles")
+            .select("id", { count: "exact", head: true })
+            .eq("role", "subscriber")
+            .in(
+              "id",
+              supabase
+                .from("invitation_codes")
+                .select("used_by")
+                .eq("pro_id", user.id)
+                .not("used_by", "is", null)
+            ),
           supabase
             .from("visio_consultations")
             .select("id, scheduled_at, status, payment_status, amount_cents, patients(first_name, last_name)")
@@ -118,8 +110,8 @@ function AnalyticsContent() {
         }
 
         const consultations = (consultsRes.data ?? []) as Consultation[];
-
         const activePatients = patientsRes.count ?? 0;
+        const activeSubscribers = subscribersRes.count ?? 0;
 
         const thisMonthConsults = consultations.filter((c) => {
           if (!c.scheduled_at) return false;
@@ -154,46 +146,30 @@ function AnalyticsContent() {
         }
 
         const paymentCounts: Record<PaymentStatus, number> = {
-          pending: 0,
-          paid: 0,
-          refunded: 0,
-          partial_refund: 0,
-          failed: 0,
+          pending: 0, paid: 0, refunded: 0, partial_refund: 0, failed: 0,
         };
         consultations.forEach((c) => {
           paymentCounts[c.payment_status] = (paymentCounts[c.payment_status] ?? 0) + 1;
         });
 
         const PAYMENT_COLORS: Record<PaymentStatus, string> = {
-          pending: "#94a3b8",
-          paid: "#6DB33F",
-          refunded: "#f59e0b",
-          partial_refund: "#f97316",
-          failed: "#ef4444",
+          pending: "#94a3b8", paid: "#6DB33F", refunded: "#f59e0b",
+          partial_refund: "#f97316", failed: "#ef4444",
         };
-
         const PAYMENT_LABELS: Record<PaymentStatus, string> = {
-          pending: "En attente",
-          paid: "Payé",
-          refunded: "Remboursé",
-          partial_refund: "Remb. partiel",
-          failed: "Échec",
+          pending: "En attente", paid: "Payé", refunded: "Remboursé",
+          partial_refund: "Remb. partiel", failed: "Échec",
         };
 
         const paymentDistribution = (Object.keys(paymentCounts) as PaymentStatus[])
           .filter((k) => paymentCounts[k] > 0)
-          .map((k) => ({
-            name: PAYMENT_LABELS[k],
-            value: paymentCounts[k],
-            color: PAYMENT_COLORS[k],
-          }));
+          .map((k) => ({ name: PAYMENT_LABELS[k], value: paymentCounts[k], color: PAYMENT_COLORS[k] }));
 
-        const recentPayments = consultations
-          .filter((c) => c.payment_status === "paid")
-          .slice(0, 5);
+        const recentPayments = consultations.filter((c) => c.payment_status === "paid").slice(0, 5);
 
         setData({
           activePatients,
+          activeSubscribers,
           consultationsThisMonth: thisMonthConsults.length,
           consultationsLastMonth: lastMonthConsults.length,
           revenueThisMonthCents,
@@ -204,17 +180,13 @@ function AnalyticsContent() {
           recentPayments,
         });
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Erreur");
-        }
+        if (!cancelled) setError(err instanceof Error ? err.message : "Erreur");
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [user]);
 
   const cancellationRate = useMemo(() => {
@@ -242,12 +214,18 @@ function AnalyticsContent() {
           </div>
         )}
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* KPI Cards — 5 cartes sur 2 rangées */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           <KpiCard
             label="Patients actifs"
             value={data?.activePatients}
             icon={<Users className="h-5 w-5 text-[#6DB33F]" />}
+            loading={loading}
+          />
+          <KpiCard
+            label="Abonnés actifs"
+            value={data?.activeSubscribers}
+            icon={<UserCheck className="h-5 w-5 text-[#6DB33F]" />}
             loading={loading}
           />
           <KpiCard
@@ -274,7 +252,6 @@ function AnalyticsContent() {
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Weekly consultations bar chart */}
           <Card className="border-border/60">
             <CardHeader>
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -301,7 +278,6 @@ function AnalyticsContent() {
             </CardContent>
           </Card>
 
-          {/* Payment status pie chart */}
           <Card className="border-border/60">
             <CardHeader>
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -320,12 +296,9 @@ function AnalyticsContent() {
                   <PieChart>
                     <Pie
                       data={data.paymentDistribution}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
-                      paddingAngle={4}
-                      dataKey="value"
+                      cx="50%" cy="50%"
+                      innerRadius={60} outerRadius={90}
+                      paddingAngle={4} dataKey="value"
                     >
                       {data.paymentDistribution.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -353,33 +326,24 @@ function AnalyticsContent() {
           <CardContent>
             {loading ? (
               <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-10 w-full" />
-                ))}
+                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
             ) : !data || data.recentPayments.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4">Aucun paiement reçu.</p>
             ) : (
               <div className="space-y-2">
                 {data.recentPayments.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-muted/40 transition-colors"
-                  >
+                  <div key={p.id} className="flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-muted/40 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-[#6DB33F]/10 flex items-center justify-center">
                         <TrendingUp className="h-4 w-4 text-[#6DB33F]" />
                       </div>
                       <div>
                         <p className="text-sm font-medium">
-                          {p.patient
-                            ? `${p.patient.first_name} ${p.patient.last_name}`
-                            : "Patient"}
+                          {p.patient ? `${p.patient.first_name} ${p.patient.last_name}` : "Patient"}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {p.scheduled_at
-                            ? format(new Date(p.scheduled_at), "dd MMM yyyy", { locale: fr })
-                            : "—"}
+                          {p.scheduled_at ? format(new Date(p.scheduled_at), "dd MMM yyyy", { locale: fr }) : "—"}
                         </p>
                       </div>
                     </div>
@@ -398,12 +362,7 @@ function AnalyticsContent() {
 }
 
 function KpiCard({
-  label,
-  value,
-  icon,
-  loading,
-  evolution,
-  trend,
+  label, value, icon, loading, evolution, trend,
 }: {
   label: string;
   value: string | number | undefined;
@@ -428,31 +387,25 @@ function KpiCard({
           <div className="flex items-center gap-2">
             <p className="text-3xl font-bold text-foreground">{value ?? 0}</p>
             {evolution !== undefined && evolution !== null && (
-              <span
-                className={cn(
-                  "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                  isPositive && "bg-[#6DB33F]/15 text-[#2D7A1F]",
-                  isNegative && "bg-red-100 text-red-700"
-                )}
-              >
+              <span className={cn(
+                "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                isPositive && "bg-[#6DB33F]/15 text-[#2D7A1F]",
+                isNegative && "bg-red-100 text-red-700"
+              )}>
                 {isPositive && <ArrowUpRight className="h-3 w-3 mr-0.5" />}
                 {isNegative && <ArrowDownRight className="h-3 w-3 mr-0.5" />}
                 {Math.abs(evolution)}%
               </span>
             )}
             {trend && evolution === undefined && (
-              <span
-                className={cn(
-                  "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                  trend === "positive" && "bg-[#6DB33F]/15 text-[#2D7A1F]",
-                  trend === "negative" && "bg-red-100 text-red-700"
-                )}
-              >
-                {trend === "positive" ? (
-                  <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                ) : (
-                  <ArrowDownRight className="h-3 w-3 mr-0.5" />
-                )}
+              <span className={cn(
+                "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                trend === "positive" && "bg-[#6DB33F]/15 text-[#2D7A1F]",
+                trend === "negative" && "bg-red-100 text-red-700"
+              )}>
+                {trend === "positive"
+                  ? <ArrowUpRight className="h-3 w-3 mr-0.5" />
+                  : <ArrowDownRight className="h-3 w-3 mr-0.5" />}
                 {trend === "positive" ? "Bon" : "À surveiller"}
               </span>
             )}

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { Video, Calendar as CalendarIcon, Target, Dumbbell, Utensils } from "lucide-react";
+import { fr } from "date-fns/locale";
+import { Video, Calendar as CalendarIcon, Target, Dumbbell, Utensils, ChevronRight } from "lucide-react";
 import { PatientLayout } from "@/layouts/PatientLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/patient/dashboard")({
 
 type Status = "scheduled" | "completed" | "cancelled" | "refunded" | "no_show";
 type PayStatus = "pending" | "paid" | "refunded" | "partial_refund" | "failed";
+
 interface Consultation {
   id: string;
   scheduled_at: string | null;
@@ -33,42 +35,103 @@ interface Consultation {
   pro_id: string;
 }
 
+interface NutritionProgram {
+  id: string;
+  name: string;
+  kcal_per_day: number | null;
+  duration_weeks: number | null;
+  is_active: boolean;
+}
+
+interface SportProgram {
+  id: string;
+  name: string;
+  frequency_per_week: number | null;
+  level: "debutant" | "intermediaire" | "avance" | null;
+  is_active: boolean;
+}
+
 const STATUS_LABEL: Record<Status, string> = {
   scheduled: "Planifiée", completed: "Terminée", cancelled: "Annulée",
   refunded: "Remboursée", no_show: "Absent",
 };
 
+const LEVEL_LABEL: Record<string, string> = {
+  debutant: "Débutant", intermediaire: "Intermédiaire", avance: "Avancé",
+};
+
 function DashboardContent() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+
   const [upcoming, setUpcoming] = useState<Consultation | null | undefined>(undefined);
   const [past, setPast] = useState<Consultation[] | null>(null);
   const [proName, setProName] = useState<string>("");
+
+  // Fix 4 — programmes du pro
+  const [nutritionPrograms, setNutritionPrograms] = useState<NutritionProgram[] | null>(null);
+  const [sportPrograms, setSportPrograms] = useState<SportProgram[] | null>(null);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       const nowIso = new Date().toISOString();
-      const { data: up } = await supabase.from("visio_consultations")
-        .select("id, scheduled_at, duration_min, status, payment_status, amount_cents, room_url, pro_id")
-        .eq("patient_user_id", user.id)
-        .eq("status", "scheduled")
-        .gte("scheduled_at", nowIso)
-        .order("scheduled_at", { ascending: true })
-        .limit(1);
-      const next = (up?.[0] as Consultation | undefined) ?? null;
+
+      // Récupérer le patient_id lié à ce user
+      const { data: patientRow } = await supabase
+        .from("patients")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      const patientId = (patientRow as { id?: string } | null)?.id ?? null;
+
+      const [upRes, histRes, nutriRes, sportRes] = await Promise.all([
+        supabase.from("visio_consultations")
+          .select("id, scheduled_at, duration_min, status, payment_status, amount_cents, room_url, pro_id")
+          .eq("patient_user_id", user.id)
+          .eq("status", "scheduled")
+          .gte("scheduled_at", nowIso)
+          .order("scheduled_at", { ascending: true })
+          .limit(1),
+
+        supabase.from("visio_consultations")
+          .select("id, scheduled_at, duration_min, status, payment_status, amount_cents, room_url, pro_id")
+          .eq("patient_user_id", user.id)
+          .in("status", ["completed", "cancelled", "refunded", "no_show"])
+          .order("scheduled_at", { ascending: false })
+          .limit(10),
+
+        patientId
+          ? supabase.from("nutrition_programs")
+              .select("id, name, kcal_per_day, duration_weeks, is_active")
+              .eq("patient_id", patientId)
+              .eq("is_active", true)
+              .order("created_at", { ascending: false })
+              .limit(3)
+          : Promise.resolve({ data: [] }),
+
+        patientId
+          ? supabase.from("sport_programs")
+              .select("id, name, frequency_per_week, level, is_active")
+              .eq("patient_id", patientId)
+              .eq("is_active", true)
+              .order("created_at", { ascending: false })
+              .limit(3)
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      const next = (upRes.data?.[0] as Consultation | undefined) ?? null;
       setUpcoming(next);
+
       if (next?.pro_id) {
         const { data: p } = await supabase.from("profiles").select("full_name").eq("id", next.pro_id).maybeSingle();
         setProName((p as { full_name?: string } | null)?.full_name ?? "");
       }
-      const { data: hist } = await supabase.from("visio_consultations")
-        .select("id, scheduled_at, duration_min, status, payment_status, amount_cents, room_url, pro_id")
-        .eq("patient_user_id", user.id)
-        .in("status", ["completed", "cancelled", "refunded", "no_show"])
-        .order("scheduled_at", { ascending: false })
-        .limit(10);
-      setPast((hist ?? []) as Consultation[]);
+
+      setPast((histRes.data ?? []) as Consultation[]);
+      setNutritionPrograms((nutriRes.data ?? []) as NutritionProgram[]);
+      setSportPrograms((sportRes.data ?? []) as SportProgram[]);
     })();
   }, [user]);
 
@@ -81,6 +144,7 @@ function DashboardContent() {
         <p className="text-sm text-muted-foreground">Voici un aperçu de votre suivi.</p>
       </div>
 
+      {/* Prochaine consultation */}
       <Card>
         <CardHeader><CardTitle className="text-base">Prochaine consultation</CardTitle></CardHeader>
         <CardContent>
@@ -94,7 +158,9 @@ function DashboardContent() {
                 <div className="flex items-center gap-2 text-sm">
                   <CalendarIcon className="h-4 w-4 text-[#6DB33F]" />
                   <span className="font-medium">
-                    {upcoming.scheduled_at ? format(new Date(upcoming.scheduled_at), "EEEE dd MMMM 'à' HH:mm") : "—"}
+                    {upcoming.scheduled_at
+                      ? format(new Date(upcoming.scheduled_at), "EEEE dd MMMM 'à' HH:mm", { locale: fr })
+                      : "—"}
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
@@ -115,12 +181,88 @@ function DashboardContent() {
         </CardContent>
       </Card>
 
+      {/* Fix 4 — Plan nutritionnel actif */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Utensils className="h-4 w-4 text-[#6DB33F]" /> Mon plan nutritionnel
+          </CardTitle>
+          <Link to="/patient/nutrition" className="text-xs text-[#6DB33F] hover:underline flex items-center gap-0.5">
+            Voir tout <ChevronRight className="h-3 w-3" />
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {nutritionPrograms === null ? (
+            <Skeleton className="h-16 w-full" />
+          ) : nutritionPrograms.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Aucun plan nutritionnel actif.</p>
+          ) : (
+            <ul className="divide-y">
+              {nutritionPrograms.map((n) => (
+                <li key={n.id} className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-sm font-medium">{n.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {n.kcal_per_day ? `${n.kcal_per_day} kcal/j` : ""}
+                      {n.kcal_per_day && n.duration_weeks ? " · " : ""}
+                      {n.duration_weeks ? `${n.duration_weeks} semaines` : ""}
+                    </p>
+                  </div>
+                  <span className="text-xs rounded-full bg-[#6DB33F]/15 text-[#2D7A1F] px-2 py-0.5 font-medium">
+                    Actif
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Fix 4 — Programme sport actif */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Dumbbell className="h-4 w-4 text-[#6DB33F]" /> Mon programme sport
+          </CardTitle>
+          <Link to="/patient/sport" className="text-xs text-[#6DB33F] hover:underline flex items-center gap-0.5">
+            Voir tout <ChevronRight className="h-3 w-3" />
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {sportPrograms === null ? (
+            <Skeleton className="h-16 w-full" />
+          ) : sportPrograms.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Aucun programme sport actif.</p>
+          ) : (
+            <ul className="divide-y">
+              {sportPrograms.map((s) => (
+                <li key={s.id} className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-sm font-medium">{s.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {s.frequency_per_week ? `${s.frequency_per_week}×/sem.` : ""}
+                      {s.frequency_per_week && s.level ? " · " : ""}
+                      {s.level ? LEVEL_LABEL[s.level] : ""}
+                    </p>
+                  </div>
+                  <span className="text-xs rounded-full bg-[#6DB33F]/15 text-[#2D7A1F] px-2 py-0.5 font-medium">
+                    Actif
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Raccourcis */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <QuickCard icon={Utensils} label="Mon plan nutritionnel" to="/patient/nutrition" />
         <QuickCard icon={Dumbbell} label="Mon programme sport" to="/patient/sport" />
         <QuickCard icon={Target} label="Mes objectifs" to="/patient/profil" />
       </div>
 
+      {/* Historique consultations */}
       <Card>
         <CardHeader><CardTitle className="text-base">Historique des consultations</CardTitle></CardHeader>
         <CardContent>
