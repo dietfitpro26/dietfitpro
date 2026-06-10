@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
+import { Route as FeedRouteImport } from './routes/feed'
 import { Route as BienvenueRouteImport } from './routes/bienvenue'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProSubscribersRouteImport } from './routes/pro.subscribers'
@@ -54,6 +55,11 @@ const LoginRoute = LoginRouteImport.update({
 const HomeRoute = HomeRouteImport.update({
   id: '/home',
   path: '/home',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedRoute = FeedRouteImport.update({
+  id: '/feed',
+  path: '/feed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BienvenueRoute = BienvenueRouteImport.update({
@@ -201,6 +207,7 @@ const PatientPayConsultationIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/bienvenue': typeof BienvenueRoute
+  '/feed': typeof FeedRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -234,6 +241,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bienvenue': typeof BienvenueRoute
+  '/feed': typeof FeedRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -268,6 +276,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/bienvenue': typeof BienvenueRoute
+  '/feed': typeof FeedRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -303,6 +312,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/bienvenue'
+    | '/feed'
     | '/home'
     | '/login'
     | '/register'
@@ -336,6 +346,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/bienvenue'
+    | '/feed'
     | '/home'
     | '/login'
     | '/register'
@@ -369,6 +380,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/bienvenue'
+    | '/feed'
     | '/home'
     | '/login'
     | '/register'
@@ -403,6 +415,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BienvenueRoute: typeof BienvenueRoute
+  FeedRoute: typeof FeedRoute
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
@@ -450,6 +463,13 @@ declare module '@tanstack/react-router' {
       path: '/home'
       fullPath: '/home'
       preLoaderRoute: typeof HomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feed': {
+      id: '/feed'
+      path: '/feed'
+      fullPath: '/feed'
+      preLoaderRoute: typeof FeedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bienvenue': {
@@ -713,6 +733,7 @@ const ProSportRouteWithChildren = ProSportRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BienvenueRoute: BienvenueRoute,
+  FeedRoute: FeedRoute,
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
