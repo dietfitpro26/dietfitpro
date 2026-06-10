@@ -3,50 +3,56 @@ import { supabase } from "@/lib/supabase";
 import { useAuth, type Profile } from "./useAuth";
 
 export interface AccessRights {
-  recipes: boolean;
-  sport: boolean;
-  messaging: boolean;
-  aiUnlimited: boolean;
-  nutritionPrograms: boolean;
+  access_recipes: boolean;
+  access_sport_programs: boolean;
+  access_nutrition_programs: boolean;
+  access_messaging: boolean;
+  access_visio: boolean;
+  access_premium_content: boolean;
 }
 
 const PLAN_RIGHTS: Record<Profile["plan"], AccessRights> = {
   basic: {
-    recipes: true,
-    sport: false,
-    messaging: false,
-    aiUnlimited: false,
-    nutritionPrograms: false,
+    access_recipes:            true,
+    access_sport_programs:     false,
+    access_nutrition_programs: false,
+    access_messaging:          false,
+    access_visio:              false,
+    access_premium_content:    false,
   },
   premium: {
-    recipes: true,
-    sport: true,
-    messaging: true,
-    aiUnlimited: true,
-    nutritionPrograms: false,
+    access_recipes:            true,
+    access_sport_programs:     true,
+    access_nutrition_programs: true,
+    access_messaging:          true,
+    access_visio:              false,
+    access_premium_content:    true,
   },
   visio: {
-    recipes: true,
-    sport: true,
-    messaging: true,
-    aiUnlimited: true,
-    nutritionPrograms: true,
+    access_recipes:            true,
+    access_sport_programs:     true,
+    access_nutrition_programs: true,
+    access_messaging:          true,
+    access_visio:              true,
+    access_premium_content:    true,
   },
   patient: {
-    recipes: true,
-    sport: true,
-    messaging: true,
-    aiUnlimited: true,
-    nutritionPrograms: true,
+    access_recipes:            true,
+    access_sport_programs:     true,
+    access_nutrition_programs: true,
+    access_messaging:          true,
+    access_visio:              true,
+    access_premium_content:    true,
   },
 };
 
 const PRO_RIGHTS: AccessRights = {
-  recipes: true,
-  sport: true,
-  messaging: true,
-  aiUnlimited: true,
-  nutritionPrograms: true,
+  access_recipes:            true,
+  access_sport_programs:     true,
+  access_nutrition_programs: true,
+  access_messaging:          true,
+  access_visio:              true,
+  access_premium_content:    true,
 };
 
 export function useAccessRights() {
@@ -71,7 +77,7 @@ export function useAccessRights() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const base = { ...PLAN_RIGHTS[profile.plan] };
+      const base: AccessRights = { ...PLAN_RIGHTS[profile.plan] };
 
       const { data, error } = await supabase
         .from("subscriber_overrides")
@@ -93,9 +99,7 @@ export function useAccessRights() {
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [user, profile, authLoading]);
 
   return { rights, loading: loading || authLoading };
