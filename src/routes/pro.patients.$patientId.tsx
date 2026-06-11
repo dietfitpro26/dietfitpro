@@ -1,6 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Pencil, TrendingUp, Plus, Save, X, ChevronDown, ChevronUp, Mail, Trash2, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft, Pencil, TrendingUp, Plus, Save, X,
+  ChevronDown, ChevronUp, Mail, Trash2, AlertTriangle,
+  FileText, Upload, ExternalLink, Loader2
+} from "lucide-react";
 import { toast } from "sonner";
 import { ProLayout } from "@/layouts/ProLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -12,22 +16,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Table, TableHeader, TableRow, TableHead, TableBody, TableCell,
-} from "@/components/ui/table";
-import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
-} from "@/components/ui/select";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter,
-} from "@/components/ui/sheet";
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend,
-} from "recharts";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 
@@ -36,6 +29,7 @@ export const Route = createFileRoute("/pro/patients/$patientId")({
   component: PatientDetailPage,
 });
 
+// ── Interfaces ────────────────────────────────────────────
 interface Patient {
   id: string;
   user_id: string | null;
@@ -54,7 +48,6 @@ interface Patient {
   is_active: boolean;
   created_at: string;
 }
-
 interface NutritionProgram {
   id: string; name: string; is_active: boolean;
   start_date: string; end_date: string | null; daily_kcal_target: number | null;
@@ -74,7 +67,16 @@ interface BodyMeasurement {
 interface Appointment {
   id: string; starts_at: string; ends_at: string; status: string; is_visio: boolean;
 }
+interface PatientDocument {
+  id: string;
+  title: string;
+  file_url: string;
+  file_name: string | null;
+  category: string | null;
+  created_at: string;
+}
 
+// ── Constantes ────────────────────────────────────────────
 const GOAL_LABEL: Record<string, string> = {
   perte_de_poids: "Perte de poids", prise_de_masse: "Prise de masse",
   maintien: "Maintien", autre: "Autre",
@@ -89,6 +91,7 @@ function calcBmi(weight: number | null, height: number | null): string {
   return (weight / Math.pow(height / 100, 2)).toFixed(1);
 }
 
+// ── Page ──────────────────────────────────────────────────
 function PatientDetailPage() {
   return (
     <ProtectedRoute allow={["pro"]}>
@@ -101,18 +104,19 @@ function PatientDetailContent() {
   const { patientId } = Route.useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [patient, setPatient]           = useState<Patient | null>(null);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState<string | null>(null);
   const [nutritionPrograms, setNutritionPrograms] = useState<NutritionProgram[]>([]);
-  const [sportPrograms, setSportPrograms] = useState<SportProgram[]>([]);
-  const [measurements, setMeasurements] = useState<BodyMeasurement[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [editOpen, setEditOpen] = useState(false);
-  const [measureOpen, setMeasureOpen] = useState(false);
-  const [inviting, setInviting] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [sportPrograms, setSportPrograms]         = useState<SportProgram[]>([]);
+  const [measurements, setMeasurements]           = useState<BodyMeasurement[]>([]);
+  const [appointments, setAppointments]           = useState<Appointment[]>([]);
+  const [documents, setDocuments]                 = useState<PatientDocument[]>([]);
+  const [editOpen, setEditOpen]         = useState(false);
+  const [measureOpen, setMeasureOpen]   = useState(false);
+  const [inviting, setInviting]         = useState(false);
+  const [deleteOpen, setDeleteOpen]     = useState(false);
+  const [deleting, setDeleting]         = useState(false);
 
   const loadPatient = async () => {
     if (!user) return;
@@ -124,7 +128,7 @@ function PatientDetailContent() {
 
   const loadSecondary = async (patientRow: Patient) => {
     const userId = patientRow.user_id;
-    const [npRes, spRes, mRes, aRes] = await Promise.all([
+    const [npRes, spRes, mRes, aRes, docsRes] = await Promise.all([
       supabase.from("nutrition_programs")
         .select("id, name, is_active, start_date, end_date, daily_kcal_target")
         .eq("patient_id", patientRow.id).order("start_date", { ascending: false }),
@@ -133,19 +137,22 @@ function PatientDetailContent() {
         .eq("patient_id", patientRow.id).order("created_at", { ascending: false }),
       supabase.from("body_measurements")
         .select("id, measured_at, weight_kg, body_fat_pct, muscle_mass_kg, metabolic_age, visceral_fat, waist_cm, hip_cm, arm_cm, thigh_cm, chest_cm, notes")
-        .eq("patient_id", patientRow.id)
-        .order("measured_at", { ascending: true }),
+        .eq("patient_id", patientRow.id).order("measured_at", { ascending: true }),
       userId
         ? supabase.from("appointments")
             .select("id, starts_at, ends_at, status, is_visio")
             .eq("pro_id", user!.id).eq("patient_user_id", userId)
             .order("starts_at", { ascending: false })
         : Promise.resolve({ data: [] }),
+      supabase.from("patient_documents")
+        .select("id, title, file_url, file_name, category, created_at")
+        .eq("patient_id", patientRow.id).order("created_at", { ascending: false }),
     ]);
     setNutritionPrograms((npRes.data as NutritionProgram[]) ?? []);
     setSportPrograms((spRes.data as SportProgram[]) ?? []);
     setMeasurements((mRes.data as BodyMeasurement[]) ?? []);
     setAppointments((aRes.data as Appointment[]) ?? []);
+    setDocuments((docsRes.data as PatientDocument[]) ?? []);
   };
 
   useEffect(() => {
@@ -172,20 +179,13 @@ function PatientDetailContent() {
     try {
       const { data, error } = await supabase.functions.invoke("invite-patient", {
         body: {
-          email: patient.email,
-          patient_id: patient.id,
-          pro_id: user?.id,
-          redirect_to: `${window.location.origin}/bienvenue`,
+          email: patient.email, patient_id: patient.id,
+          pro_id: user?.id, redirect_to: `${window.location.origin}/bienvenue`,
         },
       });
-      if (error || data?.error) {
-        toast.error(data?.error ?? error?.message ?? "Erreur inconnue");
-        return;
-      }
+      if (error || data?.error) { toast.error(data?.error ?? error?.message ?? "Erreur inconnue"); return; }
       toast.success(`Invitation envoyée à ${patient.email} ✉️`);
-    } finally {
-      setInviting(false);
-    }
+    } finally { setInviting(false); }
   };
 
   const handleDelete = async () => {
@@ -194,6 +194,7 @@ function PatientDetailContent() {
       await supabase.from("body_measurements").delete().eq("patient_id", patientId);
       await supabase.from("nutrition_programs").delete().eq("patient_id", patientId);
       await supabase.from("sport_programs").delete().eq("patient_id", patientId);
+      await supabase.from("patient_documents").delete().eq("patient_id", patientId);
       if (patient?.user_id) {
         await supabase.from("appointments").delete().eq("patient_user_id", patient.user_id);
       }
@@ -201,10 +202,7 @@ function PatientDetailContent() {
       if (error) { toast.error(error.message); return; }
       toast.success("Patient supprimé ✅");
       navigate({ to: "/pro/patients" });
-    } finally {
-      setDeleting(false);
-      setDeleteOpen(false);
-    }
+    } finally { setDeleting(false); setDeleteOpen(false); }
   };
 
   if (loading) return (
@@ -212,7 +210,6 @@ function PatientDetailContent() {
       <Skeleton className="h-8 w-48" /><Skeleton className="h-24 w-full" /><Skeleton className="h-64 w-full" />
     </div>
   );
-
   if (error || !patient) return (
     <div className="p-6">
       <Button variant="ghost" onClick={() => navigate({ to: "/pro/patients" })}>
@@ -278,7 +275,7 @@ function PatientDetailContent() {
 
       <div className="p-6">
         <Tabs defaultValue="evolution">
-          <TabsList className="mb-4">
+          <TabsList className="mb-4 flex-wrap">
             <TabsTrigger value="evolution">📈 Évolution</TabsTrigger>
             <TabsTrigger value="info">Infos générales</TabsTrigger>
             <TabsTrigger value="programs">Programmes</TabsTrigger>
@@ -299,7 +296,6 @@ function PatientDetailContent() {
                 color="orange"
               />
             </div>
-
             {measurements.length === 0 ? (
               <div className="rounded-lg border bg-card p-12 text-center text-muted-foreground">
                 <TrendingUp className="h-10 w-10 mx-auto mb-3 opacity-30" />
@@ -334,7 +330,6 @@ function PatientDetailContent() {
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
-
                 {measurements.some((m) => m.body_fat_pct || m.muscle_mass_kg || m.metabolic_age || m.visceral_fat) && (
                   <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-base">💪 Composition corporelle</CardTitle></CardHeader>
@@ -342,10 +337,8 @@ function PatientDetailContent() {
                       <ResponsiveContainer width="100%" height={220}>
                         <LineChart data={measurements.map((m) => ({
                           date: new Date(m.measured_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }),
-                          "% Graisse": m.body_fat_pct,
-                          "Masse musc. (kg)": m.muscle_mass_kg,
-                          "Âge métabo.": m.metabolic_age,
-                          "Graisse visc.": m.visceral_fat,
+                          "% Graisse": m.body_fat_pct, "Masse musc. (kg)": m.muscle_mass_kg,
+                          "Âge métabo.": m.metabolic_age, "Graisse visc.": m.visceral_fat,
                         }))}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                           <XAxis dataKey="date" tick={{ fontSize: 11 }} />
@@ -360,7 +353,6 @@ function PatientDetailContent() {
                     </CardContent>
                   </Card>
                 )}
-
                 {measurements.some((m) => m.waist_cm || m.hip_cm || m.arm_cm || m.thigh_cm) && (
                   <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-base">📏 Mensurations (cm)</CardTitle></CardHeader>
@@ -412,27 +404,37 @@ function PatientDetailContent() {
           {/* ── PROGRAMMES ── */}
           <TabsContent value="programs" className="mt-4 space-y-4">
             <Card>
-              <CardContent className="p-6">
-                <h3 className="font-semibold mb-3">🥗 Programmes nutrition</h3>
-                {nutritionPrograms.length === 0
-                  ? <p className="text-sm text-muted-foreground">Aucun programme. (PDF à venir)</p>
-                  : <ul className="space-y-2">{nutritionPrograms.map((np) => (
-                      <li key={np.id} className="flex items-center justify-between text-sm">
-                        <span>{np.name}</span>
-                        <span className="text-muted-foreground">{np.daily_kcal_target ? `${np.daily_kcal_target} kcal/j` : ""} {np.is_active ? "• actif" : "• inactif"}</span>
-                      </li>))}</ul>}
+              <CardContent className="p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">🥗 Programme nutrition</h3>
+                  <PdfUploadButton
+                    patientId={patientId}
+                    proId={user?.id ?? ""}
+                    category="nutrition"
+                    onUploaded={() => patient && loadSecondary(patient)}
+                  />
+                </div>
+                <PdfList
+                  documents={documents.filter((d) => d.category === "nutrition")}
+                  onDeleted={() => patient && loadSecondary(patient)}
+                />
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-6">
-                <h3 className="font-semibold mb-3">🏋️ Programmes sport</h3>
-                {sportPrograms.length === 0
-                  ? <p className="text-sm text-muted-foreground">Aucun programme. (PDF à venir)</p>
-                  : <ul className="space-y-2">{sportPrograms.map((sp) => (
-                      <li key={sp.id} className="flex items-center justify-between text-sm">
-                        <span>{sp.name}</span>
-                        <span className="text-muted-foreground">{sp.frequency_per_week ? `${sp.frequency_per_week}x/sem` : ""} {sp.is_active ? "• actif" : "• inactif"}</span>
-                      </li>))}</ul>}
+              <CardContent className="p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">🏋️ Programme sport</h3>
+                  <PdfUploadButton
+                    patientId={patientId}
+                    proId={user?.id ?? ""}
+                    category="sport"
+                    onUploaded={() => patient && loadSecondary(patient)}
+                  />
+                </div>
+                <PdfList
+                  documents={documents.filter((d) => d.category === "sport")}
+                  onDeleted={() => patient && loadSecondary(patient)}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -500,23 +502,17 @@ function PatientDetailContent() {
 
       <AddMeasureDialog open={measureOpen} onOpenChange={setMeasureOpen}
         patient={patient} proId={user?.id ?? ""}
-        onSaved={async () => {
-          setMeasureOpen(false);
-          await loadSecondary(patient);
-          toast.success("Mesure enregistrée ✅");
-        }} />
+        onSaved={async () => { setMeasureOpen(false); await loadSecondary(patient); toast.success("Mesure enregistrée ✅"); }} />
 
-      {/* ── DIALOG SUPPRESSION ── */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="h-5 w-5" />
-              Supprimer ce patient ?
+              <AlertTriangle className="h-5 w-5" /> Supprimer ce patient ?
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Vous allez supprimer <strong>{patient?.first_name} {patient?.last_name}</strong> ainsi que toutes ses données (mesures, programmes, rendez-vous). Cette action est <strong>irréversible</strong>.
+            Vous allez supprimer <strong>{patient?.first_name} {patient?.last_name}</strong> ainsi que toutes ses données. Cette action est <strong>irréversible</strong>.
           </p>
           <DialogFooter className="gap-2 mt-2">
             <Button variant="ghost" onClick={() => setDeleteOpen(false)}>Annuler</Button>
@@ -532,16 +528,133 @@ function PatientDetailContent() {
 }
 
 /* ══════════════════════════════════════════
+   PDF UPLOAD BUTTON
+══════════════════════════════════════════ */
+function PdfUploadButton({ patientId, proId, category, onUploaded }: {
+  patientId: string; proId: string; category: string; onUploaded: () => void;
+}) {
+  const fileRef              = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setUploading(true);
+  try {
+    const path = `${proId}/patient-docs/${patientId}/${category}-${Date.now()}.pdf`;
+
+    const { error: upErr } = await supabase.storage
+      .from("message-attachments")
+      .upload(path, file, { upsert: false });
+
+    if (upErr) throw upErr;
+
+    const { error: insertErr } = await supabase.from("patient_documents").insert({
+      patient_id: patientId,
+      pro_id: proId,
+      title: file.name.replace(".pdf", ""),
+      file_url: path, // on stocke le path, pas une URL publique
+      file_name: file.name,
+      category,
+    });
+
+    if (insertErr) throw insertErr;
+
+    toast.success("PDF ajouté ✅");
+    onUploaded();
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : "Erreur upload");
+  } finally {
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+};
+
+  return (
+    <>
+      <input ref={fileRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleFile} />
+      <Button size="sm" variant="outline" disabled={uploading} onClick={() => fileRef.current?.click()}>
+        {uploading
+          ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />Upload…</>
+          : <><Upload className="h-3.5 w-3.5 mr-1" />Ajouter un PDF</>
+        }
+      </Button>
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PDF LIST
+══════════════════════════════════════════ */
+function PdfList({ documents, onDeleted }: {
+  documents: PatientDocument[]; onDeleted: () => void;
+}) {
+  if (documents.length === 0) return (
+    <p className="text-sm text-muted-foreground">Aucun PDF assigné pour l'instant.</p>
+  );
+
+  const handleOpen = async (filePath: string) => {
+    const { data, error } = await supabase.storage
+      .from("message-attachments")
+      .createSignedUrl(filePath, 60 * 60);
+
+    if (error || !data?.signedUrl) {
+      toast.error("Impossible d'ouvrir le fichier");
+      return;
+    }
+
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handleDelete = async (id: string, filePath: string) => {
+    if (!confirm("Supprimer ce PDF ?")) return;
+    await supabase.storage.from("message-attachments").remove([filePath]);
+    await supabase.from("patient_documents").delete().eq("id", id);
+    toast.success("PDF supprimé");
+    onDeleted();
+  };
+
+  return (
+    <div className="space-y-2">
+      {documents.map((doc) => (
+        <div key={doc.id} className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <FileText className="h-4 w-4 text-red-500 flex-shrink-0" />
+            <span className="text-sm truncate">{doc.title}</span>
+            <span className="text-xs text-muted-foreground flex-shrink-0">
+              {new Date(doc.created_at).toLocaleDateString("fr-FR")}
+            </span>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button onClick={() => handleOpen(doc.file_url)}
+              className="text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-1">
+              <ExternalLink className="h-3 w-3" /> Voir
+            </button>
+            <button onClick={() => handleDelete(doc.id, doc.file_url)}
+              className="text-xs px-2 py-1 rounded-md bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/20 transition-colors">
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
    DRAWER — MODIFIER LE PATIENT
 ══════════════════════════════════════════ */
 function EditPatientSheet({ open, onOpenChange, patient, onSaved }: {
   open: boolean; onOpenChange: (v: boolean) => void; patient: Patient; onSaved: () => void;
 }) {
-  const [form, setForm] = useState({ ...patient });
+  const [form, setForm]           = useState({ ...patient });
   const [allergiesStr, setAllergiesStr] = useState(patient.allergies?.join(", ") ?? "");
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]       = useState(false);
 
-  useEffect(() => { setForm({ ...patient }); setAllergiesStr(patient.allergies?.join(", ") ?? ""); }, [patient, open]);
+  useEffect(() => {
+    setForm({ ...patient });
+    setAllergiesStr(patient.allergies?.join(", ") ?? "");
+  }, [patient, open]);
 
   const set = (field: keyof typeof form, value: string | number | null | boolean) =>
     setForm((f) => ({ ...f, [field]: value }));
@@ -641,20 +754,20 @@ function AddMeasureDialog({ open, onOpenChange, patient, proId, onSaved }: {
   patient: Patient; proId: string; onSaved: () => void;
 }) {
   const today = new Date().toISOString().split("T")[0];
-  const [date, setDate] = useState(today);
-  const [weight, setWeight] = useState("");
-  const [fat, setFat] = useState("");
-  const [muscle, setMuscle] = useState("");
-  const [metaAge, setMetaAge] = useState("");
+  const [date, setDate]               = useState(today);
+  const [weight, setWeight]           = useState("");
+  const [fat, setFat]                 = useState("");
+  const [muscle, setMuscle]           = useState("");
+  const [metaAge, setMetaAge]         = useState("");
   const [visceralFat, setVisceralFat] = useState("");
   const [showOptional, setShowOptional] = useState(false);
-  const [waist, setWaist] = useState("");
-  const [hip, setHip] = useState("");
-  const [arm, setArm] = useState("");
-  const [thigh, setThigh] = useState("");
-  const [chest, setChest] = useState("");
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [waist, setWaist]             = useState("");
+  const [hip, setHip]                 = useState("");
+  const [arm, setArm]                 = useState("");
+  const [thigh, setThigh]             = useState("");
+  const [chest, setChest]             = useState("");
+  const [notes, setNotes]             = useState("");
+  const [saving, setSaving]           = useState(false);
 
   const bmiPreview = weight && patient.height_cm
     ? calcBmi(Number(weight), patient.height_cm) : null;
@@ -670,8 +783,7 @@ function AddMeasureDialog({ open, onOpenChange, patient, proId, onSaved }: {
   const handleSave = async () => {
     setSaving(true);
     const { error } = await supabase.from("body_measurements").insert({
-      patient_id: patient.id,
-      user_id: patient.user_id ?? null,
+      patient_id: patient.id, user_id: patient.user_id ?? null,
       measured_at: date,
       weight_kg: weight ? Number(weight) : null,
       body_fat_pct: fat ? Number(fat) : null,
@@ -696,12 +808,10 @@ function AddMeasureDialog({ open, onOpenChange, patient, proId, onSaved }: {
         <DialogHeader>
           <DialogTitle>📊 Nouvelle mesure — {patient.first_name} {patient.last_name}</DialogTitle>
         </DialogHeader>
-
         <div className="space-y-4">
           <Field label="Date de la mesure">
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
-
           <div className="rounded-lg bg-muted/40 p-4 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Données essentielles</p>
             <div className="grid grid-cols-2 gap-3">
@@ -731,16 +841,11 @@ function AddMeasureDialog({ open, onOpenChange, patient, proId, onSaved }: {
               </Field>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => setShowOptional((v) => !v)}
-            className="flex w-full items-center justify-between text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
-          >
+          <button type="button" onClick={() => setShowOptional((v) => !v)}
+            className="flex w-full items-center justify-between text-sm text-muted-foreground hover:text-foreground transition-colors py-1">
             <span>📏 Mensurations optionnelles (taille, hanches, bras…)</span>
             {showOptional ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
-
           {showOptional && (
             <div className="rounded-lg border p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -752,12 +857,10 @@ function AddMeasureDialog({ open, onOpenChange, patient, proId, onSaved }: {
               </div>
             </div>
           )}
-
           <Field label="Notes (optionnel)">
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Observations, contexte…" />
           </Field>
         </div>
-
         <DialogFooter className="mt-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white" onClick={handleSave} disabled={saving}>
@@ -782,16 +885,16 @@ function KpiCard({ label, value, color = "default" }: { label: string; value: st
   const colors = { default: "bg-card border", green: "bg-[#6DB33F]/10 border-[#6DB33F]/20", orange: "bg-orange-50 border-orange-200" };
   return (
     <div className={`rounded-lg p-4 ${colors[color]}`}>
-      <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-bold mt-1">{value}</p>
+      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
+      <p className="text-2xl font-bold">{value}</p>
     </div>
   );
 }
 function InfoRow({ label, value, full }: { label: string; value: string; full?: boolean }) {
   return (
-    <div className={full ? "sm:col-span-2" : ""}>
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="text-sm text-foreground mt-0.5">{value}</p>
+    <div className={full ? "col-span-2" : ""}>
+      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">{label}</p>
+      <p className="text-sm font-medium">{value}</p>
     </div>
   );
 }
