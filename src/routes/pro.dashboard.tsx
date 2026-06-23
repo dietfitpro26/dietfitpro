@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   Bell, UserPlus, Users, CalendarCheck,
-  ClipboardList, MessageSquare, ArrowRight, Video,
+  ClipboardList, MessageSquare, ArrowRight, Video, UserCheck,
 } from "lucide-react";
 import { format, isToday, isTomorrow } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -25,6 +25,7 @@ export const Route = createFileRoute("/pro/dashboard")({
 
 interface Kpis {
   patients: number;
+  subscribers: number;
   todayConsultations: number;
   activePrograms: number;
   unreadMessages: number;
@@ -48,11 +49,26 @@ interface RecentPatient {
   updated_at: string;
 }
 
+interface RecentSubscriber {
+  id: string;
+  full_name: string | null;
+  email: string;
+  plan: string | null;
+  created_at: string;
+}
+
 const GOAL_LABEL: Record<string, string> = {
   perte_de_poids: "Perte de poids",
   prise_de_masse: "Prise de masse",
   maintien: "Maintien",
   autre: "Autre",
+};
+
+const PLAN_LABEL: Record<string, string> = {
+  basic: "Basic",
+  premium: "Premium",
+  visio: "Visio",
+  patient: "Patient",
 };
 
 function ProDashboardPage() {
@@ -72,6 +88,7 @@ function DashboardContent() {
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [upcoming, setUpcoming] = useState<UpcomingConsultation[] | null>(null);
   const [recentPatients, setRecentPatients] = useState<RecentPatient[] | null>(null);
+  const [recentSubscribers, setRecentSubscribers] = useState<RecentSubscriber[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -83,58 +100,86 @@ function DashboardContent() {
       const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
       const next7days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      const [patientsRes, visioTodayRes, nutritionRes, sportRes, messagesRes, upcomingRes, recentRes] =
-        await Promise.all([
-          supabase
-            .from("patients")
-            .select("*", { count: "exact", head: true })
-            .eq("pro_id", user.id)
-            .eq("is_active", true),
-          // ✅ Corrigé : on utilise visio_consultations, pas appointments
-          supabase
-            .from("visio_consultations")
-            .select("*", { count: "exact", head: true })
-            .eq("pro_id", user.id)
-            .eq("status", "scheduled")
-            .gte("scheduled_at", startOfDay)
-            .lt("scheduled_at", endOfDay),
-          supabase
-            .from("nutrition_programs")
-            .select("*", { count: "exact", head: true })
-            .eq("pro_id", user.id)
-            .eq("is_active", true),
-          supabase
-            .from("sport_programs")
-            .select("*", { count: "exact", head: true })
-            .eq("pro_id", user.id)
-            .eq("is_active", true),
-          supabase
-            .from("messages")
-            .select("*", { count: "exact", head: true })
-            .eq("recipient_id", user.id)
-            .is("read_at", null),
-          // Prochaines consultations sur 7 jours
-          supabase
-            .from("visio_consultations")
-            .select("id, scheduled_at, duration_min, status, room_url, patient_id")
-            .eq("pro_id", user.id)
-            .eq("status", "scheduled")
-            .gte("scheduled_at", now.toISOString())
-            .lte("scheduled_at", next7days)
-            .order("scheduled_at", { ascending: true })
-            .limit(5),
-          // 5 derniers patients
-          supabase
-            .from("patients")
-            .select("id, first_name, last_name, goal, is_active, updated_at")
-            .eq("pro_id", user.id)
-            .order("updated_at", { ascending: false })
-            .limit(5),
-        ]);
+      const [
+        patientsRes, visioTodayRes, nutritionRes,
+        sportRes, messagesRes, upcomingRes, recentRes,
+      ] = await Promise.all([
+        // Patients actifs
+        supabase
+          .from("patients")
+          .select("*", { count: "exact", head: true })
+          .eq("pro_id", user.id)
+          .eq("is_active", true),
+
+        // Consultations du jour
+        supabase
+          .from("visio_consultations")
+          .select("*", { count: "exact", head: true })
+          .eq("pro_id", user.id)
+          .eq("status", "scheduled")
+          .gte("scheduled_at", startOfDay)
+          .lt("scheduled_at", endOfDay),
+
+        // Programmes nutrition actifs
+        supabase
+          .from("nutrition_programs")
+          .select("*", { count: "exact", head: true })
+          .eq("pro_id", user.id)
+          .eq("is_active", true),
+
+        // Programmes sport actifs
+        supabase
+          .from("sport_programs")
+          .select("*", { count: "exact", head: true })
+          .eq("pro_id", user.id)
+          .eq("is_active", true),
+
+        // Messages non lus
+        supabase
+          .from("messages")
+          .select("*", { count: "exact", head: true })
+          .eq("recipient_id", user.id)
+          .is("read_at", null),
+
+        // Prochaines consultations (7 jours)
+        supabase
+          .from("visio_consultations")
+          .select("id, scheduled_at, duration_min, status, room_url, patient_id")
+          .eq("pro_id", user.id)
+          .eq("status", "scheduled")
+          .gte("scheduled_at", now.toISOString())
+          .lte("scheduled_at", next7days)
+          .order("scheduled_at", { ascending: true })
+          .limit(5),
+
+        // Derniers patients
+        supabase
+          .from("patients")
+          .select("id, first_name, last_name, goal, is_active, updated_at")
+          .eq("pro_id", user.id)
+          .order("updated_at", { ascending: false })
+          .limit(5),
+      ]);
+
+      // ✅ CORRECTION 1 : comptage abonnés directement dans profiles avec pro_id
+      const { count: subsCount } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("pro_id", user.id)
+        .eq("role", "subscriber");
+
+      // ✅ CORRECTION 2 : liste abonnés récents depuis profiles avec pro_id
+      const { data: recentSubsData } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, plan, created_at")
+        .eq("pro_id", user.id)
+        .eq("role", "subscriber")
+        .order("created_at", { ascending: false })
+        .limit(5);
 
       const firstError =
-        patientsRes.error || visioTodayRes.error || nutritionRes.error ||
-        sportRes.error || messagesRes.error;
+        patientsRes.error || visioTodayRes.error ||
+        nutritionRes.error || sportRes.error || messagesRes.error;
       if (firstError) {
         setError(firstError.message);
         return;
@@ -142,12 +187,12 @@ function DashboardContent() {
 
       setKpis({
         patients: patientsRes.count ?? 0,
+        subscribers: subsCount ?? 0,
         todayConsultations: visioTodayRes.count ?? 0,
         activePrograms: (nutritionRes.count ?? 0) + (sportRes.count ?? 0),
         unreadMessages: messagesRes.count ?? 0,
       });
 
-      // Enrichir les consultations avec les noms patients
       const rawUpcoming = (upcomingRes.data ?? []) as Array<{
         id: string; scheduled_at: string; duration_min: number | null;
         status: string; room_url: string | null; patient_id: string | null;
@@ -173,17 +218,15 @@ function DashboardContent() {
         }))
       );
       setRecentPatients((recentRes.data ?? []) as RecentPatient[]);
+      setRecentSubscribers((recentSubsData ?? []) as RecentSubscriber[]);
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur de chargement");
     }
   }, [user]);
 
-  // Chargement initial
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
-  // ✅ Rafraîchissement auto toutes les 60 secondes
   useEffect(() => {
     const interval = setInterval(() => void load(), 60_000);
     return () => clearInterval(interval);
@@ -194,7 +237,6 @@ function DashboardContent() {
 
   return (
     <div className="flex flex-col min-h-full">
-      {/* Header */}
       <header className="flex items-center justify-between border-b bg-white px-6 py-4">
         <div>
           <h1 className="text-xl font-semibold text-foreground">Tableau de bord</h1>
@@ -204,7 +246,6 @@ function DashboardContent() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* ✅ Cloche avec badge et lien */}
           <Button
             variant="ghost"
             size="icon"
@@ -219,7 +260,6 @@ function DashboardContent() {
               </span>
             )}
           </Button>
-          {/* ✅ Bouton fonctionnel avec navigation */}
           <Button
             className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white"
             onClick={() => void navigate({ to: "/pro/patients" })}
@@ -231,7 +271,6 @@ function DashboardContent() {
       </header>
 
       <div className="p-6 space-y-6">
-        {/* Erreur */}
         {error && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive flex items-center justify-between">
             <span>{error}</span>
@@ -241,14 +280,21 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* KPIs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* KPIs — 5 cartes */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
           <KpiCard
             label="Patients actifs"
             value={kpis?.patients}
             icon={<Users className="h-5 w-5 text-[#6DB33F]" />}
             loading={isLoading}
             onClick={() => void navigate({ to: "/pro/patients" })}
+          />
+          <KpiCard
+            label="Abonnés actifs"
+            value={kpis?.subscribers}
+            icon={<UserCheck className="h-5 w-5 text-[#6DB33F]" />}
+            loading={isLoading}
+            onClick={() => void navigate({ to: "/pro/subscribers" })}
           />
           <KpiCard
             label="Consultations aujourd'hui"
@@ -274,7 +320,7 @@ function DashboardContent() {
           />
         </div>
 
-        {/* Grille basse : Consultations à venir + Derniers patients */}
+        {/* Grille basse */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Prochaines consultations */}
           <Card className="border-border/60">
@@ -301,11 +347,7 @@ function DashboardContent() {
                 <div className="flex flex-col items-center py-8 text-muted-foreground text-sm gap-2">
                   <CalendarCheck className="h-8 w-8 text-muted-foreground/40" />
                   <span>Aucune consultation planifiée sur 7 jours</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void navigate({ to: "/pro/consultations" })}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => void navigate({ to: "/pro/consultations" })}>
                     Planifier une consultation
                   </Button>
                 </div>
@@ -340,16 +382,53 @@ function DashboardContent() {
                 <div className="flex flex-col items-center py-8 text-muted-foreground text-sm gap-2">
                   <Users className="h-8 w-8 text-muted-foreground/40" />
                   <span>Aucun patient pour l'instant</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void navigate({ to: "/pro/patients" })}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => void navigate({ to: "/pro/patients" })}>
                     Ajouter un patient
                   </Button>
                 </div>
               ) : (
                 recentPatients?.map((p) => <PatientRow key={p.id} patient={p} />)
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Derniers abonnés — pleine largeur */}
+          <Card className="border-border/60 lg:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <UserCheck className="h-4 w-4 text-[#6DB33F]" />
+                Derniers abonnés
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground gap-1"
+                onClick={() => void navigate({ to: "/pro/subscribers" })}
+              >
+                Voir tout <ArrowRight className="h-3 w-3" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full rounded-md" />
+                  ))}
+                </div>
+              ) : recentSubscribers?.length === 0 ? (
+                <div className="flex flex-col items-center py-8 text-muted-foreground text-sm gap-2">
+                  <UserCheck className="h-8 w-8 text-muted-foreground/40" />
+                  <span>Aucun abonné pour l'instant</span>
+                  <Button variant="outline" size="sm" onClick={() => void navigate({ to: "/pro/subscribers" })}>
+                    Gérer les abonnés
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                  {recentSubscribers?.map((s) => (
+                    <SubscriberRow key={s.id} subscriber={s} />
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -413,12 +492,7 @@ function ConsultationRow({ consult }: { consult: UpcomingConsultation }) {
         </p>
       </div>
       {consult.room_url && (
-        <a
-          href={consult.room_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <a href={consult.room_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
           <Button size="sm" className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white h-7 px-2 text-xs gap-1">
             <Video className="h-3 w-3" /> Rejoindre
           </Button>
@@ -434,7 +508,7 @@ function PatientRow({ patient }: { patient: RecentPatient }) {
   return (
     <div
       className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/50 cursor-pointer transition-colors"
-      onClick={() => void navigate({ to: "/pro/patients" })}
+      onClick={() => void navigate({ to: "/pro/patients/$patientId", params: { patientId: patient.id } })}
     >
       <Avatar className="h-8 w-8">
         <AvatarFallback className="bg-[#6DB33F]/20 text-[#2D7A1F] text-xs font-semibold">
@@ -442,9 +516,7 @@ function PatientRow({ patient }: { patient: RecentPatient }) {
         </AvatarFallback>
       </Avatar>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">
-          {patient.first_name} {patient.last_name}
-        </p>
+        <p className="text-sm font-medium truncate">{patient.first_name} {patient.last_name}</p>
         <p className="text-xs text-muted-foreground">
           {(patient.goal && GOAL_LABEL[patient.goal]) ?? "Objectif non défini"}
         </p>
@@ -459,6 +531,36 @@ function PatientRow({ patient }: { patient: RecentPatient }) {
         )}
       >
         {patient.is_active ? "Actif" : "Inactif"}
+      </Badge>
+    </div>
+  );
+}
+
+function SubscriberRow({ subscriber }: { subscriber: RecentSubscriber }) {
+  const navigate = useNavigate();
+  const name = subscriber.full_name ?? subscriber.email;
+  const initials = name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  const planLabel = (subscriber.plan && PLAN_LABEL[subscriber.plan]) ?? subscriber.plan ?? "—";
+
+  return (
+    <div
+      className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/50 cursor-pointer transition-colors"
+      onClick={() => void navigate({ to: "/pro/subscribers" })}
+    >
+      <Avatar className="h-8 w-8">
+        <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-semibold">
+          {initials}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{name}</p>
+        <p className="text-xs text-muted-foreground">{planLabel}</p>
+      </div>
+      <Badge
+        variant="outline"
+        className="text-[10px] shrink-0 border-green-500/40 text-green-700 bg-green-50"
+      >
+        Actif
       </Badge>
     </div>
   );

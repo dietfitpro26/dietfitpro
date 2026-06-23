@@ -12,13 +12,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { email, patient_id, pro_id, redirect_to } = await req.json();
+    const { email, patient_id, pro_id, role, redirect_to } = await req.json();
 
-    if (!email || !patient_id || !pro_id) {
-      return new Response(JSON.stringify({ error: "Paramètres manquants (email, patient_id, pro_id requis)" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // ✅ patient_id n'est plus obligatoire (abonnés sans fiche patient)
+    if (!email || !pro_id) {
+      return new Response(
+        JSON.stringify({ error: "Paramètres manquants (email et pro_id requis)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const supabaseAdmin = createClient(
@@ -30,40 +31,56 @@ Deno.serve(async (req) => {
     const appUrl = Deno.env.get("APP_URL") ?? "http://localhost:8080";
     const finalRedirect = redirect_to ?? `${appUrl}/bienvenue`;
 
+    // ✅ Si role est passé → on l'utilise, sinon :
+    //    patient_id présent → "patient", sinon → "subscriber"
+    const finalRole: string = role ?? (patient_id ? "patient" : "subscriber");
+
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      data: { patient_id, pro_id, role: "patient" },
+      data: {
+        pro_id,                                          // ✅ toujours présent
+        role: finalRole,                                 // ✅ rôle correct
+        ...(patient_id ? { patient_id } : {}),           // ✅ optionnel
+      },
       redirectTo: finalRedirect,
     });
 
     if (error) {
       console.error("[invite-patient] error:", error.message);
       const msg = error.message.includes("already registered")
-        ? "Cet email est déjà inscrit. Le patient peut se connecter directement."
+        ? "Cet email est déjà inscrit. L'utilisateur peut se connecter directement."
         : error.message;
-      return new Response(JSON.stringify({ error: msg }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: msg }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // Mettre à jour le patient avec son user_id
-    if (data.user?.id) {
+    // ✅ Si patient → met à jour user_id dans la table patients
+    if (patient_id && data.user?.id) {
       await supabaseAdmin
         .from("patients")
         .update({ user_id: data.user.id })
         .eq("id", patient_id);
     }
 
-    return new Response(JSON.stringify({ success: true, userId: data.user?.id }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // ✅ Double sécurité : écrit pro_id + role dans profiles immédiatement
+    if (data.user?.id) {
+      await supabaseAdmin
+        .from("profiles")
+        .update({ pro_id, role: finalRole })
+        .eq("id", data.user.id);
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, userId: data.user?.id, role: finalRole }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
 
   } catch (err) {
     console.error("[invite-patient] catch:", err);
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: String(err) }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });

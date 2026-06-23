@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft, Pencil, TrendingUp, Plus, Save, X,
   ChevronDown, ChevronUp, Mail, Trash2, AlertTriangle,
-  FileText, Upload, ExternalLink, Loader2
+  FileText, Upload, ExternalLink, Loader2, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ProLayout } from "@/layouts/ProLayout";
@@ -23,6 +23,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/com
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { MacroCalculator } from "@/components/MacroCalculator";
+import { Switch } from "@/components/ui/switch";
 
 export const Route = createFileRoute("/pro/patients/$patientId")({
   head: () => ({ meta: [{ title: "Fiche patient — DietFitPro" }] }),
@@ -75,6 +77,15 @@ interface PatientDocument {
   category: string | null;
   created_at: string;
 }
+interface PatientAccess {
+  access_recipes: boolean;
+  access_sport_programs: boolean;
+  access_nutrition_programs: boolean;
+  access_messaging: boolean;
+  access_visio: boolean;
+  access_premium_content: boolean;
+  access_ai_coach: boolean;
+}
 
 // ── Constantes ────────────────────────────────────────────
 const GOAL_LABEL: Record<string, string> = {
@@ -85,6 +96,31 @@ const STATUS_LABEL: Record<string, string> = {
   scheduled: "Planifié", completed: "Terminé",
   cancelled: "Annulé", no_show: "Absent",
 };
+
+const DEFAULT_ACCESS: PatientAccess = {
+  access_recipes: true,
+  access_sport_programs: true,
+  access_nutrition_programs: true,
+  access_messaging: true,
+  access_visio: false,
+  access_premium_content: false,
+  access_ai_coach: false,
+};
+
+const ACCESS_FEATURES: {
+  key: keyof PatientAccess;
+  label: string;
+  description: string;
+  icon: string;
+}[] = [
+  { key: "access_recipes",            label: "Recettes",            description: "Accès aux recettes partagées",             icon: "🍽️" },
+  { key: "access_nutrition_programs", label: "Programme nutrition", description: "Consultation du plan alimentaire",          icon: "🥗" },
+  { key: "access_sport_programs",     label: "Programme sport",     description: "Consultation du programme sportif",         icon: "🏋️" },
+  { key: "access_messaging",          label: "Messagerie",          description: "Échange de messages avec le pro",           icon: "💬" },
+  { key: "access_visio",              label: "Visio-consultation",  description: "Accès aux séances en visioconférence",      icon: "📹" },
+  { key: "access_premium_content",    label: "Contenu premium",     description: "Accès au contenu exclusif du feed",         icon: "⭐" },
+  { key: "access_ai_coach",           label: "Coach IA",            description: "Utilisation du coach nutritionnel IA",      icon: "🤖" },
+];
 
 function calcBmi(weight: number | null, height: number | null): string {
   if (!weight || !height) return "—";
@@ -117,6 +153,11 @@ function PatientDetailContent() {
   const [inviting, setInviting]         = useState(false);
   const [deleteOpen, setDeleteOpen]     = useState(false);
   const [deleting, setDeleting]         = useState(false);
+
+  // ── Accès & Options ──
+  const [access, setAccess]               = useState<PatientAccess>(DEFAULT_ACCESS);
+  const [accessLoading, setAccessLoading] = useState(false);
+  const [savingAccess, setSavingAccess]   = useState(false);
 
   const loadPatient = async () => {
     if (!user) return;
@@ -155,6 +196,50 @@ function PatientDetailContent() {
     setDocuments((docsRes.data as PatientDocument[]) ?? []);
   };
 
+  const loadAccess = async (patientRow: Patient) => {
+    if (!patientRow.user_id) return;
+    setAccessLoading(true);
+    const { data } = await supabase
+      .from("subscriber_overrides")
+      .select("*")
+      .eq("user_id", patientRow.user_id)
+      .maybeSingle();
+    setAccessLoading(false);
+    if (data) {
+      setAccess({
+        access_recipes:            data.access_recipes            ?? true,
+        access_sport_programs:     data.access_sport_programs     ?? true,
+        access_nutrition_programs: data.access_nutrition_programs ?? true,
+        access_messaging:          data.access_messaging          ?? true,
+        access_visio:              data.access_visio              ?? false,
+        access_premium_content:    data.access_premium_content    ?? false,
+        access_ai_coach:           data.access_ai_coach           ?? false,
+      });
+    } else {
+      setAccess(DEFAULT_ACCESS);
+    }
+  };
+
+  const saveAccess = async () => {
+    if (!patient?.user_id) {
+      toast.error("Ce patient n'a pas encore de compte — envoyez-lui une invitation d'abord.");
+      return;
+    }
+    setSavingAccess(true);
+    const { error } = await supabase
+      .from("subscriber_overrides")
+      .upsert(
+        { user_id: patient.user_id, pro_id: user?.id, ...access, updated_at: new Date().toISOString() },
+        { onConflict: "user_id" }
+      );
+    setSavingAccess(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Droits d'accès mis à jour ✅");
+  };
+
+  const toggleAccess = (key: keyof PatientAccess) =>
+    setAccess((prev) => ({ ...prev, [key]: !prev[key] }));
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -168,7 +253,7 @@ function PatientDetailContent() {
       if (!p) { setError("Patient introuvable."); setLoading(false); return; }
       const row = p as Patient;
       setPatient(row); setLoading(false);
-      await loadSecondary(row);
+      await Promise.all([loadSecondary(row), loadAccess(row)]);
     })();
     return () => { cancelled = true; };
   }, [patientId, user]);
@@ -203,6 +288,21 @@ function PatientDetailContent() {
       toast.success("Patient supprimé ✅");
       navigate({ to: "/pro/patients" });
     } finally { setDeleting(false); setDeleteOpen(false); }
+  };
+  const handleDeleteMeasurement = async (id: string) => {
+    if (!confirm("Supprimer cette mesure ?")) return;
+    const { error } = await supabase
+      .from("body_measurements")
+      .delete()
+      .eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Mesure supprimée ✅");
+    const { data } = await supabase
+      .from("body_measurements")
+      .select("*")
+      .eq("patient_id", patientId)
+      .order("measured_at", { ascending: false });
+    setMeasurements((data ?? []) as BodyMeasurement[]);
   };
 
   if (loading) return (
@@ -281,6 +381,9 @@ function PatientDetailContent() {
             <TabsTrigger value="programs">Programmes</TabsTrigger>
             <TabsTrigger value="measurements">Mesures</TabsTrigger>
             <TabsTrigger value="appointments">Historique RDV</TabsTrigger>
+            <TabsTrigger value="access">
+              <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Accès & Options
+            </TabsTrigger>
           </TabsList>
 
           {/* ── ÉVOLUTION ── */}
@@ -403,23 +506,81 @@ function PatientDetailContent() {
 
           {/* ── PROGRAMMES ── */}
           <TabsContent value="programs" className="mt-4 space-y-4">
-            <Card>
-              <CardContent className="p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">🥗 Programme nutrition</h3>
-                  <PdfUploadButton
-                    patientId={patientId}
-                    proId={user?.id ?? ""}
-                    category="nutrition"
-                    onUploaded={() => patient && loadSecondary(patient)}
-                  />
-                </div>
-                <PdfList
-                  documents={documents.filter((d) => d.category === "nutrition")}
-                  onDeleted={() => patient && loadSecondary(patient)}
-                />
-              </CardContent>
-            </Card>
+         <Card>
+  <CardContent className="p-6 space-y-4">
+    <div className="flex items-center justify-between">
+      <h3 className="font-semibold">🥗 Programme nutrition</h3>
+      <PdfUploadButton
+        patientId={patientId}
+        proId={user?.id ?? ""}
+        category="nutrition"
+        onUploaded={() => patient && loadSecondary(patient)}
+      />
+    </div>
+
+    {/* Calculateur de macros */}
+    <MacroCalculator
+      weight_kg={patient.weight_kg}
+      height_cm={patient.height_cm}
+      age={patient.birth_date
+        ? Math.floor((Date.now() - new Date(patient.birth_date).getTime()) / 31557600000)
+        : null}
+      gender={patient.gender === "homme" || patient.gender === "femme"
+        ? patient.gender
+        : null}
+      onValidate={async (result) => {
+        const { error } = await supabase
+          .from("nutrition_programs")
+          .upsert({
+            patient_id:       patientId,
+            pro_id:           user?.id,
+            name:             `Programme Phase ${result.phase}`,
+            daily_kcal_target: result.target_kcal,
+            daily_protein_g:  result.protein_g,
+            daily_carbs_g:    result.carbs_g,
+            daily_fat_g:      result.fat_g,
+            is_active:        true,
+            start_date:       new Date().toISOString().split("T")[0],
+            meals: {
+              phase:          result.phase,
+              mb:             result.mb,
+              tdee:           result.tdee,
+              matin: {
+                pain_cereales_g: result.feculent_matin_pain_g,
+                proteines:       true,
+                lipides_crus_g:  10,
+              },
+              midi: {
+                feculent_cru_g:  result.feculent_midi_cru_g,
+                feculent_cuit_g: result.feculent_midi_cru_g * 2,
+                legumes:         "à volonté",
+                proteines:       true,
+                lipides_crus_g:  10,
+              },
+              soir: {
+                feculent_cru_g:  result.feculent_soir_cru_g,
+                feculent_cuit_g: result.feculent_soir_cru_g * 2,
+                legumes:         "à volonté",
+                proteines:       true,
+                lipides_crus_g:  10,
+              },
+            },
+          }, { onConflict: "patient_id" });
+
+        if (error) {
+          toast.error("Erreur : " + error.message);
+        } else {
+          toast.success("✅ Programme nutrition enregistré !");
+        }
+      }}
+    />
+
+    <PdfList
+      documents={documents.filter((d) => d.category === "nutrition")}
+      onDeleted={() => patient && loadSecondary(patient)}
+    />
+  </CardContent>
+</Card>
             <Card>
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center justify-between">
@@ -449,23 +610,40 @@ function PatientDetailContent() {
                       <TableHead>Date</TableHead><TableHead>Poids</TableHead><TableHead>IMC</TableHead>
                       <TableHead>% MG</TableHead><TableHead>Masse musc.</TableHead>
                       <TableHead>Âge métabo.</TableHead><TableHead>Graisse visc.</TableHead>
+                      <TableHead>Action</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
-                    {measurements.length === 0 ? (
-                      <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground">Aucune mesure.</TableCell></TableRow>
-                    ) : [...measurements].reverse().map((m) => (
-                      <TableRow key={m.id}>
-                        <TableCell>{new Date(m.measured_at).toLocaleDateString("fr-FR")}</TableCell>
-                        <TableCell>{m.weight_kg ? `${m.weight_kg} kg` : "—"}</TableCell>
-                        <TableCell>{calcBmi(m.weight_kg, patient.height_cm)}</TableCell>
-                        <TableCell>{m.body_fat_pct ? `${m.body_fat_pct}%` : "—"}</TableCell>
-                        <TableCell>{m.muscle_mass_kg ? `${m.muscle_mass_kg} kg` : "—"}</TableCell>
-                        <TableCell>{m.metabolic_age ? `${m.metabolic_age} ans` : "—"}</TableCell>
-                        <TableCell>{m.visceral_fat ?? "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
+                 <TableBody>
+  {measurements.length === 0 ? (
+    <TableRow>
+      <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
+        Aucune mesure.
+      </TableCell>
+    </TableRow>
+  ) : [...measurements].reverse().map((m) => (
+    <TableRow key={m.id}>
+      <TableCell>
+        {new Date(m.measured_at).toLocaleDateString("fr-FR")}
+      </TableCell>
+      <TableCell>{m.weight_kg ? `${m.weight_kg} kg` : "—"}</TableCell>
+      <TableCell>{calcBmi(m.weight_kg, patient.height_cm)}</TableCell>
+      <TableCell>{m.body_fat_pct ? `${m.body_fat_pct}%` : "—"}</TableCell>
+      <TableCell>{m.muscle_mass_kg ? `${m.muscle_mass_kg} kg` : "—"}</TableCell>
+      <TableCell>{m.metabolic_age ? `${m.metabolic_age} ans` : "—"}</TableCell>
+      <TableCell>{m.visceral_fat ?? "—"}</TableCell>
+      <TableCell>
+        {/* Le pro peut TOUJOURS supprimer */}
+        <button
+          onClick={() => handleDeleteMeasurement(m.id)}
+          className="text-xs text-red-500 hover:text-red-700 transition-colors px-2 py-1"
+          title="Supprimer cette mesure"
+        >
+          🗑️
+        </button>
+      </TableCell>
+    </TableRow>
+  ))}
+</TableBody>
                 </Table>
               </CardContent>
             </Card>
@@ -494,6 +672,64 @@ function PatientDetailContent() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* ── ACCÈS & OPTIONS ── */}
+          <TabsContent value="access" className="mt-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-[#6DB33F]" />
+                  Droits d'accès — {patient.first_name} {patient.last_name}
+                </CardTitle>
+                {!patient.user_id && (
+                  <div className="rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2 mt-2">
+                    ⚠️ Ce patient n'a pas encore de compte. Envoyez-lui une invitation pour activer les accès.
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {accessLoading ? (
+                  Array.from({ length: 7 }).map((_, i) => (
+                    <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                  ))
+                ) : (
+                  <>
+                    {ACCESS_FEATURES.map((feature) => (
+                      <div
+                        key={feature.key}
+                        className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/20 px-4 py-3 hover:bg-muted/40 transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-xl flex-shrink-0">{feature.icon}</span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{feature.label}</p>
+                            <p className="text-xs text-muted-foreground">{feature.description}</p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={access[feature.key]}
+                          onCheckedChange={() => toggleAccess(feature.key)}
+                          disabled={!patient.user_id}
+                          className="flex-shrink-0 ml-4 data-[state=checked]:bg-[#6DB33F]"
+                        />
+                      </div>
+                    ))}
+                    <div className="pt-4 flex justify-end">
+                      <Button
+                        className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white"
+                        onClick={saveAccess}
+                        disabled={savingAccess || !patient.user_id}
+                      >
+                        <Save className="h-4 w-4 mr-1" />
+                        {savingAccess ? "Enregistrement…" : "Enregistrer les accès"}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
         </Tabs>
       </div>
 
@@ -537,38 +773,33 @@ function PdfUploadButton({ patientId, proId, category, onUploaded }: {
   const [uploading, setUploading] = useState(false);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  setUploading(true);
-  try {
-    const path = `${proId}/patient-docs/${patientId}/${category}-${Date.now()}.pdf`;
-
-    const { error: upErr } = await supabase.storage
-      .from("message-attachments")
-      .upload(path, file, { upsert: false });
-
-    if (upErr) throw upErr;
-
-    const { error: insertErr } = await supabase.from("patient_documents").insert({
-      patient_id: patientId,
-      pro_id: proId,
-      title: file.name.replace(".pdf", ""),
-      file_url: path, // on stocke le path, pas une URL publique
-      file_name: file.name,
-      category,
-    });
-
-    if (insertErr) throw insertErr;
-
-    toast.success("PDF ajouté ✅");
-    onUploaded();
-  } catch (err) {
-    toast.error(err instanceof Error ? err.message : "Erreur upload");
-  } finally {
-    setUploading(false);
-    if (fileRef.current) fileRef.current.value = "";
-  }
-};
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const path = `${proId}/patient-docs/${patientId}/${category}-${Date.now()}.pdf`;
+      const { error: upErr } = await supabase.storage
+        .from("message-attachments")
+        .upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+      const { error: insertErr } = await supabase.from("patient_documents").insert({
+        patient_id: patientId,
+        pro_id: proId,
+        title: file.name.replace(".pdf", ""),
+        file_url: path,
+        file_name: file.name,
+        category,
+      });
+      if (insertErr) throw insertErr;
+      toast.success("PDF ajouté ✅");
+      onUploaded();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur upload");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
 
   return (
     <>
@@ -597,12 +828,10 @@ function PdfList({ documents, onDeleted }: {
     const { data, error } = await supabase.storage
       .from("message-attachments")
       .createSignedUrl(filePath, 60 * 60);
-
     if (error || !data?.signedUrl) {
       toast.error("Impossible d'ouvrir le fichier");
       return;
     }
-
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
 

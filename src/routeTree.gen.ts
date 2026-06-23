@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as FeedRouteImport } from './routes/feed'
@@ -31,6 +32,7 @@ import { Route as PatientSportRouteImport } from './routes/patient.sport'
 import { Route as PatientProfilRouteImport } from './routes/patient.profil'
 import { Route as PatientNutritionRouteImport } from './routes/patient.nutrition'
 import { Route as PatientNotificationsRouteImport } from './routes/patient.notifications'
+import { Route as PatientMesuresRouteImport } from './routes/patient.mesures'
 import { Route as PatientMessagesRouteImport } from './routes/patient.messages'
 import { Route as PatientHomeRouteImport } from './routes/patient.home'
 import { Route as PatientDashboardRouteImport } from './routes/patient.dashboard'
@@ -45,6 +47,11 @@ import { Route as PatientPayConsultationIdRouteImport } from './routes/patient.p
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProgressRoute = ProgressRouteImport.update({
+  id: '/progress',
+  path: '/progress',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -152,6 +159,11 @@ const PatientNotificationsRoute = PatientNotificationsRouteImport.update({
   path: '/patient/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PatientMesuresRoute = PatientMesuresRouteImport.update({
+  id: '/patient/mesures',
+  path: '/patient/mesures',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PatientMessagesRoute = PatientMessagesRouteImport.update({
   id: '/patient/messages',
   path: '/patient/messages',
@@ -210,11 +222,13 @@ export interface FileRoutesByFullPath {
   '/feed': typeof FeedRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
   '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
   '/patient/home': typeof PatientHomeRoute
   '/patient/messages': typeof PatientMessagesRoute
+  '/patient/mesures': typeof PatientMesuresRoute
   '/patient/notifications': typeof PatientNotificationsRoute
   '/patient/nutrition': typeof PatientNutritionRoute
   '/patient/profil': typeof PatientProfilRoute
@@ -244,11 +258,13 @@ export interface FileRoutesByTo {
   '/feed': typeof FeedRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
   '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
   '/patient/home': typeof PatientHomeRoute
   '/patient/messages': typeof PatientMessagesRoute
+  '/patient/mesures': typeof PatientMesuresRoute
   '/patient/notifications': typeof PatientNotificationsRoute
   '/patient/nutrition': typeof PatientNutritionRoute
   '/patient/profil': typeof PatientProfilRoute
@@ -279,11 +295,13 @@ export interface FileRoutesById {
   '/feed': typeof FeedRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
   '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
   '/patient/home': typeof PatientHomeRoute
   '/patient/messages': typeof PatientMessagesRoute
+  '/patient/mesures': typeof PatientMesuresRoute
   '/patient/notifications': typeof PatientNotificationsRoute
   '/patient/nutrition': typeof PatientNutritionRoute
   '/patient/profil': typeof PatientProfilRoute
@@ -315,11 +333,13 @@ export interface FileRouteTypes {
     | '/feed'
     | '/home'
     | '/login'
+    | '/progress'
     | '/register'
     | '/patient/consultations'
     | '/patient/dashboard'
     | '/patient/home'
     | '/patient/messages'
+    | '/patient/mesures'
     | '/patient/notifications'
     | '/patient/nutrition'
     | '/patient/profil'
@@ -349,11 +369,13 @@ export interface FileRouteTypes {
     | '/feed'
     | '/home'
     | '/login'
+    | '/progress'
     | '/register'
     | '/patient/consultations'
     | '/patient/dashboard'
     | '/patient/home'
     | '/patient/messages'
+    | '/patient/mesures'
     | '/patient/notifications'
     | '/patient/nutrition'
     | '/patient/profil'
@@ -383,11 +405,13 @@ export interface FileRouteTypes {
     | '/feed'
     | '/home'
     | '/login'
+    | '/progress'
     | '/register'
     | '/patient/consultations'
     | '/patient/dashboard'
     | '/patient/home'
     | '/patient/messages'
+    | '/patient/mesures'
     | '/patient/notifications'
     | '/patient/nutrition'
     | '/patient/profil'
@@ -418,11 +442,13 @@ export interface RootRouteChildren {
   FeedRoute: typeof FeedRoute
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
+  ProgressRoute: typeof ProgressRoute
   RegisterRoute: typeof RegisterRoute
   PatientConsultationsRoute: typeof PatientConsultationsRoute
   PatientDashboardRoute: typeof PatientDashboardRoute
   PatientHomeRoute: typeof PatientHomeRoute
   PatientMessagesRoute: typeof PatientMessagesRoute
+  PatientMesuresRoute: typeof PatientMesuresRoute
   PatientNotificationsRoute: typeof PatientNotificationsRoute
   PatientNutritionRoute: typeof PatientNutritionRoute
   PatientProfilRoute: typeof PatientProfilRoute
@@ -449,6 +475,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/progress': {
+      id: '/progress'
+      path: '/progress'
+      fullPath: '/progress'
+      preLoaderRoute: typeof ProgressRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -598,6 +631,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PatientNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/patient/mesures': {
+      id: '/patient/mesures'
+      path: '/patient/mesures'
+      fullPath: '/patient/mesures'
+      preLoaderRoute: typeof PatientMesuresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/patient/messages': {
       id: '/patient/messages'
       path: '/patient/messages'
@@ -736,11 +776,13 @@ const rootRouteChildren: RootRouteChildren = {
   FeedRoute: FeedRoute,
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
+  ProgressRoute: ProgressRoute,
   RegisterRoute: RegisterRoute,
   PatientConsultationsRoute: PatientConsultationsRoute,
   PatientDashboardRoute: PatientDashboardRoute,
   PatientHomeRoute: PatientHomeRoute,
   PatientMessagesRoute: PatientMessagesRoute,
+  PatientMesuresRoute: PatientMesuresRoute,
   PatientNotificationsRoute: PatientNotificationsRoute,
   PatientNutritionRoute: PatientNutritionRoute,
   PatientProfilRoute: PatientProfilRoute,

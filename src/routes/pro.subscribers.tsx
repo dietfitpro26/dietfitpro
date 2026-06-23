@@ -7,6 +7,7 @@ import {
   UtensilsCrossed, Bike, MessageCircle, Video, BarChart2, Star
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 
@@ -29,7 +30,7 @@ type Subscriber = {
   created_at: string;
 };
 
-type Overrides = Record<string, boolean>; // { feature_key: enabled }
+type Overrides = Record<string, boolean>;
 
 // ── Features disponibles ──────────────────────────────────────────
 const FEATURES = [
@@ -127,7 +128,6 @@ function OverridesPanel({ userId }: { userId: string }) {
       );
 
     if (error) {
-      // Rollback si erreur
       setOverrides((prev) => ({ ...prev, [featureKey]: current }));
       console.error("Toggle error:", error);
     }
@@ -181,6 +181,9 @@ function Page() {
 }
 
 function Content() {
+  // ✅ CORRECTION : récupère l'utilisateur connecté pour filtrer par pro_id
+  const { user } = useAuth();
+
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [loading, setLoading]         = useState(true);
   const [search, setSearch]           = useState("");
@@ -189,17 +192,23 @@ function Content() {
   const [expandedId, setExpandedId]   = useState<string | null>(null);
 
   useEffect(() => {
+    if (!user) return;
+
     const fetchSubscribers = async () => {
+      // ✅ CORRECTION : utilise profiles avec filtre pro_id au lieu de pro_subscribers_view
       const { data, error } = await supabase
-        .from("pro_subscribers_view")
+        .from("profiles")
         .select("id, email, full_name, role, plan, age, weight_kg, height_cm, bmi, goal, created_at")
+        .eq("pro_id", user.id)
         .in("role", ["subscriber", "patient"])
         .order("created_at", { ascending: false });
+
       if (!error && data) setSubscribers(data as Subscriber[]);
       setLoading(false);
     };
+
     fetchSubscribers();
-  }, []);
+  }, [user]);
 
   const filtered = subscribers.filter((s) => {
     const matchSearch = !search ||
@@ -309,7 +318,7 @@ function Content() {
             return (
               <div key={s.id} className="rounded-lg border bg-card overflow-hidden transition-shadow hover:shadow-sm">
 
-                {/* Ligne principale — cliquable pour ouvrir les toggles */}
+                {/* Ligne principale */}
                 <div
                   className="p-4 flex items-center gap-4 cursor-pointer select-none"
                   onClick={() => setExpandedId(isOpen ? null : s.id)}
@@ -359,7 +368,7 @@ function Content() {
                   </div>
                 </div>
 
-                {/* Panneau toggles — s'ouvre au clic */}
+                {/* Panneau toggles */}
                 {isOpen && <OverridesPanel userId={s.id} />}
 
               </div>
