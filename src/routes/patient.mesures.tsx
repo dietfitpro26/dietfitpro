@@ -243,7 +243,7 @@ function MesuresContent() {
                     <td className="text-right pr-4">{m.muscle_mass_kg ? `${m.muscle_mass_kg} kg` : "—"}</td>
                     <td className="text-right pr-4">{m.water_pct ? `${m.water_pct} %` : "—"}</td>
                     <td className="text-right">
-                      {(!m.created_by || m.created_by === user?.id) && (
+                      {m.created_by === user?.id && (
                         <button
                           onClick={() => handleDelete(m.id)}
                           className="text-xs text-red-500 hover:text-red-700 transition-colors px-2 py-1"

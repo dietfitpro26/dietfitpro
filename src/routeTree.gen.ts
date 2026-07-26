@@ -16,6 +16,9 @@ import { Route as HomeRouteImport } from './routes/home'
 import { Route as FeedRouteImport } from './routes/feed'
 import { Route as BienvenueRouteImport } from './routes/bienvenue'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SubscriberSportRouteImport } from './routes/subscriber.sport'
+import { Route as SubscriberProfileRouteImport } from './routes/subscriber.profile'
+import { Route as SubscriberNutritionRouteImport } from './routes/subscriber.nutrition'
 import { Route as ProSubscribersRouteImport } from './routes/pro.subscribers'
 import { Route as ProSportRouteImport } from './routes/pro.sport'
 import { Route as ProSettingsRouteImport } from './routes/pro.settings'
@@ -35,8 +38,10 @@ import { Route as PatientNotificationsRouteImport } from './routes/patient.notif
 import { Route as PatientMesuresRouteImport } from './routes/patient.mesures'
 import { Route as PatientMessagesRouteImport } from './routes/patient.messages'
 import { Route as PatientHomeRouteImport } from './routes/patient.home'
+import { Route as PatientFeedRouteImport } from './routes/patient.feed'
 import { Route as PatientDashboardRouteImport } from './routes/patient.dashboard'
 import { Route as PatientConsultationsRouteImport } from './routes/patient.consultations'
+import { Route as PatientAgendaRouteImport } from './routes/patient.agenda'
 import { Route as ProSportProgramIdRouteImport } from './routes/pro.sport.$programId'
 import { Route as ProRecipesNewRouteImport } from './routes/pro.recipes.new'
 import { Route as ProPatientsPatientIdRouteImport } from './routes/pro.patients.$patientId'
@@ -77,6 +82,21 @@ const BienvenueRoute = BienvenueRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubscriberSportRoute = SubscriberSportRouteImport.update({
+  id: '/subscriber/sport',
+  path: '/subscriber/sport',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubscriberProfileRoute = SubscriberProfileRouteImport.update({
+  id: '/subscriber/profile',
+  path: '/subscriber/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubscriberNutritionRoute = SubscriberNutritionRouteImport.update({
+  id: '/subscriber/nutrition',
+  path: '/subscriber/nutrition',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProSubscribersRoute = ProSubscribersRouteImport.update({
@@ -174,6 +194,11 @@ const PatientHomeRoute = PatientHomeRouteImport.update({
   path: '/patient/home',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PatientFeedRoute = PatientFeedRouteImport.update({
+  id: '/patient/feed',
+  path: '/patient/feed',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PatientDashboardRoute = PatientDashboardRouteImport.update({
   id: '/patient/dashboard',
   path: '/patient/dashboard',
@@ -182,6 +207,11 @@ const PatientDashboardRoute = PatientDashboardRouteImport.update({
 const PatientConsultationsRoute = PatientConsultationsRouteImport.update({
   id: '/patient/consultations',
   path: '/patient/consultations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PatientAgendaRoute = PatientAgendaRouteImport.update({
+  id: '/patient/agenda',
+  path: '/patient/agenda',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProSportProgramIdRoute = ProSportProgramIdRouteImport.update({
@@ -224,8 +254,10 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
+  '/patient/agenda': typeof PatientAgendaRoute
   '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
+  '/patient/feed': typeof PatientFeedRoute
   '/patient/home': typeof PatientHomeRoute
   '/patient/messages': typeof PatientMessagesRoute
   '/patient/mesures': typeof PatientMesuresRoute
@@ -245,6 +277,9 @@ export interface FileRoutesByFullPath {
   '/pro/settings': typeof ProSettingsRoute
   '/pro/sport': typeof ProSportRouteWithChildren
   '/pro/subscribers': typeof ProSubscribersRoute
+  '/subscriber/nutrition': typeof SubscriberNutritionRoute
+  '/subscriber/profile': typeof SubscriberProfileRoute
+  '/subscriber/sport': typeof SubscriberSportRoute
   '/patient/pay/$consultationId': typeof PatientPayConsultationIdRoute
   '/pro/consultations/$id': typeof ProConsultationsIdRoute
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
@@ -260,8 +295,10 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
+  '/patient/agenda': typeof PatientAgendaRoute
   '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
+  '/patient/feed': typeof PatientFeedRoute
   '/patient/home': typeof PatientHomeRoute
   '/patient/messages': typeof PatientMessagesRoute
   '/patient/mesures': typeof PatientMesuresRoute
@@ -281,6 +318,9 @@ export interface FileRoutesByTo {
   '/pro/settings': typeof ProSettingsRoute
   '/pro/sport': typeof ProSportRouteWithChildren
   '/pro/subscribers': typeof ProSubscribersRoute
+  '/subscriber/nutrition': typeof SubscriberNutritionRoute
+  '/subscriber/profile': typeof SubscriberProfileRoute
+  '/subscriber/sport': typeof SubscriberSportRoute
   '/patient/pay/$consultationId': typeof PatientPayConsultationIdRoute
   '/pro/consultations/$id': typeof ProConsultationsIdRoute
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
@@ -297,8 +337,10 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
+  '/patient/agenda': typeof PatientAgendaRoute
   '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
+  '/patient/feed': typeof PatientFeedRoute
   '/patient/home': typeof PatientHomeRoute
   '/patient/messages': typeof PatientMessagesRoute
   '/patient/mesures': typeof PatientMesuresRoute
@@ -318,6 +360,9 @@ export interface FileRoutesById {
   '/pro/settings': typeof ProSettingsRoute
   '/pro/sport': typeof ProSportRouteWithChildren
   '/pro/subscribers': typeof ProSubscribersRoute
+  '/subscriber/nutrition': typeof SubscriberNutritionRoute
+  '/subscriber/profile': typeof SubscriberProfileRoute
+  '/subscriber/sport': typeof SubscriberSportRoute
   '/patient/pay/$consultationId': typeof PatientPayConsultationIdRoute
   '/pro/consultations/$id': typeof ProConsultationsIdRoute
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
@@ -335,8 +380,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/progress'
     | '/register'
+    | '/patient/agenda'
     | '/patient/consultations'
     | '/patient/dashboard'
+    | '/patient/feed'
     | '/patient/home'
     | '/patient/messages'
     | '/patient/mesures'
@@ -356,6 +403,9 @@ export interface FileRouteTypes {
     | '/pro/settings'
     | '/pro/sport'
     | '/pro/subscribers'
+    | '/subscriber/nutrition'
+    | '/subscriber/profile'
+    | '/subscriber/sport'
     | '/patient/pay/$consultationId'
     | '/pro/consultations/$id'
     | '/pro/nutrition/$programId'
@@ -371,8 +421,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/progress'
     | '/register'
+    | '/patient/agenda'
     | '/patient/consultations'
     | '/patient/dashboard'
+    | '/patient/feed'
     | '/patient/home'
     | '/patient/messages'
     | '/patient/mesures'
@@ -392,6 +444,9 @@ export interface FileRouteTypes {
     | '/pro/settings'
     | '/pro/sport'
     | '/pro/subscribers'
+    | '/subscriber/nutrition'
+    | '/subscriber/profile'
+    | '/subscriber/sport'
     | '/patient/pay/$consultationId'
     | '/pro/consultations/$id'
     | '/pro/nutrition/$programId'
@@ -407,8 +462,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/progress'
     | '/register'
+    | '/patient/agenda'
     | '/patient/consultations'
     | '/patient/dashboard'
+    | '/patient/feed'
     | '/patient/home'
     | '/patient/messages'
     | '/patient/mesures'
@@ -428,6 +485,9 @@ export interface FileRouteTypes {
     | '/pro/settings'
     | '/pro/sport'
     | '/pro/subscribers'
+    | '/subscriber/nutrition'
+    | '/subscriber/profile'
+    | '/subscriber/sport'
     | '/patient/pay/$consultationId'
     | '/pro/consultations/$id'
     | '/pro/nutrition/$programId'
@@ -444,8 +504,10 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ProgressRoute: typeof ProgressRoute
   RegisterRoute: typeof RegisterRoute
+  PatientAgendaRoute: typeof PatientAgendaRoute
   PatientConsultationsRoute: typeof PatientConsultationsRoute
   PatientDashboardRoute: typeof PatientDashboardRoute
+  PatientFeedRoute: typeof PatientFeedRoute
   PatientHomeRoute: typeof PatientHomeRoute
   PatientMessagesRoute: typeof PatientMessagesRoute
   PatientMesuresRoute: typeof PatientMesuresRoute
@@ -465,6 +527,9 @@ export interface RootRouteChildren {
   ProSettingsRoute: typeof ProSettingsRoute
   ProSportRoute: typeof ProSportRouteWithChildren
   ProSubscribersRoute: typeof ProSubscribersRoute
+  SubscriberNutritionRoute: typeof SubscriberNutritionRoute
+  SubscriberProfileRoute: typeof SubscriberProfileRoute
+  SubscriberSportRoute: typeof SubscriberSportRoute
   PatientPayConsultationIdRoute: typeof PatientPayConsultationIdRoute
 }
 
@@ -517,6 +582,27 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subscriber/sport': {
+      id: '/subscriber/sport'
+      path: '/subscriber/sport'
+      fullPath: '/subscriber/sport'
+      preLoaderRoute: typeof SubscriberSportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subscriber/profile': {
+      id: '/subscriber/profile'
+      path: '/subscriber/profile'
+      fullPath: '/subscriber/profile'
+      preLoaderRoute: typeof SubscriberProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subscriber/nutrition': {
+      id: '/subscriber/nutrition'
+      path: '/subscriber/nutrition'
+      fullPath: '/subscriber/nutrition'
+      preLoaderRoute: typeof SubscriberNutritionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pro/subscribers': {
@@ -652,6 +738,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PatientHomeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/patient/feed': {
+      id: '/patient/feed'
+      path: '/patient/feed'
+      fullPath: '/patient/feed'
+      preLoaderRoute: typeof PatientFeedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/patient/dashboard': {
       id: '/patient/dashboard'
       path: '/patient/dashboard'
@@ -664,6 +757,13 @@ declare module '@tanstack/react-router' {
       path: '/patient/consultations'
       fullPath: '/patient/consultations'
       preLoaderRoute: typeof PatientConsultationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/patient/agenda': {
+      id: '/patient/agenda'
+      path: '/patient/agenda'
+      fullPath: '/patient/agenda'
+      preLoaderRoute: typeof PatientAgendaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pro/sport/$programId': {
@@ -778,8 +878,10 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ProgressRoute: ProgressRoute,
   RegisterRoute: RegisterRoute,
+  PatientAgendaRoute: PatientAgendaRoute,
   PatientConsultationsRoute: PatientConsultationsRoute,
   PatientDashboardRoute: PatientDashboardRoute,
+  PatientFeedRoute: PatientFeedRoute,
   PatientHomeRoute: PatientHomeRoute,
   PatientMessagesRoute: PatientMessagesRoute,
   PatientMesuresRoute: PatientMesuresRoute,
@@ -799,6 +901,9 @@ const rootRouteChildren: RootRouteChildren = {
   ProSettingsRoute: ProSettingsRoute,
   ProSportRoute: ProSportRouteWithChildren,
   ProSubscribersRoute: ProSubscribersRoute,
+  SubscriberNutritionRoute: SubscriberNutritionRoute,
+  SubscriberProfileRoute: SubscriberProfileRoute,
+  SubscriberSportRoute: SubscriberSportRoute,
   PatientPayConsultationIdRoute: PatientPayConsultationIdRoute,
 }
 export const routeTree = rootRouteImport

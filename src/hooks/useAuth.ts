@@ -14,6 +14,14 @@ export interface Profile {
   plan: "basic" | "premium" | "visio" | "patient";
   subscription_status: "active" | "cancelled" | "past_due" | "trialing" | "none";
   pro_id: string | null;
+  // Profil physique & objectifs
+  age: number | null;
+  weight_kg: number | null;
+  height_cm: number | null;
+  goal: string | null;
+  target_weight_kg: number | null;
+  target_bmi: number | null;
+  daily_kcal_target: number | null;
 }
 
 export interface SignUpMetadata {
@@ -69,9 +77,7 @@ export function useAuth() {
 
   useEffect(() => {
     try {
-      // Listener FIRST (avoid race), then getSession.
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        // Defer Supabase calls to avoid deadlocks inside the callback.
         setTimeout(() => {
           try {
             void loadProfile(session?.user ?? null);

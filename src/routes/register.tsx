@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/register")({
   head: () => ({
@@ -19,11 +20,18 @@ export const Route = createFileRoute("/register")({
 });
 
 const GOALS = [
-  { value: "weight_loss",     label: "🥗 Perte de poids" },
-  { value: "muscle_gain",     label: "💪 Prise de masse" },
-  { value: "maintenance",     label: "⚖️ Maintien du poids" },
-  { value: "general_health",  label: "❤️ Santé générale" },
+  { value: "weight_loss",    label: "🥗 Perte de poids" },
+  { value: "muscle_gain",    label: "💪 Prise de masse" },
+  { value: "maintenance",    label: "⚖️ Maintien du poids" },
+  { value: "general_health", label: "❤️ Santé générale" },
 ];
+
+const DAILY_KCAL: Record<string, number> = {
+  weight_loss:    1800,
+  muscle_gain:    2600,
+  maintenance:    2200,
+  general_health: 2000,
+};
 
 function calcBMI(weight: number, height: number): number | null {
   if (!weight || !height || height <= 0) return null;
@@ -42,25 +50,25 @@ function RegisterPage() {
   const { signUp } = useAuth();
   const navigate = useNavigate();
 
-  // Champs existants
-  const [fullName,    setFullName]    = useState("");
-  const [email,       setEmail]       = useState("");
-  const [password,    setPassword]    = useState("");
+  const [fullName,       setFullName]       = useState("");
+  const [email,          setEmail]          = useState("");
+  const [password,       setPassword]       = useState("");
+  const [age,            setAge]            = useState("");
+  const [weightKg,       setWeightKg]       = useState("");
+  const [heightCm,       setHeightCm]       = useState("");
+  const [targetWeightKg, setTargetWeightKg] = useState("");
+  const [goal,           setGoal]           = useState("");
+  const [error,          setError]          = useState<string | null>(null);
+  const [success,        setSuccess]        = useState(false);
+  const [submitting,     setSubmitting]     = useState(false);
 
-  // Nouveaux champs
-  const [age,         setAge]         = useState("");
-  const [weightKg,    setWeightKg]    = useState("");
-  const [heightCm,    setHeightCm]    = useState("");
-  const [goal,        setGoal]        = useState("");
-
-  // États UI
-  const [error,       setError]       = useState<string | null>(null);
-  const [success,     setSuccess]     = useState(false);
-  const [submitting,  setSubmitting]  = useState(false);
-
-  // Calcul IMC en temps réel
-  const bmi = calcBMI(parseFloat(weightKg), parseFloat(heightCm));
+  // IMC actuel en temps réel
+  const bmi     = calcBMI(parseFloat(weightKg), parseFloat(heightCm));
   const bmiInfo = bmi ? getBMILabel(bmi) : null;
+
+  // IMC cible en temps réel
+  const targetBmi     = calcBMI(parseFloat(targetWeightKg), parseFloat(heightCm));
+  const targetBmiInfo = targetBmi ? getBMILabel(targetBmi) : null;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -80,12 +88,34 @@ function RegisterPage() {
       await signUp(email, password, {
         full_name: fullName,
         role: "subscriber",
-        age: age ? parseInt(age) : null,
-        weight_kg: weightKg ? parseFloat(weightKg) : null,
-        height_cm: heightCm ? parseFloat(heightCm) : null,
-        bmi: bmi ?? null,
-        goal,
       });
+
+      // Récupère la session pour avoir l'userId
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user?.id;
+
+      if (userId) {
+        const weight    = weightKg       ? parseFloat(weightKg)       : null;
+        const height    = heightCm       ? parseFloat(heightCm)       : null;
+        const targetW   = targetWeightKg ? parseFloat(targetWeightKg) : null;
+        const tBmi      = targetW && height
+          ? Math.round((targetW / ((height / 100) * (height / 100))) * 10) / 10
+          : null;
+
+        await supabase
+          .from("profiles")
+          .update({
+            age:                age ? parseInt(age) : null,
+            weight_kg:          weight,
+            height_cm:          height,
+            goal,
+            target_weight_kg:   targetW,
+            target_bmi:         tBmi,
+            daily_kcal_target:  goal ? DAILY_KCAL[goal] : null,
+          })
+          .eq("id", userId);
+      }
+
       setSuccess(true);
       setTimeout(() => void navigate({ to: "/home" as never }), 1500);
     } catch (err) {
@@ -144,9 +174,7 @@ function RegisterPage() {
 
               {/* ── Séparateur ── */}
               <div className="border-t pt-4">
-                <p className="text-sm font-medium text-foreground mb-3">
-                  Votre profil physique
-                </p>
+                <p className="text-sm font-medium text-foreground mb-3">Votre profil physique</p>
               </div>
 
               {/* ── Âge ── */}
@@ -158,33 +186,51 @@ function RegisterPage() {
                 />
               </div>
 
-              {/* ── Poids + Taille côte à côte ── */}
+              {/* ── Poids + Taille ── */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="weight">Poids (kg)</Label>
+                  <Label htmlFor="weight">Poids actuel (kg)</Label>
                   <Input
-                    id="weight" type="number" min="30" max="300"
-                    step="0.1" placeholder="ex: 75"
+                    id="weight" type="number" min="30" max="300" step="0.1" placeholder="ex: 75"
                     value={weightKg} onChange={(e) => setWeightKg(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="height">Taille (cm)</Label>
                   <Input
-                    id="height" type="number" min="100" max="250"
-                    step="0.5" placeholder="ex: 175"
+                    id="height" type="number" min="100" max="250" step="0.5" placeholder="ex: 175"
                     value={heightCm} onChange={(e) => setHeightCm(e.target.value)}
                   />
                 </div>
               </div>
 
-              {/* ── IMC calculé en temps réel ── */}
+              {/* ── IMC actuel ── */}
               {bmi && bmiInfo && (
                 <div className="rounded-lg border bg-muted/40 px-4 py-3 flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Votre IMC</span>
+                  <span className="text-sm text-muted-foreground">Votre IMC actuel</span>
                   <div className="text-right">
                     <span className="text-lg font-bold text-foreground">{bmi}</span>
                     <p className={`text-xs font-medium ${bmiInfo.color}`}>{bmiInfo.label}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Poids cible ── */}
+              <div className="space-y-2">
+                <Label htmlFor="targetWeight">Poids cible (kg)</Label>
+                <Input
+                  id="targetWeight" type="number" min="30" max="300" step="0.1" placeholder="ex: 68"
+                  value={targetWeightKg} onChange={(e) => setTargetWeightKg(e.target.value)}
+                />
+              </div>
+
+              {/* ── IMC cible ── */}
+              {targetBmi && targetBmiInfo && (
+                <div className="rounded-lg border bg-muted/40 px-4 py-3 flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">IMC cible</span>
+                  <div className="text-right">
+                    <span className="text-lg font-bold text-foreground">{targetBmi}</span>
+                    <p className={`text-xs font-medium ${targetBmiInfo.color}`}>{targetBmiInfo.label}</p>
                   </div>
                 </div>
               )}
@@ -208,6 +254,11 @@ function RegisterPage() {
                     </button>
                   ))}
                 </div>
+                {goal && (
+                  <p className="text-xs text-muted-foreground">
+                    Calories/jour estimées : <span className="font-medium text-foreground">{DAILY_KCAL[goal]} kcal</span>
+                  </p>
+                )}
               </div>
 
               {/* ── Erreur / Succès ── */}

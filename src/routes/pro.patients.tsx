@@ -36,12 +36,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 
-
 export const Route = createFileRoute("/pro/patients")({
   head: () => ({ meta: [{ title: "Mes patients — DietFitPro" }] }),
   component: PatientsPage,
 });
-
 
 interface PatientRow {
   id: string;
@@ -55,9 +53,7 @@ interface PatientRow {
   lastAppointment?: string | null;
 }
 
-
 type StatusFilter = "all" | "active" | "inactive";
-
 
 const GOAL_LABEL: Record<string, string> = {
   perte_de_poids: "Perte de poids",
@@ -66,11 +62,9 @@ const GOAL_LABEL: Record<string, string> = {
   autre: "Autre",
 };
 
-
 function getGoal(p: PatientRow): string {
   return (p.goal && GOAL_LABEL[p.goal]) || "—";
 }
-
 
 function PatientsPage() {
   return (
@@ -83,7 +77,6 @@ function PatientsPage() {
   );
 }
 
-
 function PatientsContent() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -92,7 +85,6 @@ function PatientsContent() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [modalOpen, setModalOpen] = useState(false);
-
 
   const load = async () => {
     if (!user) return;
@@ -103,14 +95,12 @@ function PatientsContent() {
       .eq("pro_id", user.id)
       .order("updated_at", { ascending: false });
 
-
     if (err) {
       console.error("[patients] load error", err);
       setError(err.message);
       setPatients([]);
       return;
     }
-
 
     const rows = (data ?? []) as PatientRow[];
     const userIds = rows.map((r) => r.user_id).filter((x): x is string => Boolean(x));
@@ -132,12 +122,10 @@ function PatientsContent() {
     setPatients(rows);
   };
 
-
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
-
 
   const filtered = useMemo(() => {
     if (!patients) return null;
@@ -153,7 +141,6 @@ function PatientsContent() {
       return matchQ && matchStatus;
     });
   }, [patients, search, status]);
-
 
   return (
     <div className="flex flex-col">
@@ -171,7 +158,6 @@ function PatientsContent() {
           </Button>
         </div>
       </header>
-
 
       <div className="p-6 space-y-4">
         <div className="flex flex-col sm:flex-row gap-3">
@@ -196,13 +182,11 @@ function PatientsContent() {
           </Select>
         </div>
 
-
         {error && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
             {error}
           </div>
         )}
-
 
         <div className="rounded-lg border bg-white overflow-hidden">
           <Table>
@@ -296,7 +280,6 @@ function PatientsContent() {
         </div>
       </div>
 
-
       <NewPatientDialog
         open={modalOpen}
         onOpenChange={setModalOpen}
@@ -308,7 +291,6 @@ function PatientsContent() {
     </div>
   );
 }
-
 
 function NewPatientDialog({
   open,
@@ -329,7 +311,6 @@ function NewPatientDialog({
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-
   const reset = () => {
     setFirstName("");
     setLastName("");
@@ -340,7 +321,6 @@ function NewPatientDialog({
     setNotes("");
   };
 
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -349,28 +329,70 @@ function NewPatientDialog({
       return;
     }
     setSubmitting(true);
-    const { error } = await supabase.from("patients").insert({
-      pro_id: user.id,
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      email: email.trim() || null,
-      phone: phone.trim() || null,
-      birth_date: birthDate || null,
-      medical_notes: notes.trim() || null,
-      goal,
-      is_active: true,
-    });
-    setSubmitting(false);
+
+    // ── Étape 1 : créer la fiche patient ──────────────────────────
+    const { data: inserted, error } = await supabase
+      .from("patients")
+      .insert({
+        pro_id: user.id,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        email: email.trim() || null,
+        phone: phone.trim() || null,
+        birth_date: birthDate || null,
+        medical_notes: notes.trim() || null,
+        goal,
+        is_active: true,
+      })
+      .select("id")
+      .single();
+
     if (error) {
       console.error("[patients] insert error", error);
       toast.error(error.message);
+      setSubmitting(false);
       return;
     }
-    toast.success("Patient créé");
+
+    // ── Étape 2 : envoyer l'invitation si email présent ───────────
+    if (email.trim() && inserted?.id) {
+      const { error: inviteError } = await supabase.functions.invoke("invite-patient", {
+        body: {
+          email: email.trim(),
+          patient_id: inserted.id,
+          pro_id: user.id,
+          role: "patient",
+        },
+      });
+
+      if (inviteError) {
+        // ✅ Lire le body brut HTTP pour avoir le vrai message
+        let errorMessage = "Erreur inconnue";
+        try {
+          const raw = await (inviteError as any).context?.text();
+          console.error("[invite] raw response:", raw);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            errorMessage = parsed?.error ?? parsed?.message ?? raw;
+          } else {
+            errorMessage = inviteError.message || JSON.stringify(inviteError);
+          }
+        } catch (_) {
+          errorMessage = inviteError.message || JSON.stringify(inviteError);
+        }
+        console.error("[patients] invite error:", errorMessage);
+        toast.warning(`Invitation échouée : ${errorMessage}`);
+      } else {
+        toast.success("Patient créé et invitation envoyée ✉️");
+      }
+    } else {
+      toast.success("Patient créé");
+    }
+
+    setSubmitting(false);
     reset();
     onCreated();
   };
-
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

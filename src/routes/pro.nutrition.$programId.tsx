@@ -1,11 +1,11 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, useRef, type FormEvent } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Pencil, Plus } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Upload, FileText, Trash2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { ProLayout } from "@/layouts/ProLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,13 +37,27 @@ interface Meal {
   carbs_g: number;
   fat_g: number;
 }
+
+interface MacroPlanData {
+  phase?: 1 | 2 | 3;
+  mb?: number;
+  tdee?: number;
+  matin?: { pain_cereales_g?: number; proteines?: boolean; lipides_crus_g?: number };
+  midi?: { feculent_cru_g?: number; feculent_cuit_g?: number; legumes?: string; proteines?: boolean; lipides_crus_g?: number };
+  soir?: { feculent_cru_g?: number; feculent_cuit_g?: number; legumes?: string; proteines?: boolean; lipides_crus_g?: number };
+}
+
 interface Program {
   id: string;
   name: string;
   patient_id: string;
   daily_kcal_target: number | null;
+  daily_protein_g: number | null;
+  daily_carbs_g: number | null;
+  daily_fat_g: number | null;
   notes: string | null;
-  meals: Meal[];
+  meals: Meal[] | MacroPlanData | null;
+  pdf_url: string | null;
 }
 interface PatientLite { id: string; first_name: string; last_name: string }
 
@@ -63,30 +77,44 @@ function Content() {
   const [patient, setPatient] = useState<PatientLite | null>(null);
   const [loading, setLoading] = useState(true);
   const [mealOpen, setMealOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [deletingPdf, setDeletingPdf] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     if (!user) return;
     setLoading(true);
     const { data, error } = await supabase
       .from("nutrition_programs")
-      .select("id, name, patient_id, daily_kcal_target, notes, meals")
+      .select("id, name, patient_id, daily_kcal_target, daily_protein_g, daily_carbs_g, daily_fat_g, notes, meals, pdf_url")
       .eq("id", programId)
       .eq("pro_id", user.id)
       .maybeSingle();
-    if (error || !data) { setLoading(false); return; }
-    const prog = { ...(data as Program), meals: Array.isArray(data.meals) ? (data.meals as Meal[]) : [] };
-    setProgram(prog);
+    if (error) {
+      console.error("Erreur chargement programme:", error.message);
+      toast.error("Erreur de chargement : " + error.message);
+      setLoading(false);
+      return;
+    }
+    if (!data) { setLoading(false); return; }
+    setProgram(data as Program);
     const { data: p } = await supabase
-      .from("patients").select("id, first_name, last_name").eq("id", prog.patient_id).maybeSingle();
+      .from("patients")
+      .select("id, first_name, last_name")
+      .eq("id", (data as Program).patient_id)
+      .maybeSingle();
     setPatient((p as PatientLite) ?? null);
     setLoading(false);
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [user, programId]);
 
+  const isMealArray = (m: Program["meals"]): m is Meal[] => Array.isArray(m);
+
   const addMeal = async (meal: Meal) => {
     if (!program) return;
-    const next = [...program.meals, meal];
+    const currentMeals = isMealArray(program.meals) ? program.meals : [];
+    const next = [...currentMeals, meal];
     const { error } = await supabase
       .from("nutrition_programs").update({ meals: next }).eq("id", program.id);
     if (error) { toast.error(error.message); return; }
@@ -95,15 +123,70 @@ function Content() {
     setMealOpen(false);
   };
 
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !program) return;
+    if (file.type !== "application/pdf") { toast.error("Seuls les fichiers PDF sont acceptés"); return; }
+    if (file.size > 10 * 1024 * 1024) { toast.error("Fichier trop lourd (max 10 Mo)"); return; }
+    setUploading(true);
+    if (program.pdf_url) {
+      await supabase.storage.from("program-pdfs").remove([program.pdf_url]);
+    }
+    const path = `${user.id}/${program.id}.pdf`;
+    const { error: uploadError } = await supabase.storage
+      .from("program-pdfs")
+      .upload(path, file, { upsert: true, contentType: "application/pdf" });
+    if (uploadError) { toast.error("Erreur upload : " + uploadError.message); setUploading(false); return; }
+    const { error: updateError } = await supabase
+      .from("nutrition_programs").update({ pdf_url: path }).eq("id", program.id);
+    if (updateError) { toast.error("Erreur sauvegarde : " + updateError.message); setUploading(false); return; }
+    setProgram({ ...program, pdf_url: path });
+    toast.success("✅ PDF uploadé avec succès");
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handlePdfDelete = async () => {
+    if (!program?.pdf_url || !user) return;
+    if (!confirm("Supprimer le PDF de ce programme ?")) return;
+    setDeletingPdf(true);
+    await supabase.storage.from("program-pdfs").remove([program.pdf_url]);
+    const { error } = await supabase
+      .from("nutrition_programs").update({ pdf_url: null }).eq("id", program.id);
+    if (error) { toast.error(error.message); setDeletingPdf(false); return; }
+    setProgram({ ...program, pdf_url: null });
+    toast.success("PDF supprimé");
+    setDeletingPdf(false);
+  };
+
+  const handlePdfDownload = async () => {
+    if (!program?.pdf_url) return;
+    const { data, error } = await supabase.storage
+      .from("program-pdfs").createSignedUrl(program.pdf_url, 60);
+    if (error || !data?.signedUrl) { toast.error("Impossible d'ouvrir le PDF"); return; }
+    window.open(data.signedUrl, "_blank");
+  };
+
   if (loading) {
     return <div className="p-6 space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-32 w-full" /></div>;
   }
   if (!program) {
-    return <div className="p-6"><Button variant="ghost" onClick={() => navigate({ to: "/pro/nutrition" })}><ArrowLeft className="h-4 w-4" /> Retour</Button><p className="mt-4 text-destructive">Programme introuvable.</p></div>;
+    return (
+      <div className="p-6">
+        <Button variant="ghost" onClick={() => navigate({ to: "/pro/nutrition" })}>
+          <ArrowLeft className="h-4 w-4" /> Retour
+        </Button>
+        <p className="mt-4 text-destructive">Programme introuvable.</p>
+      </div>
+    );
   }
 
+  const mealsArray = isMealArray(program.meals) ? program.meals : [];
+  const macroPlan: MacroPlanData = !isMealArray(program.meals) && program.meals ? program.meals : {};
+  const hasMacroPlan = macroPlan.matin || macroPlan.midi || macroPlan.soir;
+
   const grouped: Record<MealMoment, Meal[]> = { matin: [], midi: [], soir: [], collation: [] };
-  program.meals.forEach((m) => { (grouped[m.moment] ??= []).push(m); });
+  mealsArray.forEach((m) => { (grouped[m.moment] ??= []).push(m); });
 
   return (
     <div className="flex flex-col">
@@ -119,9 +202,125 @@ function Content() {
         <Button variant="outline"><Pencil className="h-4 w-4" /> Modifier</Button>
       </header>
 
-      <div className="p-6 space-y-4">
+      <div className="p-6 space-y-6">
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <KpiCard label="Kcal / jour" value={program.daily_kcal_target ? `${program.daily_kcal_target} kcal` : "—"} />
+          <KpiCard label="Protéines" value={program.daily_protein_g ? `${program.daily_protein_g} g` : "—"} />
+          <KpiCard label="Glucides" value={program.daily_carbs_g ? `${program.daily_carbs_g} g` : "—"} />
+          <KpiCard label="Lipides" value={program.daily_fat_g ? `${program.daily_fat_g} g` : "—"} />
+        </div>
+
+        {hasMacroPlan && (
+          <>
+            <h2 className="text-base font-semibold">Plan alimentaire journalier (visible par le patient)</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <MealCard
+                title="🌅 Matin"
+                items={[
+                  "Café ou thé sans sucre",
+                  macroPlan.matin?.pain_cereales_g ? `${macroPlan.matin.pain_cereales_g} g de pain aux céréales` : "Pain aux céréales",
+                  macroPlan.matin?.proteines ? "1 laitage : yaourt nature, fromage blanc 0% ou 1 œuf" : "Une source de protéines",
+                  macroPlan.matin?.lipides_crus_g ? `${macroPlan.matin.lipides_crus_g} g de beurre ou 1 c. à café d'huile` : "Un peu de matière grasse crue",
+                  "1 fruit de saison",
+                ]}
+                note="À éviter : viennoiseries, céréales sucrées, jus de fruits industriels."
+              />
+              <MealCard
+                title="☀️ Midi"
+                items={[
+                  macroPlan.midi?.proteines ? "Protéine : viande blanche, poisson, œuf ou volaille" : "Une source de protéines",
+                  macroPlan.midi?.feculent_cru_g
+                    ? `${macroPlan.midi.feculent_cru_g} g cru (${macroPlan.midi.feculent_cuit_g ?? macroPlan.midi.feculent_cru_g * 2} g cuit) de féculents`
+                    : "Une portion de féculents",
+                  macroPlan.midi?.legumes ?? "Légumes à volonté",
+                  macroPlan.midi?.lipides_crus_g ? `${macroPlan.midi.lipides_crus_g} g d'huile d'olive crue` : "1 c. à soupe d'huile d'olive",
+                  "1 fruit de saison en dessert",
+                ]}
+                note="À privilégier : cuisson vapeur, grillée ou au four. Éviter les fritures et sauces grasses."
+              />
+              <MealCard
+                title="🌙 Soir"
+                items={[
+                  macroPlan.soir?.proteines ? "Protéine : poisson, œuf ou viande blanche" : "Une source de protéines",
+                  macroPlan.soir?.feculent_cru_g
+                    ? `${macroPlan.soir.feculent_cru_g} g cru (${macroPlan.soir.feculent_cuit_g ?? macroPlan.soir.feculent_cru_g * 2} g cuit) de féculents`
+                    : "Féculents en quantité réduite",
+                  macroPlan.soir?.legumes ?? "Légumes à volonté",
+                  macroPlan.soir?.lipides_crus_g ? `${macroPlan.soir.lipides_crus_g} g d'huile d'olive crue` : "1 c. à café d'huile d'olive",
+                  "1 yaourt nature en fin de repas",
+                ]}
+                note="Repas plus léger que le midi. Éviter le sucre et les féculents raffinés le soir."
+              />
+            </div>
+
+            <Card className="border-dashed">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">📌 Règles générales à respecter</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground space-y-1">
+                <p>✅ Boire 1,5 à 2L d'eau par jour, en dehors des repas de préférence.</p>
+                <p>✅ Privilégier les cuissons sans matière grasse ajoutée (vapeur, four, grill, poêle anti-adhésive).</p>
+                <p>✅ Manger lentement, à heures régulières, et écouter sa satiété.</p>
+                <p>❌ Éviter les grignotages entre les repas, les boissons sucrées et l'alcool.</p>
+                <p>❌ Limiter les produits ultra-transformés et la charcuterie.</p>
+                {program.notes && <p className="pt-2 border-t mt-2 italic">📝 Note du coach : {program.notes}</p>}
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4 text-[#6DB33F]" />
+              Document PDF complémentaire (optionnel)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {program.pdf_url ? (
+              <div className="flex items-center gap-3 p-3 rounded-lg border bg-[#6DB33F]/5 border-[#6DB33F]/20">
+                <FileText className="h-8 w-8 text-[#6DB33F] shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Programme nutrition — PDF</p>
+                  <p className="text-xs text-muted-foreground">Visible par le patient dans son espace</p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button variant="outline" size="sm" onClick={handlePdfDownload} title="Voir le PDF">
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={handlePdfDelete} disabled={deletingPdf}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-6 border-2 border-dashed rounded-lg text-center">
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Aucun PDF associé à ce programme</p>
+                  <p className="text-xs text-muted-foreground">Max 10 Mo · Format PDF uniquement</p>
+                </div>
+                <Button variant="outline" size="sm" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-4 w-4" />
+                  {uploading ? "Upload en cours…" : "Importer un PDF"}
+                </Button>
+              </div>
+            )}
+            <input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handlePdfUpload} />
+            {program.pdf_url && (
+              <div className="mt-3">
+                <Button variant="ghost" size="sm" className="text-muted-foreground text-xs" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-3 w-3" />
+                  {uploading ? "Upload en cours…" : "Remplacer le PDF"}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Repas</h2>
+          <h2 className="text-base font-semibold">Repas personnalisés (manuel)</h2>
           <Button className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white" onClick={() => setMealOpen(true)}>
             <Plus className="h-4 w-4" /> Ajouter un repas
           </Button>
@@ -133,7 +332,7 @@ function Content() {
               <CardContent className="p-4">
                 <h3 className="font-semibold mb-2">{MOMENT_LABEL[m]}</h3>
                 {grouped[m].length === 0
-                  ? <p className="text-sm text-muted-foreground">Aucun repas</p>
+                  ? <p className="text-sm text-muted-foreground">Aucun repas ajouté manuellement</p>
                   : <ul className="space-y-2">
                       {grouped[m].map((meal) => (
                         <li key={meal.id} className="rounded-md border p-2 text-sm">
@@ -152,6 +351,36 @@ function Content() {
 
       <AddMealDialog open={mealOpen} onOpenChange={setMealOpen} onAdd={addMeal} />
     </div>
+  );
+}
+
+function KpiCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border bg-muted/30 p-3 text-center">
+      <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+      <p className="text-lg font-bold text-[#2D7A1F]">{value}</p>
+    </div>
+  );
+}
+
+function MealCard({ title, items, note }: { title: string; items: string[]; note?: string }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <ul className="space-y-1.5">
+          {items.map((item, i) => (
+            <li key={i} className="text-sm flex items-start gap-2">
+              <span className="text-[#6DB33F] mt-0.5">•</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+        {note && <p className="text-xs text-muted-foreground italic border-t pt-2 mt-2">{note}</p>}
+      </CardContent>
+    </Card>
   );
 }
 

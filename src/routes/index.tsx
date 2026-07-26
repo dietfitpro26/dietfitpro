@@ -117,6 +117,7 @@ function LandingPage() {
           <div className="mx-auto max-w-6xl px-6">
             <h2 className="text-center text-3xl font-bold tracking-tight">Des formules simples</h2>
             <div className="mt-12 grid gap-6 md:grid-cols-3">
+
               <Card className="p-8">
                 <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
                   Basic
@@ -125,7 +126,7 @@ function LandingPage() {
                   9,99€<span className="text-base font-normal text-muted-foreground">/mois</span>
                 </p>
                 <ul className="mt-6 space-y-3 text-sm">
-                  {["Journal comportemental", "Coach IA (5 msg/jour)", "Programmes auto", "Feed & gamification"].map(
+                  {["Coach IA (5 msg/jour)", "Programmes auto", "Feed & gamification"].map(
                     (item) => (
                       <li key={item} className="flex gap-2">
                         <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
@@ -176,6 +177,7 @@ function LandingPage() {
                   ))}
                 </ul>
               </Card>
+
             </div>
           </div>
         </section>
