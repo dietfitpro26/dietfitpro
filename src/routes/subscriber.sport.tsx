@@ -8,9 +8,9 @@ import {
   Target,
   Check,
   Download,
+  Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
-import { fr } from "date-fns/locale";
 import { SubscriberLayout } from "@/layouts/SubscriberLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAccessRights } from "@/hooks/useAccessRights";
@@ -75,6 +75,17 @@ type PremiumDocument = {
   file_name: string | null;
 };
 
+type SessionItem = {
+  id: string;
+  title: string;
+  subtitle: string;
+  details: string[];
+  notes: string;
+  done: boolean;
+  locked: boolean;
+  onToggleDone: () => void;
+};
+
 const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 
 const LEVEL_LABEL: Record<string, string> = {
@@ -82,6 +93,179 @@ const LEVEL_LABEL: Record<string, string> = {
   intermediaire: "Intermédiaire",
   avance: "Avancé",
 };
+
+const BASIC_GENERIC_SESSIONS: {
+  title: string;
+  duration: string;
+  locked: boolean;
+  items: SessionItem[];
+}[] = [
+  {
+    title: "Séance 1 — Haut du corps",
+    duration: "40 min",
+    locked: false,
+    items: [
+      {
+        id: "basic-1",
+        title: "Échauffement épaules / dos",
+        subtitle: "Préparation articulaire",
+        details: [],
+        notes: "",
+        done: false,
+        locked: false,
+        onToggleDone: () => undefined,
+      },
+      {
+        id: "basic-2",
+        title: "Pompes ou développé",
+        subtitle: "Travail poussée",
+        details: [],
+        notes: "",
+        done: false,
+        locked: false,
+        onToggleDone: () => undefined,
+      },
+      {
+        id: "basic-3",
+        title: "Tirage ou rowing",
+        subtitle: "Travail dos",
+        details: [],
+        notes: "",
+        done: false,
+        locked: false,
+        onToggleDone: () => undefined,
+      },
+      {
+        id: "basic-4",
+        title: "Gainage",
+        subtitle: "Stabilité du tronc",
+        details: [],
+        notes: "",
+        done: false,
+        locked: false,
+        onToggleDone: () => undefined,
+      },
+    ],
+  },
+  {
+    title: "Séance 2 — Bas du corps",
+    duration: "45 min",
+    locked: false,
+    items: [
+      {
+        id: "basic-5",
+        title: "Échauffement bas du corps",
+        subtitle: "Mobilité et activation",
+        details: [],
+        notes: "",
+        done: false,
+        locked: false,
+        onToggleDone: () => undefined,
+      },
+      {
+        id: "basic-6",
+        title: "Squat ou variante",
+        subtitle: "Travail principal",
+        details: [],
+        notes: "",
+        done: false,
+        locked: false,
+        onToggleDone: () => undefined,
+      },
+      {
+        id: "basic-7",
+        title: "Fentes ou presse",
+        subtitle: "Renforcement complémentaire",
+        details: [],
+        notes: "",
+        done: false,
+        locked: false,
+        onToggleDone: () => undefined,
+      },
+      {
+        id: "basic-8",
+        title: "Mollets / finition",
+        subtitle: "Fin de séance",
+        details: [],
+        notes: "",
+        done: false,
+        locked: false,
+        onToggleDone: () => undefined,
+      },
+    ],
+  },
+  {
+    title: "Séance 3 — Abdos / cardio",
+    duration: "30 min",
+    locked: false,
+    items: [
+      {
+        id: "basic-9",
+        title: "Crunch ou variante",
+        subtitle: "Travail abdominal",
+        details: [],
+        notes: "",
+        done: false,
+        locked: false,
+        onToggleDone: () => undefined,
+      },
+      {
+        id: "basic-10",
+        title: "Gainage dynamique",
+        subtitle: "Ceinture abdominale",
+        details: [],
+        notes: "",
+        done: false,
+        locked: false,
+        onToggleDone: () => undefined,
+      },
+      {
+        id: "basic-11",
+        title: "Cardio léger",
+        subtitle: "Marche active ou vélo",
+        details: [],
+        notes: "",
+        done: false,
+        locked: false,
+        onToggleDone: () => undefined,
+      },
+    ],
+  },
+  {
+    title: "Séance 4 — Full body",
+    duration: "40 min",
+    locked: true,
+    items: [
+      {
+        id: "basic-locked-1",
+        title: "Séance premium supplémentaire",
+        subtitle: "Visible mais réservée à l’offre Premium",
+        details: [],
+        notes: "",
+        done: false,
+        locked: true,
+        onToggleDone: () => undefined,
+      },
+    ],
+  },
+  {
+    title: "Séance 5 — Renforcement avancé",
+    duration: "45 min",
+    locked: true,
+    items: [
+      {
+        id: "basic-locked-2",
+        title: "Séance premium supplémentaire",
+        subtitle: "Débloquez plus de variété et de personnalisation",
+        details: [],
+        notes: "",
+        done: false,
+        locked: true,
+        onToggleDone: () => undefined,
+      },
+    ],
+  },
+];
 
 function todayIso() {
   return format(new Date(), "yyyy-MM-dd");
@@ -94,7 +278,7 @@ function doneKey(programId: string, date: string) {
 function loadDone(programId: string, date: string): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
-    return new Set(JSON.parse(localStorage.getItem(doneKey(programId, date)) ?? "[]"));
+    return new Set(JSON.parse(window.localStorage.getItem(doneKey(programId, date)) ?? "[]"));
   } catch {
     return new Set();
   }
@@ -102,7 +286,11 @@ function loadDone(programId: string, date: string): Set<string> {
 
 function saveDone(programId: string, date: string, set: Set<string>) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(doneKey(programId, date), JSON.stringify([...set]));
+  try {
+    window.localStorage.setItem(doneKey(programId, date), JSON.stringify([...set]));
+  } catch {
+    console.warn("Impossible d'enregistrer l'état local des séances.");
+  }
 }
 
 function SportContent() {
@@ -111,7 +299,9 @@ function SportContent() {
 
   const firstName = profile?.full_name?.split(" ")[0] ?? "vous";
   const hasAccess = rights?.access_sport_programs ?? false;
-  const isPremiumLike = profile?.plan === "premium" || profile?.plan === "visio";
+  const sportLimit = rights?.sport_session_limit ?? null;
+  const isBasicLimited = typeof sportLimit === "number" && sportLimit > 0;
+  const isPremiumLike = !!rights && !isBasicLimited && rights.access_sport_programs;
 
   const [program, setProgram] = useState<PremiumProgram | null | undefined>(undefined);
   const [done, setDone] = useState<Set<string>>(new Set());
@@ -232,8 +422,7 @@ function SportContent() {
                 <div>
                   <CardTitle className="text-xl sm:text-2xl">Sport</CardTitle>
                   <CardDescription className="mt-1 text-sm sm:text-base">
-                    Bonjour {firstName}, retrouvez ici vos séances, vos documents et
-                    votre organisation sportive.
+                    Bonjour {firstName}, retrouvez ici vos séances, vos documents et votre organisation sportive.
                   </CardDescription>
                 </div>
               </div>
@@ -249,17 +438,17 @@ function SportContent() {
                 <div>
                   <CardTitle>Module sport verrouillé</CardTitle>
                   <CardDescription>
-                    Cette page est disponible, mais l’accès personnalisé dépend d’une formule supérieure.
+                    Cette page est visible, mais votre accès au module sport n’est pas activé.
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-                En formule basic, vous gardez une organisation simple et un aperçu générique.
+                Contactez votre coach si cette option devait être incluse dans votre accompagnement.
               </div>
-              <Button variant="outline" className="rounded-2xl">
-                Découvrir une formule premium
+              <Button variant="outline" className="rounded-2xl" disabled>
+                Désactivé par votre coach
               </Button>
             </CardContent>
           </Card>
@@ -268,7 +457,16 @@ function SportContent() {
     );
   }
 
-  if (!isPremiumLike) {
+  if (isBasicLimited) {
+    const visibleSessions = BASIC_GENERIC_SESSIONS.map((session, index) => ({
+      ...session,
+      locked: index >= sportLimit,
+      items: session.items.map((item) => ({
+        ...item,
+        locked: index >= sportLimit ? true : item.locked,
+      })),
+    }));
+
     return (
       <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
         <div className="mx-auto max-w-5xl space-y-6">
@@ -281,8 +479,7 @@ function SportContent() {
                 <div>
                   <CardTitle className="text-xl sm:text-2xl">Sport</CardTitle>
                   <CardDescription className="mt-1 text-sm sm:text-base">
-                    Bonjour {firstName}, retrouvez ici vos séances, vos documents et
-                    votre organisation sportive.
+                    Bonjour {firstName}, votre formule inclut {sportLimit} séance{sportLimit > 1 ? "s" : ""}.
                   </CardDescription>
                 </div>
               </div>
@@ -294,153 +491,47 @@ function SportContent() {
               icon={<Target className="h-5 w-5" />}
               title="Objectif sport"
               value="Progression encadrée"
-              subtitle="À personnaliser selon votre formule"
+              subtitle="Version basic"
             />
             <InfoCard
               icon={<Clock3 className="h-5 w-5" />}
-              title="Rythme conseillé"
-              value="2 à 4 séances / semaine"
-              subtitle="Selon votre niveau"
+              title="Accès inclus"
+              value={`${sportLimit} séance${sportLimit > 1 ? "s" : ""}`}
+              subtitle="Les autres restent visibles mais verrouillées"
             />
             <InfoCard
-              icon={<FileText className="h-5 w-5" />}
-              title="Supports"
-              value="PDF / séances / consignes"
-              subtitle="Organisation simple et claire"
+              icon={<Sparkles className="h-5 w-5" />}
+              title="Premium"
+              value="Plus de variété"
+              subtitle="Débloquez plus de séances personnalisées"
             />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <SessionCard
-              title="Séance 1 — Bas du corps"
-              duration="45 min"
-              items={[
-                {
-                  id: "generic-1",
-                  title: "Échauffement articulaire",
-                  subtitle: "Mobilité et mise en route",
-                  details: [],
-                  notes: "",
-                  done: false,
-                  onToggleDone: () => undefined,
-                },
-                {
-                  id: "generic-2",
-                  title: "Squat ou variante",
-                  subtitle: "Travail de base",
-                  details: [],
-                  notes: "",
-                  done: false,
-                  onToggleDone: () => undefined,
-                },
-                {
-                  id: "generic-3",
-                  title: "Fentes ou presse",
-                  subtitle: "Renforcement",
-                  details: [],
-                  notes: "",
-                  done: false,
-                  onToggleDone: () => undefined,
-                },
-                {
-                  id: "generic-4",
-                  title: "Gainage de fin de séance",
-                  subtitle: "Stabilité du tronc",
-                  details: [],
-                  notes: "",
-                  done: false,
-                  onToggleDone: () => undefined,
-                },
-              ]}
-            />
-            <SessionCard
-              title="Séance 2 — Haut du corps"
-              duration="40 min"
-              items={[
-                {
-                  id: "generic-5",
-                  title: "Échauffement épaules / dos",
-                  subtitle: "Préparation",
-                  details: [],
-                  notes: "",
-                  done: false,
-                  onToggleDone: () => undefined,
-                },
-                {
-                  id: "generic-6",
-                  title: "Tirage ou rowing",
-                  subtitle: "Dos",
-                  details: [],
-                  notes: "",
-                  done: false,
-                  onToggleDone: () => undefined,
-                },
-                {
-                  id: "generic-7",
-                  title: "Développé ou pompes",
-                  subtitle: "Poussée",
-                  details: [],
-                  notes: "",
-                  done: false,
-                  onToggleDone: () => undefined,
-                },
-                {
-                  id: "generic-8",
-                  title: "Travail bras / posture",
-                  subtitle: "Finition",
-                  details: [],
-                  notes: "",
-                  done: false,
-                  onToggleDone: () => undefined,
-                },
-              ]}
-            />
-            <SessionCard
-              title="Séance 3 — Cardio / dépense"
-              duration="30 min"
-              items={[
-                {
-                  id: "generic-9",
-                  title: "Marche active ou vélo",
-                  subtitle: "Cardio léger",
-                  details: [],
-                  notes: "",
-                  done: false,
-                  onToggleDone: () => undefined,
-                },
-                {
-                  id: "generic-10",
-                  title: "Intervalles légers",
-                  subtitle: "Endurance",
-                  details: [],
-                  notes: "",
-                  done: false,
-                  onToggleDone: () => undefined,
-                },
-                {
-                  id: "generic-11",
-                  title: "Retour au calme",
-                  subtitle: "Récupération",
-                  details: [],
-                  notes: "",
-                  done: false,
-                  onToggleDone: () => undefined,
-                },
-              ]}
-            />
+            {visibleSessions.map((session) => (
+              <SessionCard
+                key={session.title}
+                title={session.title}
+                duration={session.duration}
+                locked={session.locked}
+                lockMessage={session.locked ? "Disponible dans Premium" : undefined}
+                items={session.items}
+              />
+            ))}
+
             <DocumentsCard docs={[]} onOpen={handleOpenPdf} generic />
           </div>
 
           <Card className="rounded-3xl border shadow-sm">
             <CardHeader>
-              <CardTitle>Étape suivante</CardTitle>
+              <CardTitle>Passer à Premium</CardTitle>
               <CardDescription>
-                Cette version reste générique. La version premium permet un programme réellement personnalisé.
+                Débloquez plus de séances, un programme sport plus complet et une personnalisation avancée.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="rounded-2xl">
-                Passer en premium
+              <Button className="rounded-2xl" disabled>
+                Disponible dans Premium
               </Button>
             </CardContent>
           </Card>
@@ -473,8 +564,7 @@ function SportContent() {
               <div>
                 <CardTitle className="text-xl sm:text-2xl">Sport</CardTitle>
                 <CardDescription className="mt-1 text-sm sm:text-base">
-                  Bonjour {firstName}, retrouvez ici vos séances, vos documents et
-                  votre organisation sportive.
+                  Bonjour {firstName}, retrouvez ici vos séances, vos documents et votre organisation sportive.
                 </CardDescription>
               </div>
             </div>
@@ -529,6 +619,7 @@ function SportContent() {
                     : [],
                   notes: session.notes || "",
                   done: done.has(session.id),
+                  locked: false,
                   onToggleDone: () => toggleDone(session.id),
                 }))}
               />
@@ -546,6 +637,7 @@ function SportContent() {
                     details: [],
                     notes: "",
                     done: false,
+                    locked: false,
                     onToggleDone: () => undefined,
                   },
                 ]}
@@ -561,6 +653,7 @@ function SportContent() {
                     details: [],
                     notes: "",
                     done: false,
+                    locked: false,
                     onToggleDone: () => undefined,
                   },
                 ]}
@@ -570,7 +663,7 @@ function SportContent() {
 
           <DocumentsCard docs={pdfDocs} onOpen={handleOpenPdf} />
 
-          {!program?.notes && (
+          {!program?.notes ? (
             <SessionCard
               title="Notes"
               duration="Suivi"
@@ -582,11 +675,12 @@ function SportContent() {
                   details: [],
                   notes: "",
                   done: false,
+                  locked: false,
                   onToggleDone: () => undefined,
                 },
               ]}
             />
-          )}
+          ) : null}
         </div>
 
         <Card className="rounded-3xl border shadow-sm">
@@ -597,13 +691,13 @@ function SportContent() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button className="rounded-2xl">
+            <Button className="rounded-2xl" disabled>
               Programme premium prêt
             </Button>
           </CardContent>
         </Card>
 
-        {program?.notes && (
+        {program?.notes ? (
           <Card className="rounded-3xl border shadow-sm">
             <CardHeader>
               <CardTitle>Notes du coach</CardTitle>
@@ -617,7 +711,7 @@ function SportContent() {
               </p>
             </CardContent>
           </Card>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -652,86 +746,110 @@ function SessionCard({
   title,
   duration,
   items,
+  locked = false,
+  lockMessage,
 }: {
   title: string;
   duration: string;
-  items: {
-    id: string;
-    title: string;
-    subtitle: string;
-    details: string[];
-    notes: string;
-    done: boolean;
-    onToggleDone: () => void;
-  }[];
+  items: SessionItem[];
+  locked?: boolean;
+  lockMessage?: string;
 }) {
   return (
-    <Card className="rounded-3xl border shadow-sm">
+    <Card className={`rounded-3xl border shadow-sm ${locked ? "opacity-75" : ""}`}>
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-base">{title}</CardTitle>
-          <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-            {duration}
-          </span>
+          <div className="flex items-center gap-2">
+            {locked ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                <Lock className="h-3 w-3" />
+                {lockMessage ?? "Verrouillé"}
+              </span>
+            ) : null}
+            <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+              {duration}
+            </span>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className={`rounded-2xl px-3 py-3 ${
-                item.done
-                  ? "border border-[#6DB33F]/40 bg-[#6DB33F]/5"
-                  : "bg-muted/30"
-              }`}
-            >
-              <div className="mb-2 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div
-                    className={`text-sm font-medium ${
-                      item.done ? "line-through text-muted-foreground" : ""
-                    }`}
-                  >
-                    {item.title}
-                  </div>
-                  <div className="text-xs text-muted-foreground">{item.subtitle}</div>
-                </div>
+          {items.map((item) => {
+            const itemLocked = locked || item.locked;
 
-                {!item.id.startsWith("generic-") &&
-                  !item.id.startsWith("premium-empty-") && (
+            return (
+              <div
+                key={item.id}
+                className={`rounded-2xl px-3 py-3 ${
+                  itemLocked
+                    ? "border border-dashed bg-muted/30 opacity-80"
+                    : item.done
+                    ? "border border-[#6DB33F]/40 bg-[#6DB33F]/5"
+                    : "bg-muted/30"
+                }`}
+              >
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div
+                      className={`text-sm font-medium ${
+                        itemLocked
+                          ? "text-muted-foreground"
+                          : item.done
+                          ? "line-through text-muted-foreground"
+                          : ""
+                      }`}
+                    >
+                      {item.title}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{item.subtitle}</div>
+                  </div>
+
+                  {!item.id.startsWith("generic-") &&
+                  !item.id.startsWith("premium-empty-") &&
+                  !itemLocked ? (
                     <Button
                       size="sm"
                       variant={item.done ? "default" : "outline"}
-                      className={item.done ? "bg-[#6DB33F] text-white hover:bg-[#2D7A1F]" : "rounded-xl"}
+                      className={
+                        item.done
+                          ? "bg-[#6DB33F] text-white hover:bg-[#2D7A1F]"
+                          : "rounded-xl"
+                      }
                       onClick={item.onToggleDone}
                     >
                       <Check className="mr-1 h-4 w-4" />
                       {item.done ? "Terminée" : "Valider"}
                     </Button>
-                  )}
+                  ) : itemLocked ? (
+                    <Button size="sm" variant="outline" className="rounded-xl" disabled>
+                      <Lock className="mr-1 h-4 w-4" />
+                      Premium
+                    </Button>
+                  ) : null}
+                </div>
+
+                {item.details.length > 0 ? (
+                  <ul className="space-y-2">
+                    {item.details.map((detail, index) => (
+                      <li
+                        key={`${item.id}-${index}`}
+                        className="rounded-xl bg-background px-3 py-2 text-sm text-muted-foreground"
+                      >
+                        {detail}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                {item.notes ? (
+                  <p className="mt-3 whitespace-pre-wrap text-xs text-muted-foreground">
+                    {item.notes}
+                  </p>
+                ) : null}
               </div>
-
-              {item.details.length > 0 && (
-                <ul className="space-y-2">
-                  {item.details.map((detail, index) => (
-                    <li
-                      key={`${item.id}-${index}`}
-                      className="rounded-xl bg-background px-3 py-2 text-sm text-muted-foreground"
-                    >
-                      {detail}
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {item.notes && (
-                <p className="mt-3 whitespace-pre-wrap text-xs text-muted-foreground">
-                  {item.notes}
-                </p>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </CardContent>
     </Card>

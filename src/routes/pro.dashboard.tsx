@@ -1,8 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
-  Bell, UserPlus, Users, CalendarCheck,
-  ClipboardList, MessageSquare, ArrowRight, Video, UserCheck,
+  Bell,
+  UserPlus,
+  Users,
+  CalendarCheck,
+  ClipboardList,
+  MessageSquare,
+  ArrowRight,
+  Video,
+  UserCheck,
 } from "lucide-react";
 import { format, isToday, isTomorrow } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -49,13 +56,24 @@ interface RecentPatient {
   updated_at: string;
 }
 
+type SubscriberPlan = "basic" | "premium" | null;
+
 interface RecentSubscriber {
   id: string;
   full_name: string | null;
   email: string;
-  plan: string | null;
+  plan: SubscriberPlan;
   created_at: string;
 }
+
+type FeatureKey =
+  | "access_recipes"
+  | "access_sport_programs"
+  | "access_nutrition_programs"
+  | "access_messaging"
+  | "access_visio"
+  | "access_ai_coach"
+  | "access_premium_content";
 
 const GOAL_LABEL: Record<string, string> = {
   perte_de_poids: "Perte de poids",
@@ -67,8 +85,27 @@ const GOAL_LABEL: Record<string, string> = {
 const PLAN_LABEL: Record<string, string> = {
   basic: "Basic",
   premium: "Premium",
-  visio: "Visio",
-  patient: "Patient",
+};
+
+const PLAN_FEATURES: Record<"basic" | "premium", Record<FeatureKey, boolean>> = {
+  basic: {
+    access_recipes: false,
+    access_sport_programs: true,
+    access_nutrition_programs: false,
+    access_messaging: false,
+    access_visio: false,
+    access_ai_coach: false,
+    access_premium_content: false,
+  },
+  premium: {
+    access_recipes: true,
+    access_sport_programs: true,
+    access_nutrition_programs: true,
+    access_messaging: true,
+    access_visio: false,
+    access_ai_coach: true,
+    access_premium_content: true,
+  },
 };
 
 function ProDashboardPage() {
@@ -85,33 +122,50 @@ function DashboardContent() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
+
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [upcoming, setUpcoming] = useState<UpcomingConsultation[] | null>(null);
   const [recentPatients, setRecentPatients] = useState<RecentPatient[] | null>(null);
   const [recentSubscribers, setRecentSubscribers] = useState<RecentSubscriber[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [updatingSubscriberId, setUpdatingSubscriberId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
+
     setError(null);
+
     try {
       const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
-      const next7days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const startOfDay = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate()
+      ).toISOString();
+      const endOfDay = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1
+      ).toISOString();
+      const next7days = new Date(
+        now.getTime() + 7 * 24 * 60 * 60 * 1000
+      ).toISOString();
 
       const [
-        patientsRes, visioTodayRes, nutritionRes,
-        sportRes, messagesRes, upcomingRes, recentRes,
+        patientsRes,
+        visioTodayRes,
+        nutritionRes,
+        sportRes,
+        messagesRes,
+        upcomingRes,
+        recentRes,
       ] = await Promise.all([
-        // Patients actifs
         supabase
           .from("patients")
           .select("*", { count: "exact", head: true })
           .eq("pro_id", user.id)
           .eq("is_active", true),
 
-        // Consultations du jour
         supabase
           .from("visio_consultations")
           .select("*", { count: "exact", head: true })
@@ -120,28 +174,24 @@ function DashboardContent() {
           .gte("scheduled_at", startOfDay)
           .lt("scheduled_at", endOfDay),
 
-        // Programmes nutrition actifs
         supabase
           .from("nutrition_programs")
           .select("*", { count: "exact", head: true })
           .eq("pro_id", user.id)
           .eq("is_active", true),
 
-        // Programmes sport actifs
         supabase
           .from("sport_programs")
           .select("*", { count: "exact", head: true })
           .eq("pro_id", user.id)
           .eq("is_active", true),
 
-        // Messages non lus
         supabase
           .from("messages")
           .select("*", { count: "exact", head: true })
           .eq("recipient_id", user.id)
           .is("read_at", null),
 
-        // Prochaines consultations (7 jours)
         supabase
           .from("visio_consultations")
           .select("id, scheduled_at, duration_min, status, room_url, patient_id")
@@ -152,7 +202,6 @@ function DashboardContent() {
           .order("scheduled_at", { ascending: true })
           .limit(5),
 
-        // Derniers patients
         supabase
           .from("patients")
           .select("id, first_name, last_name, goal, is_active, updated_at")
@@ -161,15 +210,13 @@ function DashboardContent() {
           .limit(5),
       ]);
 
-      // ✅ CORRECTION 1 : comptage abonnés directement dans profiles avec pro_id
-      const { count: subsCount } = await supabase
+      const { count: subsCount, error: subsCountError } = await supabase
         .from("profiles")
         .select("*", { count: "exact", head: true })
         .eq("pro_id", user.id)
         .eq("role", "subscriber");
 
-      // ✅ CORRECTION 2 : liste abonnés récents depuis profiles avec pro_id
-      const { data: recentSubsData } = await supabase
+      const { data: recentSubsData, error: recentSubsError } = await supabase
         .from("profiles")
         .select("id, full_name, email, plan, created_at")
         .eq("pro_id", user.id)
@@ -178,8 +225,16 @@ function DashboardContent() {
         .limit(5);
 
       const firstError =
-        patientsRes.error || visioTodayRes.error ||
-        nutritionRes.error || sportRes.error || messagesRes.error;
+        patientsRes.error ||
+        visioTodayRes.error ||
+        nutritionRes.error ||
+        sportRes.error ||
+        messagesRes.error ||
+        upcomingRes.error ||
+        recentRes.error ||
+        subsCountError ||
+        recentSubsError;
+
       if (firstError) {
         setError(firstError.message);
         return;
@@ -194,49 +249,133 @@ function DashboardContent() {
       });
 
       const rawUpcoming = (upcomingRes.data ?? []) as Array<{
-        id: string; scheduled_at: string; duration_min: number | null;
-        status: string; room_url: string | null; patient_id: string | null;
+        id: string;
+        scheduled_at: string;
+        duration_min: number | null;
+        status: string;
+        room_url: string | null;
+        patient_id: string | null;
       }>;
+
       const patientIds = rawUpcoming
         .map((c) => c.patient_id)
         .filter((x): x is string => Boolean(x));
-      let patientNames: Record<string, string> = {};
+
+      const patientNames: Record<string, string> = {};
+
       if (patientIds.length) {
         const { data: pts } = await supabase
           .from("patients")
           .select("id, first_name, last_name")
           .in("id", patientIds);
+
         for (const p of pts ?? []) {
-          patientNames[(p as { id: string; first_name: string; last_name: string }).id] =
-            `${(p as { first_name: string }).first_name} ${(p as { last_name: string }).last_name}`;
+          patientNames[
+            (p as { id: string; first_name: string; last_name: string }).id
+          ] = `${(p as { first_name: string }).first_name} ${
+            (p as { last_name: string }).last_name
+          }`;
         }
       }
+
       setUpcoming(
         rawUpcoming.map((c) => ({
           ...c,
-          patient_name: c.patient_id ? (patientNames[c.patient_id] ?? "Patient") : "Patient",
+          patient_name: c.patient_id
+            ? patientNames[c.patient_id] ?? "Patient"
+            : "Patient",
         }))
       );
+
       setRecentPatients((recentRes.data ?? []) as RecentPatient[]);
       setRecentSubscribers((recentSubsData ?? []) as RecentSubscriber[]);
-
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur de chargement");
     }
   }, [user]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   useEffect(() => {
     const interval = setInterval(() => void load(), 60_000);
     return () => clearInterval(interval);
   }, [load]);
 
+  async function handleToggleSubscriberPlan(subscriber: RecentSubscriber) {
+    if (!user) return;
+
+    const currentPlan = subscriber.plan ?? "basic";
+    const nextPlan: "basic" | "premium" =
+      currentPlan === "premium" ? "basic" : "premium";
+
+    const confirmed = window.confirm(
+      nextPlan === "premium"
+        ? `Passer ${subscriber.full_name ?? subscriber.email} en Premium ?`
+        : `Repasser ${subscriber.full_name ?? subscriber.email} en Basic ?`
+    );
+
+    if (!confirmed) return;
+
+    setUpdatingSubscriberId(subscriber.id);
+
+    try {
+      const rights = PLAN_FEATURES[nextPlan];
+
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ plan: nextPlan })
+        .eq("id", subscriber.id)
+        .eq("pro_id", user.id);
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      const overrideRows = Object.entries(rights).map(([feature_key, enabled]) => ({
+        user_id: subscriber.id,
+        feature_key,
+        enabled,
+      }));
+
+      const { error: overridesError } = await supabase
+        .from("subscriber_overrides")
+        .upsert(overrideRows, {
+          onConflict: "user_id,feature_key",
+        });
+
+      if (overridesError) {
+        throw overridesError;
+      }
+
+      await load();
+
+      setRecentSubscribers((prev) =>
+        (prev ?? []).map((item) =>
+          item.id === subscriber.id ? { ...item, plan: nextPlan } : item
+        )
+      );
+
+      window.alert(
+        nextPlan === "premium"
+          ? "Abonné passé en Premium avec succès."
+          : "Abonné repassé en Basic avec succès."
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Erreur inconnue lors de la mise à jour";
+      window.alert(`Impossible de mettre à jour l'abonné : ${message}`);
+    } finally {
+      setUpdatingSubscriberId(null);
+    }
+  }
+
   const firstName = profile?.full_name?.split(" ")[0] ?? "Docteur";
   const isLoading = !kpis && !error;
 
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex min-h-full flex-col">
       <header className="flex items-center justify-between border-b bg-white px-6 py-4">
         <div>
           <h1 className="text-xl font-semibold text-foreground">Tableau de bord</h1>
@@ -245,6 +384,7 @@ function DashboardContent() {
             {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
           </p>
         </div>
+
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
@@ -255,13 +395,14 @@ function DashboardContent() {
           >
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+              <span className="absolute -right-0.5 -top-0.5 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
                 {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             )}
           </Button>
+
           <Button
-            className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white"
+            className="bg-[#6DB33F] text-white hover:bg-[#2D7A1F]"
             onClick={() => void navigate({ to: "/pro/patients" })}
           >
             <UserPlus className="h-4 w-4" />
@@ -270,9 +411,9 @@ function DashboardContent() {
         </div>
       </header>
 
-      <div className="p-6 space-y-6">
+      <div className="space-y-6 p-6">
         {error && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive flex items-center justify-between">
+          <div className="flex items-center justify-between rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
             <span>{error}</span>
             <Button variant="ghost" size="sm" onClick={() => void load()}>
               Réessayer
@@ -280,8 +421,7 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* KPIs — 5 cartes */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <KpiCard
             label="Patients actifs"
             value={kpis?.patients}
@@ -289,6 +429,7 @@ function DashboardContent() {
             loading={isLoading}
             onClick={() => void navigate({ to: "/pro/patients" })}
           />
+
           <KpiCard
             label="Abonnés actifs"
             value={kpis?.subscribers}
@@ -296,6 +437,7 @@ function DashboardContent() {
             loading={isLoading}
             onClick={() => void navigate({ to: "/pro/subscribers" })}
           />
+
           <KpiCard
             label="Consultations aujourd'hui"
             value={kpis?.todayConsultations}
@@ -303,6 +445,7 @@ function DashboardContent() {
             loading={isLoading}
             onClick={() => void navigate({ to: "/pro/consultations" })}
           />
+
           <KpiCard
             label="Programmes actifs"
             value={kpis?.activePrograms}
@@ -310,6 +453,7 @@ function DashboardContent() {
             loading={isLoading}
             onClick={() => void navigate({ to: "/pro/nutrition" })}
           />
+
           <KpiCard
             label="Messages non lus"
             value={kpis?.unreadMessages}
@@ -320,34 +464,38 @@ function DashboardContent() {
           />
         </div>
 
-        {/* Grille basse */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Prochaines consultations */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Card className="border-border/60">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
                 <Video className="h-4 w-4 text-[#6DB33F]" />
                 Prochaines consultations
               </CardTitle>
+
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-xs text-muted-foreground gap-1"
+                className="gap-1 text-xs text-muted-foreground"
                 onClick={() => void navigate({ to: "/pro/consultations" })}
               >
                 Voir tout <ArrowRight className="h-3 w-3" />
               </Button>
             </CardHeader>
+
             <CardContent className="space-y-2">
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-14 w-full rounded-md" />
                 ))
               ) : upcoming?.length === 0 ? (
-                <div className="flex flex-col items-center py-8 text-muted-foreground text-sm gap-2">
+                <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
                   <CalendarCheck className="h-8 w-8 text-muted-foreground/40" />
                   <span>Aucune consultation planifiée sur 7 jours</span>
-                  <Button variant="outline" size="sm" onClick={() => void navigate({ to: "/pro/consultations" })}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void navigate({ to: "/pro/consultations" })}
+                  >
                     Planifier une consultation
                   </Button>
                 </div>
@@ -357,32 +505,37 @@ function DashboardContent() {
             </CardContent>
           </Card>
 
-          {/* Derniers patients */}
           <Card className="border-border/60">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
                 <Users className="h-4 w-4 text-[#6DB33F]" />
                 Derniers patients
               </CardTitle>
+
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-xs text-muted-foreground gap-1"
+                className="gap-1 text-xs text-muted-foreground"
                 onClick={() => void navigate({ to: "/pro/patients" })}
               >
                 Voir tout <ArrowRight className="h-3 w-3" />
               </Button>
             </CardHeader>
+
             <CardContent className="space-y-2">
               {isLoading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <Skeleton key={i} className="h-12 w-full rounded-md" />
                 ))
               ) : recentPatients?.length === 0 ? (
-                <div className="flex flex-col items-center py-8 text-muted-foreground text-sm gap-2">
+                <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
                   <Users className="h-8 w-8 text-muted-foreground/40" />
                   <span>Aucun patient pour l'instant</span>
-                  <Button variant="outline" size="sm" onClick={() => void navigate({ to: "/pro/patients" })}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void navigate({ to: "/pro/patients" })}
+                  >
                     Ajouter un patient
                   </Button>
                 </div>
@@ -392,41 +545,51 @@ function DashboardContent() {
             </CardContent>
           </Card>
 
-          {/* Derniers abonnés — pleine largeur */}
           <Card className="border-border/60 lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
                 <UserCheck className="h-4 w-4 text-[#6DB33F]" />
                 Derniers abonnés
               </CardTitle>
+
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-xs text-muted-foreground gap-1"
+                className="gap-1 text-xs text-muted-foreground"
                 onClick={() => void navigate({ to: "/pro/subscribers" })}
               >
                 Voir tout <ArrowRight className="h-3 w-3" />
               </Button>
             </CardHeader>
+
             <CardContent>
               {isLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                   {Array.from({ length: 3 }).map((_, i) => (
                     <Skeleton key={i} className="h-12 w-full rounded-md" />
                   ))}
                 </div>
               ) : recentSubscribers?.length === 0 ? (
-                <div className="flex flex-col items-center py-8 text-muted-foreground text-sm gap-2">
+                <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
                   <UserCheck className="h-8 w-8 text-muted-foreground/40" />
                   <span>Aucun abonné pour l'instant</span>
-                  <Button variant="outline" size="sm" onClick={() => void navigate({ to: "/pro/subscribers" })}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void navigate({ to: "/pro/subscribers" })}
+                  >
                     Gérer les abonnés
                   </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                   {recentSubscribers?.map((s) => (
-                    <SubscriberRow key={s.id} subscriber={s} />
+                    <SubscriberRow
+                      key={s.id}
+                      subscriber={s}
+                      updating={updatingSubscriberId === s.id}
+                      onTogglePlan={handleToggleSubscriberPlan}
+                    />
                   ))}
                 </div>
               )}
@@ -438,10 +601,13 @@ function DashboardContent() {
   );
 }
 
-/* ---------- Sous-composants ---------- */
-
 function KpiCard({
-  label, value, icon, loading, highlight, onClick,
+  label,
+  value,
+  icon,
+  loading,
+  highlight,
+  onClick,
 }: {
   label: string;
   value: number | undefined;
@@ -455,14 +621,17 @@ function KpiCard({
       className={cn(
         "border-border/60 transition-shadow",
         onClick && "cursor-pointer hover:shadow-md",
-        highlight && "border-[#6DB33F]/40 bg-[#6DB33F]/5",
+        highlight && "border-[#6DB33F]/40 bg-[#6DB33F]/5"
       )}
       onClick={onClick}
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {label}
+        </CardTitle>
         <div className="rounded-md bg-[#6DB33F]/10 p-2">{icon}</div>
       </CardHeader>
+
       <CardContent>
         {loading ? (
           <Skeleton className="h-8 w-16" />
@@ -484,16 +653,25 @@ function ConsultationRow({ consult }: { consult: UpcomingConsultation }) {
 
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{consult.patient_name}</p>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{consult.patient_name}</p>
         <p className="text-xs text-muted-foreground">
           {dayLabel} à {format(date, "HH:mm")}
           {consult.duration_min ? ` · ${consult.duration_min} min` : ""}
         </p>
       </div>
+
       {consult.room_url && (
-        <a href={consult.room_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-          <Button size="sm" className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white h-7 px-2 text-xs gap-1">
+        <a
+          href={consult.room_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Button
+            size="sm"
+            className="h-7 gap-1 bg-[#6DB33F] px-2 text-xs text-white hover:bg-[#2D7A1F]"
+          >
             <Video className="h-3 w-3" /> Rejoindre
           </Button>
         </a>
@@ -505,29 +683,39 @@ function ConsultationRow({ consult }: { consult: UpcomingConsultation }) {
 function PatientRow({ patient }: { patient: RecentPatient }) {
   const navigate = useNavigate();
   const initials = `${patient.first_name[0] ?? ""}${patient.last_name[0] ?? ""}`.toUpperCase();
+
   return (
     <div
-      className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/50 cursor-pointer transition-colors"
-      onClick={() => void navigate({ to: "/pro/patients/$patientId", params: { patientId: patient.id } })}
+      className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/50"
+      onClick={() =>
+        void navigate({
+          to: "/pro/patients/$patientId",
+          params: { patientId: patient.id },
+        })
+      }
     >
       <Avatar className="h-8 w-8">
-        <AvatarFallback className="bg-[#6DB33F]/20 text-[#2D7A1F] text-xs font-semibold">
+        <AvatarFallback className="bg-[#6DB33F]/20 text-xs font-semibold text-[#2D7A1F]">
           {initials}
         </AvatarFallback>
       </Avatar>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{patient.first_name} {patient.last_name}</p>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">
+          {patient.first_name} {patient.last_name}
+        </p>
         <p className="text-xs text-muted-foreground">
           {(patient.goal && GOAL_LABEL[patient.goal]) ?? "Objectif non défini"}
         </p>
       </div>
+
       <Badge
         variant="outline"
         className={cn(
-          "text-[10px] shrink-0",
+          "shrink-0 text-[10px]",
           patient.is_active
-            ? "border-green-500/40 text-green-700 bg-green-50"
-            : "border-gray-300 text-gray-500",
+            ? "border-green-500/40 bg-green-50 text-green-700"
+            : "border-gray-300 text-gray-500"
         )}
       >
         {patient.is_active ? "Actif" : "Inactif"}
@@ -536,32 +724,76 @@ function PatientRow({ patient }: { patient: RecentPatient }) {
   );
 }
 
-function SubscriberRow({ subscriber }: { subscriber: RecentSubscriber }) {
+function SubscriberRow({
+  subscriber,
+  updating,
+  onTogglePlan,
+}: {
+  subscriber: RecentSubscriber;
+  updating?: boolean;
+  onTogglePlan: (subscriber: RecentSubscriber) => void;
+}) {
   const navigate = useNavigate();
   const name = subscriber.full_name ?? subscriber.email;
-  const initials = name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
-  const planLabel = (subscriber.plan && PLAN_LABEL[subscriber.plan]) ?? subscriber.plan ?? "—";
+  const initials = name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const plan = subscriber.plan ?? "basic";
+  const planLabel = PLAN_LABEL[plan] ?? "Basic";
+  const isPremium = plan === "premium";
+  const canToggle = plan === "basic" || plan === "premium" || plan === null;
 
   return (
     <div
-      className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/50 cursor-pointer transition-colors"
+      className="flex cursor-pointer items-center gap-3 rounded-lg border border-border/50 px-3 py-3 transition-colors hover:bg-muted/40"
       onClick={() => void navigate({ to: "/pro/subscribers" })}
     >
       <Avatar className="h-8 w-8">
-        <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-semibold">
+        <AvatarFallback className="bg-blue-100 text-xs font-semibold text-blue-700">
           {initials}
         </AvatarFallback>
       </Avatar>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{name}</p>
-        <p className="text-xs text-muted-foreground">{planLabel}</p>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{name}</p>
+        <p className="text-xs text-muted-foreground">{subscriber.email}</p>
+
+        <div className="mt-1 flex items-center gap-2">
+          <Badge
+            variant="outline"
+            className={cn(
+              "shrink-0 text-[10px]",
+              isPremium
+                ? "border-amber-500/40 bg-amber-50 text-amber-700"
+                : "border-green-500/40 bg-green-50 text-green-700"
+            )}
+          >
+            {planLabel}
+          </Badge>
+        </div>
       </div>
-      <Badge
-        variant="outline"
-        className="text-[10px] shrink-0 border-green-500/40 text-green-700 bg-green-50"
-      >
-        Actif
-      </Badge>
+
+      {canToggle && (
+        <Button
+          size="sm"
+          variant={isPremium ? "outline" : "default"}
+          className={cn(
+            "h-8 shrink-0 rounded-xl",
+            !isPremium && "bg-[#6DB33F] text-white hover:bg-[#2D7A1F]"
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            onTogglePlan(subscriber);
+          }}
+          disabled={updating}
+        >
+          {updating ? "..." : isPremium ? "Remettre Basic" : "Passer Premium"}
+        </Button>
+      )}
     </div>
   );
 }
