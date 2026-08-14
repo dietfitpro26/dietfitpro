@@ -1,52 +1,62 @@
-import { useEffect, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { supabase } from "@/lib/supabase";
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card'
+import { Alert, AlertDescription } from '../components/ui/alert'
+import { Loader2, CheckCircle2 } from 'lucide-react'
+import { useAuth } from '../hooks/useAuth'
 
-export const Route = createFileRoute("/bienvenue")({
-  component: BienvenuePage,
-});
+export const Route = createFileRoute('/bienvenue')({
+  component: BienvenueComponent,
+})
 
-function BienvenuePage() {
-  const navigate = useNavigate();
-  const [step, setStep] = useState<"loading" | "form" | "done">("loading");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
+function BienvenueComponent() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [step, setStep] = useState(1)
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    birthDate: '',
+    gender: '',
+    height: '',
+    weight: '',
+    goal: '',
+  })
 
+  // Vérifier que l'utilisateur est connecté
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setStep("form");
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === "SIGNED_IN" && session) {
-          setStep("form");
-        }
-      }
-    );
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password.length < 8) { setError("8 caractères minimum."); return; }
-    if (password !== confirm) { setError("Les mots de passe ne correspondent pas."); return; }
-
-    setSaving(true);
-    setError("");
-
-    const { data: { session } } = await supabase.auth.getSession();
-
-    const { error: err } = await supabase.auth.updateUser({ password });
-
-    if (err) {
-      setSaving(false);
-      setError(err.message);
-      return;
+    if (!user) {
+      navigate({ to: '/login' })
     }
+  }, [user, navigate])
 
+  async function handleNext(e: React.FormEvent) {
+    e.preventDefault()
+    
+    if (step === 1) {
+      if (!formData.firstName || !formData.lastName || !formData.birthDate) {
+        setError('Veuillez remplir tous les champs')
+        return
+      }
+      setStep(2)
+      setError(null)
+    } else if (step === 2) {
+      if (!formData.height || !formData.weight || !formData.goal) {
+        setError('Veuillez remplir tous les champs')
+        return
+      }
+      setStep(3)
+      setError(null)
+    }
+  }
+
+<<<<<<< HEAD
     // Lier le compte patient
     if (session?.user) {
       await supabase.rpc("link_patient_account", {
@@ -63,28 +73,115 @@ function BienvenuePage() {
           profile_complete: true,
         })
         .eq("id", session.user.id);
-    }
+=======
+  async function handleComplete() {
+    if (!user) return
 
-    setSaving(false);
-    setStep("done");
-    setTimeout(() => navigate({ to: "/patient/dashboard" }), 2000);
-  };
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Mettre à jour le profil avec les informations
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          birth_date: formData.birthDate,
+          gender: formData.gender || null,
+          height_cm: formData.height ? parseFloat(formData.height) : null,
+          weight_kg: formData.weight ? parseFloat(formData.weight) : null,
+          goal: formData.goal || null,
+          profile_complete: true, // ← IMPORTANT: marque le profil comme complet
+        })
+        .eq('id', user.id)
+
+      if (updateError) throw updateError
+
+      // Rėcupėrer le rôle pour rediriger vers le bon dashboard
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) throw new Error('Profil introuvable')
+
+      // Redirection selon rôle
+      switch (profile.role) {
+        case 'pro':
+          navigate({ to: '/pro/dashboard' })
+          break
+        case 'patient':
+          navigate({ to: '/patient/dashboard' })
+          break
+        case 'subscriber':
+          navigate({ to: '/subscriber/nutrition' })
+          break
+      }
+    } catch (err: any) {
+      console.error('Bienvenue error:', err)
+      setError(err.message || 'Une erreur est survenue')
+    } finally {
+      setLoading(false)
+>>>>>>> 99408d3e5828c26f7f68f4143aa8c5d8c6e2d77e
+    }
+  }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f0f7eb", padding: "1rem" }}>
-      <div style={{ background: "white", borderRadius: "1rem", padding: "2rem", width: "100%", maxWidth: "400px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
-        <div style={{ textAlign: "center", marginBottom: "1.5rem" }}>
-          <div style={{ width: 56, height: 56, background: "#6DB33F", borderRadius: "0.75rem", margin: "0 auto 1rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ color: "white", fontSize: 28 }}>🥗</span>
+    <div className="min-h-screen flex items-center justify-center bg-muted/20 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <div className="flex items-center gap-2 mb-2">
+            <CheckCircle2 className="h-6 w-6 text-primary" />
+            <CardTitle>Bienvenue !</CardTitle>
           </div>
-          <h1 style={{ color: "#2D7A1F", fontWeight: 700, fontSize: "1.4rem" }}>DietFitPro</h1>
-          <p style={{ color: "#888", fontSize: "0.85rem" }}>Votre espace santé personnalisé</p>
-        </div>
+          <CardDescription>
+            Complé·´tez votre profil pour accéder à votre espace
+          </CardDescription>
+        </CardHeader>
+        <form>
+          <CardContent className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-        {step === "loading" && (
-          <p style={{ textAlign: "center", color: "#666" }}>⏳ Vérification de votre invitation…</p>
-        )}
+            {step === 1 && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">Prėnom</Label>
+                  <Input
+                    id="firstName"
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Nom</Label>
+                  <Input
+                    id="lastName"
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="birthDate">Date de naissance</Label>
+                  <Input
+                    id="birthDate"
+                    type="date"
+                    value={formData.birthDate}
+                    onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                    disabled={loading}
+                  />
+                </div>
+              </>
+            )}
 
+<<<<<<< HEAD
         {step === "form" && (
           <form onSubmit={handleSubmit}>
             <p style={{ fontWeight: 600, marginBottom: "1rem", textAlign: "center" }}>Créez votre mot de passe</p>
@@ -108,15 +205,79 @@ function BienvenuePage() {
             </button>
           </form>
         )}
+=======
+            {step === 2 && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="height">Taille (cm)</Label>
+                  <Input
+                    id="height"
+                    type="number"
+                    placeholder="170"
+                    value={formData.height}
+                    onChange={(e) => setFormData({ ...formData, height: e.target.value })}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="weight">Poids (kg)</Label>
+                  <Input
+                    id="weight"
+                    type="number"
+                    placeholder="70"
+                    value={formData.weight}
+                    onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="goal">Objectif principal</Label>
+                  <Input
+                    id="goal"
+                    placeholder="Perte de poids, Prise de masse, etc."
+                    value={formData.goal}
+                    onChange={(e) => setFormData({ ...formData, goal: e.target.value })}
+                    disabled={loading}
+                  />
+                </div>
+              </>
+            )}
+>>>>>>> 99408d3e5828c26f7f68f4143aa8c5d8c6e2d77e
 
-        {step === "done" && (
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 48, marginBottom: "0.5rem" }}>🎉</div>
-            <p style={{ fontWeight: 600 }}>Bienvenue !</p>
-            <p style={{ color: "#888", fontSize: "0.85rem" }}>Redirection en cours…</p>
-          </div>
-        )}
-      </div>
+            {step === 3 && (
+              <div className="text-center py-8">
+                <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Profil prêt !</h3>
+                <p className="text-muted-foreground">
+                  Vous allez être redirigé·´e vers votre espace personnel.
+                </p>
+              </div>
+            )}
+          </CardContent>
+          <CardFooter className="flex gap-2">
+            {step > 1 && step < 3 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep(step - 1)}
+                disabled={loading}
+              >
+                Retour
+              </Button>
+            )}
+            {step < 3 ? (
+              <Button type="button" onClick={handleNext} className="flex-1" disabled={loading}>
+                {step === 2 ? 'Suivant' : 'Continuer'}
+              </Button>
+            ) : (
+              <Button onClick={handleComplete} className="w-full" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Accé·´der à mon espace
+              </Button>
+            )}
+          </CardFooter>
+        </form>
+      </Card>
     </div>
-  );
+  )
 }
