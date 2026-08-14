@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Utensils, Lock, Flame, Target } from "lucide-react";
+import { Utensils, Lock, Flame, Target, CheckCircle } from "lucide-react";
 import { SubscriberLayout } from "@/layouts/SubscriberLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { useAccessRights } from "@/hooks/useAccessRights";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Card,
@@ -30,20 +29,38 @@ function SubscriberNutritionPage() {
 
 function NutritionContent() {
   const { profile } = useAuth();
-  const { rights, loading } = useAccessRights();
 
   const firstName = profile?.full_name?.split(" ")[0] ?? "vous";
-  const hasAccess = rights?.access_nutrition_programs ?? false;
 
-  if (loading) {
+  // Vérification de l'accès : abonné actif (Basic ou Premium)
+  const isSubscriber = profile?.role === "subscriber";
+  const isActive =
+    profile?.subscription_status === "active" ||
+    profile?.subscription_status === "trialing";
+  const isPremium = profile?.plan === "premium";
+
+  const hasAccess = isSubscriber && isActive;
+  const isPremiumUser = isSubscriber && isActive && isPremium;
+
+  if (!hasAccess) {
     return (
-      <div className="p-4 sm:p-6">
-        <div className="mx-auto max-w-5xl space-y-4">
-          <div className="h-32 animate-pulse rounded-3xl bg-muted" />
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="h-56 animate-pulse rounded-3xl bg-muted" />
-            <div className="h-56 animate-pulse rounded-3xl bg-muted" />
-          </div>
+      <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
+        <div className="mx-auto max-w-5xl space-y-6">
+          <Card className="rounded-3xl border shadow-sm">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                  <Lock className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle>Accès non disponible</CardTitle>
+                  <CardDescription>
+                    Votre abonnement n'est pas actif. Veuillez contacter le support ou régulariser votre situation.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
         </div>
       </div>
     );
@@ -69,111 +86,107 @@ function NutritionContent() {
                   </CardDescription>
                 </div>
               </div>
+              {isPremiumUser && (
+                <div className="flex items-center gap-2 rounded-full bg-[#6DB33F]/10 px-3 py-1 text-xs font-medium text-[#2D7A1F]">
+                  <CheckCircle className="h-4 w-4" />
+                  Premium
+                </div>
+              )}
             </div>
           </CardHeader>
         </Card>
 
-        {hasAccess ? (
-          <>
-            <div className="grid gap-4 md:grid-cols-3">
-              <InfoCard
-                icon={<Flame className="h-5 w-5" />}
-                title="Objectif kcal / jour"
-                value="À personnaliser"
-                subtitle="À relier ensuite à votre vrai plan"
-              />
-              <InfoCard
-                icon={<Target className="h-5 w-5" />}
-                title="Objectif nutrition"
-                value="Programme actif"
-                subtitle="Version abonnés selon votre offre"
-              />
-              <InfoCard
-                icon={<Utensils className="h-5 w-5" />}
-                title="Organisation repas"
-                value="Matin · Midi · Soir"
-                subtitle="Collation si besoin"
-              />
-            </div>
+        <>
+          <div className="grid gap-4 md:grid-cols-3">
+            <InfoCard
+              icon={<Flame className="h-5 w-5" />}
+              title="Objectif kcal / jour"
+              value="À personnaliser"
+              subtitle="À relier ensuite à votre vrai plan"
+            />
+            <InfoCard
+              icon={<Target className="h-5 w-5" />}
+              title="Objectif nutrition"
+              value={isPremiumUser ? "Programme Premium" : "Programme Basic"}
+              subtitle={isPremiumUser ? "Fonctionnalités avancées" : "Version abonnés selon votre offre"}
+            />
+            <InfoCard
+              icon={<Utensils className="h-5 w-5" />}
+              title="Organisation repas"
+              value="Matin · Midi · Soir"
+              subtitle="Collation si besoin"
+            />
+          </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <MealCard
-                title="Petit-déjeuner"
-                items={[
-                  "Source de protéines",
-                  "Produit céréalier ou équivalent",
-                  "Fruit ou laitage selon le plan",
-                ]}
-              />
-              <MealCard
-                title="Déjeuner"
-                items={[
-                  "Protéines",
-                  "Féculents selon objectif",
-                  "Légumes + matière grasse adaptée",
-                ]}
-              />
-              <MealCard
-                title="Dîner"
-                items={[
-                  "Repas structuré et digeste",
-                  "Légumes systématiques",
-                  "Répartition selon votre objectif kcal",
-                ]}
-              />
-              <MealCard
-                title="Collation"
-                items={[
-                  "Seulement si prévue au plan",
-                  "Protéines ou fruit selon besoin",
-                  "Adaptée à votre journée",
-                ]}
-              />
-            </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <MealCard
+              title="Petit-déjeuner"
+              items={[
+                "Source de protéines",
+                "Produit céréalier ou équivalent",
+                "Fruit ou laitage selon le plan",
+              ]}
+            />
+            <MealCard
+              title="Déjeuner"
+              items={[
+                "Protéines",
+                "Féculents selon objectif",
+                "Légumes + matière grasse adaptée",
+              ]}
+            />
+            <MealCard
+              title="Dîner"
+              items={[
+                "Repas structuré et digeste",
+                "Légumes systématiques",
+                "Répartition selon votre objectif kcal",
+              ]}
+            />
+            <MealCard
+              title="Collation"
+              items={[
+                "Seulement si prévue au plan",
+                "Protéines ou fruit selon besoin",
+                "Adaptée à votre journée",
+              ]}
+            />
+          </div>
 
+          {isPremiumUser ? (
             <Card className="rounded-3xl border shadow-sm">
               <CardHeader>
-                <CardTitle>Suite du raccordement</CardTitle>
+                <CardTitle>Fonctionnalités Premium</CardTitle>
                 <CardDescription>
-                  Cette page est maintenant créée. À l’étape suivante, on pourra
-                  la connecter à vos vraies données nutrition si elles existent
-                  déjà en base.
+                  Vous avez accès aux fonctionnalités avancées de nutrition.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button className="rounded-2xl">
-                  Page nutrition abonné prête
+                <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+                  Contenu Premium à intégrer : plans personnalisés, suivi avancé, etc.
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="rounded-3xl border shadow-sm">
+              <CardHeader>
+                <CardTitle>Passer en Premium</CardTitle>
+                <CardDescription>
+                  Débloquez toutes les fonctionnalités de nutrition avec l'offre Premium.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+                  Vous gardez ainsi la même structure d'application entre patient et abonné,
+                  avec un accès qui varie selon vos règles métier.
+                </div>
+                <Button variant="outline" className="rounded-2xl">
+                  Découvrir une formule supérieure
                 </Button>
               </CardContent>
             </Card>
-          </>
-        ) : (
-          <Card className="rounded-3xl border shadow-sm">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-                  <Lock className="h-5 w-5" />
-                </div>
-                <div>
-                  <CardTitle>Module nutrition verrouillé</CardTitle>
-                  <CardDescription>
-                    Cette page existe bien pour l’abonné, mais son ouverture dépend
-                    du forfait ou d’une activation manuelle du professionnel.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-                Vous gardez ainsi la même structure d’application entre patient et abonné,
-                avec un accès qui varie selon vos règles métier.
-              </div>
-              <Button variant="outline" className="rounded-2xl">
-                Découvrir une formule supérieure
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+          )}
+        </>
       </div>
     </div>
   );

@@ -17,13 +17,16 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 
+
 export const Route = createFileRoute("/pro/analytics")({
   head: () => ({ meta: [{ title: "Analytics — DietFitPro" }] }),
   component: Page,
 });
 
+
 type PaymentStatus = "pending" | "paid" | "refunded" | "partial_refund" | "failed";
 type Status = "scheduled" | "completed" | "cancelled" | "refunded" | "no_show";
+
 
 interface Consultation {
   id: string;
@@ -33,6 +36,7 @@ interface Consultation {
   amount_cents: number | null;
   patient?: { first_name: string; last_name: string } | null;
 }
+
 
 interface AnalyticsData {
   activePatients: number;
@@ -47,6 +51,7 @@ interface AnalyticsData {
   recentPayments: Consultation[];
 }
 
+
 function Page() {
   return (
     <ProtectedRoute allow={["pro"]}>
@@ -55,19 +60,23 @@ function Page() {
   );
 }
 
+
 function AnalyticsContent() {
   const { user } = useAuth();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
 
+
     (async () => {
       try {
         setLoading(true);
+
 
         const now = new Date();
         const thisMonthStart = startOfMonth(now);
@@ -75,25 +84,19 @@ function AnalyticsContent() {
         const lastMonthStart = startOfMonth(subMonths(now, 1));
         const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
+
         const [patientsRes, subscribersRes, consultsRes] = await Promise.all([
           supabase
             .from("patients")
             .select("*", { count: "exact", head: true })
             .eq("pro_id", user.id)
             .eq("is_active", true),
-          // Abonnés actifs liés au pro via invitation_codes
+          // Abonnés actifs liés directement via profiles.pro_id
           supabase
             .from("profiles")
             .select("id", { count: "exact", head: true })
             .eq("role", "subscriber")
-            .in(
-              "id",
-              supabase
-                .from("invitation_codes")
-                .select("used_by")
-                .eq("pro_id", user.id)
-                .not("used_by", "is", null)
-            ),
+            .eq("pro_id", user.id),
           supabase
             .from("visio_consultations")
             .select("id, scheduled_at, status, payment_status, amount_cents, patients(first_name, last_name)")
@@ -101,17 +104,26 @@ function AnalyticsContent() {
             .order("scheduled_at", { ascending: false }),
         ]);
 
+
         if (cancelled) return;
 
-        if (patientsRes.error || consultsRes.error) {
-          setError(patientsRes.error?.message || consultsRes.error?.message || "Erreur de chargement");
+
+        if (patientsRes.error || subscribersRes.error || consultsRes.error) {
+          setError(
+            patientsRes.error?.message ||
+              subscribersRes.error?.message ||
+              consultsRes.error?.message ||
+              "Erreur de chargement"
+          );
           setLoading(false);
           return;
         }
 
+
         const consultations = (consultsRes.data ?? []) as Consultation[];
         const activePatients = patientsRes.count ?? 0;
         const activeSubscribers = subscribersRes.count ?? 0;
+
 
         const thisMonthConsults = consultations.filter((c) => {
           if (!c.scheduled_at) return false;
@@ -119,18 +131,22 @@ function AnalyticsContent() {
           return isWithinInterval(d, { start: thisMonthStart, end: thisMonthEnd });
         });
 
+
         const lastMonthConsults = consultations.filter((c) => {
           if (!c.scheduled_at) return false;
           const d = new Date(c.scheduled_at);
           return isWithinInterval(d, { start: lastMonthStart, end: lastMonthEnd });
         });
 
+
         const revenueThisMonthCents = thisMonthConsults
           .filter((c) => c.payment_status === "paid")
           .reduce((sum, c) => sum + (c.amount_cents ?? 0), 0);
 
+
         const totalConsultations = consultations.length;
         const cancelledConsultations = consultations.filter((c) => c.status === "cancelled").length;
+
 
         const weeks: { week: string; count: number }[] = [];
         for (let i = 3; i >= 0; i--) {
@@ -145,12 +161,14 @@ function AnalyticsContent() {
           weeks.push({ week: label, count });
         }
 
+
         const paymentCounts: Record<PaymentStatus, number> = {
           pending: 0, paid: 0, refunded: 0, partial_refund: 0, failed: 0,
         };
         consultations.forEach((c) => {
           paymentCounts[c.payment_status] = (paymentCounts[c.payment_status] ?? 0) + 1;
         });
+
 
         const PAYMENT_COLORS: Record<PaymentStatus, string> = {
           pending: "#94a3b8", paid: "#6DB33F", refunded: "#f59e0b",
@@ -161,11 +179,14 @@ function AnalyticsContent() {
           partial_refund: "Remb. partiel", failed: "Échec",
         };
 
+
         const paymentDistribution = (Object.keys(paymentCounts) as PaymentStatus[])
           .filter((k) => paymentCounts[k] > 0)
           .map((k) => ({ name: PAYMENT_LABELS[k], value: paymentCounts[k], color: PAYMENT_COLORS[k] }));
 
+
         const recentPayments = consultations.filter((c) => c.payment_status === "paid").slice(0, 5);
+
 
         setData({
           activePatients,
@@ -186,13 +207,16 @@ function AnalyticsContent() {
       }
     })();
 
+
     return () => { cancelled = true; };
   }, [user]);
+
 
   const cancellationRate = useMemo(() => {
     if (!data || data.totalConsultations === 0) return 0;
     return Math.round((data.cancelledConsultations / data.totalConsultations) * 100);
   }, [data]);
+
 
   const consultationEvolution = useMemo(() => {
     if (!data || data.consultationsLastMonth === 0) return null;
@@ -201,11 +225,13 @@ function AnalyticsContent() {
     );
   }, [data]);
 
+
   return (
     <div className="flex flex-col">
       <header className="flex items-center justify-between border-b bg-white px-6 py-4">
         <h1 className="text-xl font-semibold text-foreground">Statistiques</h1>
       </header>
+
 
       <div className="p-6 space-y-6">
         {error && (
@@ -213,6 +239,7 @@ function AnalyticsContent() {
             {error}
           </div>
         )}
+
 
         {/* KPI Cards — 5 cartes sur 2 rangées */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -250,6 +277,7 @@ function AnalyticsContent() {
           />
         </div>
 
+
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="border-border/60">
@@ -277,6 +305,7 @@ function AnalyticsContent() {
               )}
             </CardContent>
           </Card>
+
 
           <Card className="border-border/60">
             <CardHeader>
@@ -315,6 +344,7 @@ function AnalyticsContent() {
             </CardContent>
           </Card>
         </div>
+
 
         {/* Recent payments */}
         <Card className="border-border/60">
@@ -361,6 +391,7 @@ function AnalyticsContent() {
   );
 }
 
+
 function KpiCard({
   label, value, icon, loading, evolution, trend,
 }: {
@@ -373,6 +404,7 @@ function KpiCard({
 }) {
   const isPositive = evolution !== undefined && evolution !== null && evolution >= 0;
   const isNegative = evolution !== undefined && evolution !== null && evolution < 0;
+
 
   return (
     <Card className="border-border/60">

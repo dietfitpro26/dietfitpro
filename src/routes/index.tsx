@@ -2,16 +2,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Apple, Dumbbell, Brain, MessageCircle, CheckCircle2 } from "lucide-react";
+import { Apple, Dumbbell, Brain, MessageCircle, CheckCircle2, Play, Users, Star, TrendingUp } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "DietFitPro (DFP) — Coach Nutrition, Diététique & Sport" },
+      { title: "DietFitPro — Coach Nutrition & Sport Personnalisé" },
       {
         name: "description",
         content:
-          "DietFitPro : votre coach nutrition et sport personnalisé. Suivi diététique, programmes alimentaires et coaching sportif par un professionnel.",
+          "DietFitPro : votre coach nutrition et sport personnalisé. Pas de régime, juste de meilleures habitudes.",
       },
       { property: "og:title", content: "DietFitPro — Votre coach nutrition & sport" },
       {
@@ -48,63 +48,123 @@ const features = [
 
 function LandingPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
+    <div className="min-h-screen bg-gradient-to-b from-white to-green-50/50">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-border/40 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Logo />
           <div className="flex items-center gap-3">
             <Button variant="ghost" asChild>
-              <Link to="/">Connexion</Link>
+              <Link to="/login">Se connecter</Link>
             </Button>
-            <Button asChild>
-              <Link to="/">Essai gratuit 3 jours</Link>
+            <Button className="bg-[#6DB33F] text-white hover:bg-[#2D7A1F]" asChild>
+              <Link to="/register">Essai gratuit</Link>
             </Button>
           </div>
         </div>
       </header>
 
       <main>
-        {/* Hero */}
+        {/* Hero Section */}
         <section className="mx-auto max-w-6xl px-6 py-20 text-center">
-          <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-accent px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-accent-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-            Par David — Diététicien-nutritionniste & Coach sportif
-          </p>
-          <h1 className="mx-auto max-w-3xl text-5xl font-bold leading-tight tracking-tight text-foreground md:text-6xl">
+          {/* Badge */}
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-green-100 px-4 py-2 text-sm font-medium text-green-800">
+            <Star className="h-4 w-4 fill-green-600 text-green-600" />
+            <span>Par David — Diététicien-nutritionniste & Coach sportif</span>
+          </div>
+
+          {/* Titre principal */}
+          <h1 className="mx-auto max-w-4xl text-5xl font-extrabold leading-tight tracking-tight text-foreground md:text-6xl lg:text-7xl">
             Pas de régime,
             <br />
-            <span className="text-primary">juste de meilleures habitudes.</span>
+            <span className="text-[#6DB33F]">juste de meilleures habitudes.</span>
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-            Une expérience humaine, guidée par l'IA, contrôlée par un professionnel. Votre coach
-            nutrition, sport et bien-être en poche.
+
+          {/* Sous-titre */}
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">
+            Une expérience humaine, guidée par l'IA, contrôlée par un professionnel.
+            <br />
+            Votre coach nutrition, sport et bien-être en poche.
           </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <Button size="lg" className="h-12 px-8 text-base" asChild>
-              <Link to="/">Démarrer mon essai gratuit</Link>
+
+          {/* CTAs */}
+          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Button 
+              size="lg" 
+              className="h-14 w-full px-8 text-lg font-semibold sm:w-auto" 
+              asChild
+            >
+              <Link to="/register">
+                <Play className="mr-2 h-5 w-5" />
+                Démarrer mon essai gratuit
+              </Link>
             </Button>
-            <Button size="lg" variant="outline" className="h-12 px-8 text-base" asChild>
-              <Link to="/">J'ai un code d'invitation</Link>
+            <Button 
+              size="lg" 
+              variant="outline" 
+              className="h-14 w-full px-8 text-lg sm:w-auto" 
+              asChild
+            >
+              <Link to="/login">
+                Se connecter
+              </Link>
             </Button>
           </div>
-          <p className="mt-6 text-xs text-muted-foreground">
-            3 jours gratuits · Sans engagement · Annulable à tout moment
-          </p>
+
+          {/* Trust signals */}
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-[#6DB33F]" />
+              <span>3 jours gratuits</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-[#6DB33F]" />
+              <span>Sans engagement</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-[#6DB33F]" />
+              <span>Annulable à tout moment</span>
+            </div>
+          </div>
+
+          {/* Social proof */}
+          <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-center">
+            <div>
+              <p className="text-3xl font-bold text-[#2D7A1F]">500+</p>
+              <p className="text-sm text-muted-foreground">Clients accompagnés</p>
+            </div>
+            <div className="h-12 w-px bg-border" />
+            <div>
+              <p className="text-3xl font-bold text-[#2D7A1F]">4.9/5</p>
+              <p className="text-sm text-muted-foreground">Satisfaction client</p>
+            </div>
+            <div className="h-12 w-px bg-border" />
+            <div>
+              <p className="text-3xl font-bold text-[#2D7A1F]">10+</p>
+              <p className="text-sm text-muted-foreground">Ans d'expérience</p>
+            </div>
+          </div>
         </section>
 
-        {/* Features */}
-        <section className="border-t border-border bg-muted/30 py-20">
+        {/* Features Section */}
+        <section className="border-t border-border bg-white py-20">
           <div className="mx-auto max-w-6xl px-6">
-            <h2 className="text-center text-3xl font-bold tracking-tight">
-              Tout ce dont vous avez besoin pour avancer
+            <h2 className="text-center text-3xl font-bold tracking-tight md:text-4xl">
+              Tout ce dont vous avez besoin pour{" "}
+              <span className="text-[#6DB33F]">avancer durablement</span>
             </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-center text-muted-foreground">
+              Des outils concrets, un accompagnement personnalisé et une approche scientifique
+              pour transformer vos habitudes sans frustration.
+            </p>
+
             <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               {features.map((f) => (
-                <Card key={f.title} className="p-6 transition-shadow hover:shadow-md">
-                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-                    <f.icon className="h-5 w-5" />
+                <Card key={f.title} className="group p-6 transition-all hover:shadow-lg hover:shadow-green-100">
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 text-[#2D7A1F] transition-colors group-hover:bg-[#6DB33F] group-hover:text-white">
+                    <f.icon className="h-6 w-6" />
                   </div>
-                  <h3 className="mb-2 font-semibold">{f.title}</h3>
+                  <h3 className="mb-2 text-lg font-semibold">{f.title}</h3>
                   <p className="text-sm text-muted-foreground">{f.desc}</p>
                 </Card>
               ))}
@@ -112,37 +172,60 @@ function LandingPage() {
           </div>
         </section>
 
-        {/* Plans */}
-        <section className="py-20">
+        {/* Plans Section */}
+        <section className="border-t border-border bg-gradient-to-b from-green-50/50 to-white py-20">
           <div className="mx-auto max-w-6xl px-6">
-            <h2 className="text-center text-3xl font-bold tracking-tight">Des formules simples</h2>
-            <div className="mt-12 grid gap-6 md:grid-cols-3">
+            <h2 className="text-center text-3xl font-bold tracking-tight md:text-4xl">
+              Des formules simples et{" "}
+              <span className="text-[#6DB33F]">transparentes</span>
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-center text-muted-foreground">
+              Choisissez l'offre qui correspond à vos objectifs. Changez à tout moment.
+            </p>
 
-              <Card className="p-8">
-                <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-                  Basic
-                </p>
-                <p className="mt-3 text-4xl font-bold">
+            <div className="mt-12 grid gap-6 md:grid-cols-3">
+              {/* Basic */}
+              <Card className="p-8 transition-shadow hover:shadow-lg">
+                <div className="mb-4 flex items-center gap-2">
+                  <Apple className="h-6 w-6 text-[#6DB33F]" />
+                  <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                    Basic
+                  </p>
+                </div>
+                <p className="text-4xl font-bold">
                   9,99€<span className="text-base font-normal text-muted-foreground">/mois</span>
                 </p>
+                <p className="mt-2 text-sm text-green-600">7 jours d'essai offerts</p>
                 <ul className="mt-6 space-y-3 text-sm">
-                  {["Coach IA (5 msg/jour)", "Programmes auto", "Feed & gamification"].map(
-                    (item) => (
-                      <li key={item} className="flex gap-2">
-                        <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
-                        <span>{item}</span>
-                      </li>
-                    ),
-                  )}
+                  {[
+                    "Coach IA (5 messages/jour)",
+                    "Programmes automatiques",
+                    "Feed & gamification",
+                    "Suivi de vos progrès",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#6DB33F]" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
                 </ul>
+                <Button className="mt-8 w-full" variant="outline" asChild>
+                  <Link to="/register">Commencer l'essai</Link>
+                </Button>
               </Card>
 
-              <Card className="relative border-primary p-8 shadow-lg">
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
-                  Recommandé
+              {/* Premium */}
+              <Card className="relative border-2 border-[#6DB33F] p-8 shadow-xl">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#6DB33F] px-3 py-1 text-xs font-semibold text-white">
+                  ⭐ Recommandé
                 </span>
-                <p className="text-sm font-medium uppercase tracking-wider text-primary">Premium</p>
-                <p className="mt-3 text-4xl font-bold">
+                <div className="mb-4 flex items-center gap-2">
+                  <Star className="h-6 w-6 fill-[#6DB33F] text-[#6DB33F]" />
+                  <p className="text-sm font-medium uppercase tracking-wider text-[#6DB33F]">
+                    Premium
+                  </p>
+                </div>
+                <p className="text-4xl font-bold">
                   25,99€<span className="text-base font-normal text-muted-foreground">/mois</span>
                 </p>
                 <ul className="mt-6 space-y-3 text-sm">
@@ -152,39 +235,85 @@ function LandingPage() {
                     "Recettes du pro",
                     "Programmes sport sur-mesure",
                     "Messagerie avec David",
+                    "Accès prioritaire",
                   ].map((item) => (
-                    <li key={item} className="flex gap-2">
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+                    <li key={item} className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 fill-[#6DB33F] text-[#6DB33F]" />
                       <span>{item}</span>
                     </li>
                   ))}
                 </ul>
+                <Button className="mt-8 w-full bg-[#6DB33F] text-white hover:bg-[#2D7A1F]" asChild>
+                  <Link to="/register">Commencer l'essai</Link>
+                </Button>
               </Card>
 
-              <Card className="p-8">
-                <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-                  Visio
-                </p>
-                <p className="mt-3 text-4xl font-bold">
+              {/* Visio */}
+              <Card className="p-8 transition-shadow hover:shadow-lg">
+                <div className="mb-4 flex items-center gap-2">
+                  <Users className="h-6 w-6 text-[#6DB33F]" />
+                  <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                    Visio
+                  </p>
+                </div>
+                <p className="text-4xl font-bold">
                   30€<span className="text-base font-normal text-muted-foreground">/session</span>
                 </p>
                 <ul className="mt-6 space-y-3 text-sm">
-                  {["20-30 min avec David", "Via WhatsApp", "Compte-rendu inclus", "Sans engagement"].map((item) => (
-                    <li key={item} className="flex gap-2">
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+                  {[
+                    "20-30 min avec David",
+                    "Via WhatsApp",
+                    "Compte-rendu inclus",
+                    "Sans engagement",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#6DB33F]" />
                       <span>{item}</span>
                     </li>
                   ))}
                 </ul>
+                <Button className="mt-8 w-full" variant="outline" asChild>
+                  <Link to="/register">Réserver</Link>
+                </Button>
               </Card>
-
             </div>
+          </div>
+        </section>
+
+        {/* Final CTA */}
+        <section className="border-t border-border bg-[#6DB33F] py-20 text-center text-white">
+          <div className="mx-auto max-w-4xl px-6">
+            <TrendingUp className="mx-auto mb-6 h-12 w-12" />
+            <h2 className="text-3xl font-bold md:text-4xl">
+              Prêt à transformer vos habitudes ?
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-lg text-green-100">
+              Rejoignez les centaines de clients qui ont déjà amélioré leur santé avec DietFitPro.
+            </p>
+            <Button 
+              size="lg" 
+              className="mt-8 h-14 bg-white text-[#6DB33F] hover:bg-green-50" 
+              asChild
+            >
+              <Link to="/register">
+                Démarrer mon essai gratuit maintenant
+              </Link>
+            </Button>
+            <p className="mt-4 text-sm text-green-100">
+              3 jours gratuits · Sans engagement · Annulable à tout moment
+            </p>
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-border py-8 text-center text-sm text-muted-foreground">
-        © 2026 DietFitPro · Diet N Trainer · David
+      {/* Footer */}
+      <footer className="border-t border-border bg-white py-8 text-center text-sm text-muted-foreground">
+        <div className="mx-auto max-w-6xl px-6">
+          <p>© 2026 DietFitPro · Diet N Trainer · David</p>
+          <p className="mt-2 text-xs">
+            Votre coach nutrition et sport personnalisé
+          </p>
+        </div>
       </footer>
     </div>
   );

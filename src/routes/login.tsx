@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
-import { Activity } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { Activity, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
-import { ROLE_HOME } from "@/components/ProtectedRoute";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/login")({
@@ -22,28 +21,45 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { user, role, loading, signIn } = useAuth();
+  const { signIn } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!loading && user) {
-      // Redirige selon le rôle ; rôle null/inconnu → /home par défaut
-      const target = role ? ROLE_HOME[role] : "/home";
-      void navigate({ to: target });
-    }
-  }, [user, role, loading, navigate]);
-
-  const handleSignIn = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleSignIn = async (event: FormEvent) => {
+    event.preventDefault();
     setError(null);
     setSubmitting(true);
+    
     try {
-      await signIn(email, password);
+      await signIn(email.trim(), password);
+      
+      // ✅ Récupérer la session et le profil pour rediriger
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        // Récupérer le profil pour connaître le rôle
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .maybeSingle();
+        
+        const userRole = profile?.role as "pro" | "patient" | "subscriber" | null;
+        
+        // ✅ Rediriger selon le rôle
+        if (userRole === "pro") {
+          void navigate({ to: "/pro/dashboard" });
+        } else if (userRole === "patient") {
+          void navigate({ to: "/patient/dashboard" });
+        } else if (userRole === "subscriber") {
+          void navigate({ to: "/home" });
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur de connexion");
     } finally {
@@ -51,50 +67,35 @@ function LoginPage() {
     }
   };
 
-  const handleInvitation = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleInvitation = async (event: FormEvent) => {
+    event.preventDefault();
     setError(null);
-    const trimmed = code.trim().toUpperCase();
-    if (trimmed.length !== 8) {
+    const trimmedCode = code.trim().toUpperCase();
+
+    if (trimmedCode.length !== 8) {
       setError("Le code d'invitation doit contenir 8 caractères.");
       return;
     }
+
     setSubmitting(true);
+
     try {
-      // Connexion d'abord
-      await signIn(email, password);
-      // Récupère l'utilisateur fraîchement connecté
-      const { data: sessionData } = await supabase.auth.getUser();
-      const uid = sessionData.user?.id;
-      if (!uid) throw new Error("Connexion impossible.");
+      await signIn(email.trim(), password);
 
-      // Vérifie le code
-      const { data: codeRow, error: codeErr } = await supabase
-        .from("invitation_codes")
-        .select("id, pro_id, used_by, expires_at")
-        .eq("code", trimmed)
-        .maybeSingle();
-      if (codeErr) throw codeErr;
-      if (!codeRow) throw new Error("Code d'invitation invalide.");
-      if (codeRow.used_by) throw new Error("Ce code a déjà été utilisé.");
-      if (new Date(codeRow.expires_at) < new Date()) throw new Error("Code expiré.");
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!userData.user) throw new Error("Connexion impossible.");
 
-      // Marque le code utilisé + met à jour le profil
-      const { error: upErr } = await supabase
-        .from("invitation_codes")
-        .update({ used_by: uid, used_at: new Date().toISOString() })
-        .eq("id", codeRow.id);
-      if (upErr) throw upErr;
+      const { error: invitationError } = await supabase.rpc("activate_invitation_code", {
+        p_code: trimmedCode,
+      });
 
-      const { error: profErr } = await supabase
-        .from("profiles")
-        .update({ role: "patient", pro_id: codeRow.pro_id, plan: "patient" })
-        .eq("id", uid);
-      if (profErr) throw profErr;
+      if (invitationError) throw invitationError;
 
-      void navigate({ to: "/patient/home" as never });
+      // ✅ Nouveau patient avec code → /bienvenue pour finaliser
+      await navigate({ to: "/bienvenue" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur");
+      setError(err instanceof Error ? err.message : "Erreur lors de l'activation du compte");
     } finally {
       setSubmitting(false);
     }
@@ -107,7 +108,6 @@ function LoginPage() {
           <Activity className="h-7 w-7 text-primary" />
           <span className="text-2xl font-bold text-foreground">DietFitPro</span>
         </div>
-
         <Card>
           <CardHeader>
             <CardTitle>Connexion</CardTitle>
@@ -119,7 +119,6 @@ function LoginPage() {
                 <TabsTrigger value="login">Connexion</TabsTrigger>
                 <TabsTrigger value="invitation">Code d'invitation</TabsTrigger>
               </TabsList>
-
               <TabsContent value="login" className="mt-4">
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
@@ -135,20 +134,35 @@ function LoginPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">Mot de passe</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      autoComplete="current-password"
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
+                        onClick={() => setShowPassword((value) => !value)}
+                        aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                        disabled={submitting}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
-                  {error && (
+                  {error ? (
                     <Alert variant="destructive">
                       <AlertDescription>{error}</AlertDescription>
                     </Alert>
-                  )}
+                  ) : null}
                   <Button type="submit" className="w-full" disabled={submitting}>
                     {submitting ? "Connexion…" : "Se connecter"}
                   </Button>
@@ -160,7 +174,6 @@ function LoginPage() {
                   </p>
                 </form>
               </TabsContent>
-
               <TabsContent value="invitation" className="mt-4">
                 <form onSubmit={handleInvitation} className="space-y-4">
                   <div className="space-y-2">
@@ -171,17 +184,34 @@ function LoginPage() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password-inv">Mot de passe</Label>
-                    <Input
-                      id="password-inv"
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password-inv"
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
+                        onClick={() => setShowPassword((value) => !value)}
+                        aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                        disabled={submitting}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="code">Code d'invitation (8 caractères)</Label>
@@ -200,11 +230,11 @@ function LoginPage() {
                       Saisissez le code fourni par votre coach pour activer votre compte patient.
                     </p>
                   </div>
-                  {error && (
+                  {error ? (
                     <Alert variant="destructive">
                       <AlertDescription>{error}</AlertDescription>
                     </Alert>
-                  )}
+                  ) : null}
                   <Button type="submit" className="w-full" disabled={submitting}>
                     {submitting ? "Validation…" : "Activer mon compte patient"}
                   </Button>

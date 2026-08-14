@@ -53,6 +53,16 @@ function BienvenuePage() {
         p_user_id: session.user.id,
         p_email: session.user.email ?? "",
       });
+
+      // Mettre à jour le profil avec le rôle patient
+      await supabase
+        .from("profiles")
+        .update({
+          role: "patient",
+          // ✅ Nouveau : marquer le profil comme complet
+          profile_complete: true,
+        })
+        .eq("id", session.user.id);
     }
 
     setSaving(false);
@@ -78,6 +88,7 @@ function BienvenuePage() {
         {step === "form" && (
           <form onSubmit={handleSubmit}>
             <p style={{ fontWeight: 600, marginBottom: "1rem", textAlign: "center" }}>Créez votre mot de passe</p>
+            
             <div style={{ marginBottom: "0.75rem" }}>
               <label style={{ fontSize: "0.8rem", color: "#666", display: "block", marginBottom: 4 }}>Mot de passe</label>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)}

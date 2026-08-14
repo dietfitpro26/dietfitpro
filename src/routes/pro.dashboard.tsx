@@ -10,6 +10,7 @@ import {
   ArrowRight,
   Video,
   UserCheck,
+  Trash2,
 } from "lucide-react";
 import { format, isToday, isTomorrow } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -129,6 +130,7 @@ function DashboardContent() {
   const [recentSubscribers, setRecentSubscribers] = useState<RecentSubscriber[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updatingSubscriberId, setUpdatingSubscriberId] = useState<string | null>(null);
+  const [deletingSubscriberId, setDeletingSubscriberId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -371,6 +373,39 @@ function DashboardContent() {
     }
   }
 
+  async function handleDeleteSubscriber(subscriber: RecentSubscriber) {
+    if (!user) return;
+
+    const confirmed = window.confirm(
+      `Supprimer définitivement l'abonné ${subscriber.full_name ?? subscriber.email} ?\n\nCette action est irréversible et supprimera toutes ses données.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingSubscriberId(subscriber.id);
+
+    try {
+      // Appeler la fonction SQL delete_subscriber_by_user_id
+      const { error } = await supabase.rpc("delete_subscriber_by_user_id", {
+        p_user_id: subscriber.id,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      await load();
+
+      window.alert("Abonné supprimé avec succès.");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Erreur inconnue lors de la suppression";
+      window.alert(`Impossible de supprimer l'abonné : ${message}`);
+    } finally {
+      setDeletingSubscriberId(null);
+    }
+  }
+
   const firstName = profile?.full_name?.split(" ")[0] ?? "Docteur";
   const isLoading = !kpis && !error;
 
@@ -588,7 +623,9 @@ function DashboardContent() {
                       key={s.id}
                       subscriber={s}
                       updating={updatingSubscriberId === s.id}
+                      deleting={deletingSubscriberId === s.id}
                       onTogglePlan={handleToggleSubscriberPlan}
+                      onDelete={handleDeleteSubscriber}
                     />
                   ))}
                 </div>
@@ -727,11 +764,15 @@ function PatientRow({ patient }: { patient: RecentPatient }) {
 function SubscriberRow({
   subscriber,
   updating,
+  deleting,
   onTogglePlan,
+  onDelete,
 }: {
   subscriber: RecentSubscriber;
   updating?: boolean;
+  deleting?: boolean;
   onTogglePlan: (subscriber: RecentSubscriber) => void;
+  onDelete: (subscriber: RecentSubscriber) => void;
 }) {
   const navigate = useNavigate();
   const name = subscriber.full_name ?? subscriber.email;
@@ -777,23 +818,38 @@ function SubscriberRow({
         </div>
       </div>
 
-      {canToggle && (
+      <div className="flex shrink-0 items-center gap-2">
+        {canToggle && (
+          <Button
+            size="sm"
+            variant={isPremium ? "outline" : "default"}
+            className={cn(
+              "h-8 shrink-0 rounded-xl",
+              !isPremium && "bg-[#6DB33F] text-white hover:bg-[#2D7A1F]"
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePlan(subscriber);
+            }}
+            disabled={updating}
+          >
+            {updating ? "..." : isPremium ? "Remettre Basic" : "Passer Premium"}
+          </Button>
+        )}
+
         <Button
           size="sm"
-          variant={isPremium ? "outline" : "default"}
-          className={cn(
-            "h-8 shrink-0 rounded-xl",
-            !isPremium && "bg-[#6DB33F] text-white hover:bg-[#2D7A1F]"
-          )}
+          variant="destructive"
+          className="h-8 shrink-0 rounded-xl"
           onClick={(e) => {
             e.stopPropagation();
-            onTogglePlan(subscriber);
+            onDelete(subscriber);
           }}
-          disabled={updating}
+          disabled={deleting}
         >
-          {updating ? "..." : isPremium ? "Remettre Basic" : "Passer Premium"}
+          {deleting ? "..." : <Trash2 className="h-4 w-4" />}
         </Button>
-      )}
+      </div>
     </div>
   );
 }

@@ -26,11 +26,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/pro/nutrition")({
-  head: () => ({ meta: [{ title: "Programmes nutrition — DietFitPro" }] }),
+  head: () => ({ meta: [{ title: "Programmes nutrition â€” DietFitPro" }] }),
   component: Page,
 });
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface PatientLite { id: string; first_name: string; last_name: string }
 interface NutritionRow {
   id: string; name: string; patient_id: string;
@@ -57,7 +57,7 @@ interface TemplateProtein { protein_id: string; meal: string; quantity_g: number
 interface TemplateStarch { starch_id: string; meal: string; starch?: Starch }
 
 const OBJECTIVE_LABEL: Record<string, string> = {
-  perte_poids: "Perte de poids", prise_masse: "Prise de masse", equilibre: "Équilibre",
+  perte_poids: "Perte de poids", prise_masse: "Prise de masse", equilibre: "Ã‰quilibre",
 };
 const OBJECTIVE_COLOR: Record<string, string> = {
   perte_poids: "bg-blue-100 text-blue-700",
@@ -74,12 +74,12 @@ function Page() {
 }
 
 function weeksBetween(start: string, end: string | null): string {
-  if (!end) return "—";
+  if (!end) return "â€”";
   const d = (new Date(end).getTime() - new Date(start).getTime()) / 86400000;
-  return d > 0 ? `${Math.round(d / 7)} sem.` : "—";
+  return d > 0 ? `${Math.round(d / 7)} sem.` : "â€”";
 }
 
-// ─── Génération PDF ──────────────────────────────────────────────────────────
+// â”€â”€â”€ GÃ©nÃ©ration PDF â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function generateNutritionPdf(
   template: NutritionTemplate,
   patient: PatientLite,
@@ -180,7 +180,7 @@ async function generateNutritionPdf(
   <div class="footer">Document genere par DietFitPro - ${new Date().toLocaleDateString("fr-FR")} - Ce programme est personnalise et confidentiel</div>
   </body></html>`;
 
-  // Créer un conteneur hors-écran
+  // CrÃ©er un conteneur hors-Ã©cran
   const container = document.createElement("div");
   container.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:794px;background:#fff;";
   container.innerHTML = html;
@@ -206,7 +206,7 @@ async function generateNutritionPdf(
   const pdfW = pdf.internal.pageSize.getWidth();
   const pdfH = (canvas.height * pdfW) / canvas.width;
 
-  // Si le contenu dépasse une page, on découpe
+  // Si le contenu dÃ©passe une page, on dÃ©coupe
   const pageH = pdf.internal.pageSize.getHeight();
   if (pdfH <= pageH) {
     pdf.addImage(imgData, "JPEG", 0, 0, pdfW, pdfH);
@@ -228,7 +228,7 @@ async function generateNutritionPdf(
 
   return pdf.output("blob");
 }
-// ─── Content principal ────────────────────────────────────────────────────────
+// â”€â”€â”€ Content principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Content() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -287,7 +287,7 @@ function Content() {
     setDeleting(false);
     if (error) { toast.error(error.message); return; }
     setRows((prev) => prev?.filter((x) => x.id !== deleteId) ?? null);
-    toast.success("Programme supprimé"); setDeleteId(null); setDeleteName("");
+    toast.success("Programme supprimÃ©"); setDeleteId(null); setDeleteName("");
   };
 
   const handleDeleteTemplate = async () => {
@@ -297,7 +297,7 @@ function Content() {
     setDeletingTemplate(false);
     if (error) { toast.error(error.message); return; }
     setTemplates((prev) => prev?.filter((x) => x.id !== deleteTemplateId) ?? null);
-    toast.success("Template supprimé"); setDeleteTemplateId(null); setDeleteTemplateName("");
+    toast.success("Template supprimÃ©"); setDeleteTemplateId(null); setDeleteTemplateName("");
   };
 
   return (
@@ -314,12 +314,12 @@ function Content() {
             <TabsTrigger value="templates">Templates</TabsTrigger>
           </TabsList>
 
-          {/* ── Onglet Programmes ── */}
+          {/* â”€â”€ Onglet Programmes â”€â”€ */}
           <TabsContent value="programmes" className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="relative max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Rechercher…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <Input placeholder="Rechercherâ€¦" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
               <Button className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white" onClick={() => setModalOpen(true)}>
                 <Plus className="h-4 w-4" /> Nouveau programme
@@ -330,8 +330,8 @@ function Content() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nom</TableHead><TableHead>Patient</TableHead>
-                    <TableHead>Calories/j</TableHead><TableHead>Durée</TableHead>
-                    <TableHead>Statut</TableHead><TableHead>Créé le</TableHead>
+                    <TableHead>Calories/j</TableHead><TableHead>DurÃ©e</TableHead>
+                    <TableHead>Statut</TableHead><TableHead>CrÃ©Ã© le</TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -343,8 +343,8 @@ function Content() {
                       : filtered.map((r) => (
                         <TableRow key={r.id} className="cursor-pointer hover:bg-muted/40" onClick={() => navigate({ to: "/pro/nutrition/$programId", params: { programId: r.id } })}>
                           <TableCell className="font-medium">{r.name}</TableCell>
-                          <TableCell>{r.patient ? `${r.patient.first_name} ${r.patient.last_name}` : "—"}</TableCell>
-                          <TableCell>{r.daily_kcal_target ?? "—"}</TableCell>
+                          <TableCell>{r.patient ? `${r.patient.first_name} ${r.patient.last_name}` : "â€”"}</TableCell>
+                          <TableCell>{r.daily_kcal_target ?? "â€”"}</TableCell>
                           <TableCell>{weeksBetween(r.start_date, r.end_date)}</TableCell>
                           <TableCell><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${r.is_active ? "bg-[#6DB33F]/15 text-[#2D7A1F]" : "bg-muted text-muted-foreground"}`}>{r.is_active ? "Actif" : "Inactif"}</span></TableCell>
                           <TableCell className="text-muted-foreground">{new Date(r.created_at).toLocaleDateString("fr-FR")}</TableCell>
@@ -360,10 +360,10 @@ function Content() {
             </div>
           </TabsContent>
 
-          {/* ── Onglet Templates ── */}
+          {/* â”€â”€ Onglet Templates â”€â”€ */}
           <TabsContent value="templates" className="space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Créez un template une fois, assignez-le à plusieurs patients.</p>
+              <p className="text-sm text-muted-foreground">CrÃ©ez un template une fois, assignez-le Ã  plusieurs patients.</p>
               <Button className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white" onClick={() => setTemplateModalOpen(true)}>
                 <Plus className="h-4 w-4" /> Nouveau template
               </Button>
@@ -372,7 +372,7 @@ function Content() {
             {templates === null ? (
               <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}</div>
             ) : templates.length === 0 ? (
-              <div className="rounded-lg border bg-white p-12 text-center text-muted-foreground">Aucun template. Créez votre premier template.</div>
+              <div className="rounded-lg border bg-white p-12 text-center text-muted-foreground">Aucun template. CrÃ©ez votre premier template.</div>
             ) : (
               <div className="space-y-3">
                 {templates.map((t) => (
@@ -387,7 +387,7 @@ function Content() {
                             <span className="font-medium">{t.name}</span>
                             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${OBJECTIVE_COLOR[t.objective] ?? ""}`}>{OBJECTIVE_LABEL[t.objective] ?? t.objective}</span>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">{t.total_kcal} kcal · Petit-déj {t.breakfast_pct}% · Déj {t.lunch_pct}% · Dîner {t.dinner_pct}%</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{t.total_kcal} kcal Â· Petit-dÃ©j {t.breakfast_pct}% Â· DÃ©j {t.lunch_pct}% Â· DÃ®ner {t.dinner_pct}%</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -401,14 +401,14 @@ function Content() {
                     </div>
                     {expandedTemplate === t.id && (
                       <div className="border-t px-4 py-4 bg-muted/20 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <MealCard title="🌅 Petit-déjeuner" kcal={Math.round(t.total_kcal * t.breakfast_pct / 100)}
-                          items={[`${t.breakfast_yogurt_g}g yaourt nature`, `${t.breakfast_bread_g}g pain aux céréales`, `${t.breakfast_butter_or_jam_g}g ${t.breakfast_butter_or_jam}`, "1 fruit"]}
+                        <MealCard title="ðŸŒ… Petit-dÃ©jeuner" kcal={Math.round(t.total_kcal * t.breakfast_pct / 100)}
+                          items={[`${t.breakfast_yogurt_g}g yaourt nature`, `${t.breakfast_bread_g}g pain aux cÃ©rÃ©ales`, `${t.breakfast_butter_or_jam_g}g ${t.breakfast_butter_or_jam}`, "1 fruit"]}
                           notes={t.breakfast_notes} />
-                        <MealCard title="☀️ Déjeuner" kcal={Math.round(t.total_kcal * t.lunch_pct / 100)}
-                          items={["Protéine (voir sélection)", "Féculents avec équivalences", "Légumes à volonté", "1 fruit"]}
+                        <MealCard title="â˜€ï¸ DÃ©jeuner" kcal={Math.round(t.total_kcal * t.lunch_pct / 100)}
+                          items={["ProtÃ©ine (voir sÃ©lection)", "FÃ©culents avec Ã©quivalences", "LÃ©gumes Ã  volontÃ©", "1 fruit"]}
                           notes={t.lunch_notes} />
-                        <MealCard title="🌙 Dîner" kcal={Math.round(t.total_kcal * t.dinner_pct / 100)}
-                          items={["Protéine (voir sélection)", "Féculents réduits", "Légumes à volonté", "1 yaourt nature"]}
+                        <MealCard title="ðŸŒ™ DÃ®ner" kcal={Math.round(t.total_kcal * t.dinner_pct / 100)}
+                          items={["ProtÃ©ine (voir sÃ©lection)", "FÃ©culents rÃ©duits", "LÃ©gumes Ã  volontÃ©", "1 yaourt nature"]}
                           notes={t.dinner_notes} />
                       </div>
                     )}
@@ -423,20 +423,20 @@ function Content() {
       {/* Modals suppression */}
       <Dialog open={!!deleteId} onOpenChange={(v) => { if (!v) { setDeleteId(null); setDeleteName(""); } }}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Supprimer le programme ?</DialogTitle><DialogDescription>"{deleteName}" sera définitivement supprimé.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Supprimer le programme ?</DialogTitle><DialogDescription>"{deleteName}" sera dÃ©finitivement supprimÃ©.</DialogDescription></DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => { setDeleteId(null); setDeleteName(""); }}>Annuler</Button>
-            <Button variant="destructive" disabled={deleting} onClick={handleDelete}>{deleting ? "Suppression…" : "Supprimer"}</Button>
+            <Button variant="destructive" disabled={deleting} onClick={handleDelete}>{deleting ? "Suppressionâ€¦" : "Supprimer"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={!!deleteTemplateId} onOpenChange={(v) => { if (!v) { setDeleteTemplateId(null); setDeleteTemplateName(""); } }}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Supprimer le template ?</DialogTitle><DialogDescription>"{deleteTemplateName}" sera définitivement supprimé.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Supprimer le template ?</DialogTitle><DialogDescription>"{deleteTemplateName}" sera dÃ©finitivement supprimÃ©.</DialogDescription></DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => { setDeleteTemplateId(null); setDeleteTemplateName(""); }}>Annuler</Button>
-            <Button variant="destructive" disabled={deletingTemplate} onClick={handleDeleteTemplate}>{deletingTemplate ? "Suppression…" : "Supprimer"}</Button>
+            <Button variant="destructive" disabled={deletingTemplate} onClick={handleDeleteTemplate}>{deletingTemplate ? "Suppressionâ€¦" : "Supprimer"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -458,7 +458,7 @@ function Content() {
   );
 }
 
-// ─── Carte repas ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Carte repas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function MealCard({ title, kcal, items, notes }: { title: string; kcal: number; items: string[]; notes: string | null }) {
   return (
     <Card className="shadow-none border">
@@ -468,14 +468,14 @@ function MealCard({ title, kcal, items, notes }: { title: string; kcal: number; 
         </CardTitle>
       </CardHeader>
       <CardContent className="px-4 pb-3">
-        <ul className="space-y-1">{items.map((item, i) => <li key={i} className="text-xs text-muted-foreground flex items-start gap-1"><span className="text-[#6DB33F] mt-0.5">•</span>{item}</li>)}</ul>
+        <ul className="space-y-1">{items.map((item, i) => <li key={i} className="text-xs text-muted-foreground flex items-start gap-1"><span className="text-[#6DB33F] mt-0.5">â€¢</span>{item}</li>)}</ul>
         {notes && <p className="text-xs text-muted-foreground mt-2 italic border-t pt-2">{notes}</p>}
       </CardContent>
     </Card>
   );
 }
 
-// ─── Modal Assigner ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Modal Assigner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function AssignTemplateDialog({
   template, patients, proteins, starches, userId, onClose, onDone,
 }: {
@@ -487,14 +487,14 @@ function AssignTemplateDialog({
   const [assigning, setAssigning] = useState(false);
 
   const handleAssign = async () => {
-    if (!patientId) { toast.error("Sélectionne un patient"); return; }
+    if (!patientId) { toast.error("SÃ©lectionne un patient"); return; }
     const patient = patients.find(p => p.id === patientId);
     if (!patient) return;
     setAssigning(true);
-    toast.info("Génération du PDF en cours…");
+    toast.info("GÃ©nÃ©ration du PDF en coursâ€¦");
 
     try {
-      // Charger les protéines et féculents du template
+      // Charger les protÃ©ines et fÃ©culents du template
       const [{ data: tmplProteins }, { data: tmplStarches }] = await Promise.all([
         supabase.from("nutrition_template_proteins").select("*, protein:nutrition_proteins(*)").eq("template_id", template.id),
         supabase.from("nutrition_template_starches").select("*, starch:nutrition_starches(*)").eq("template_id", template.id),
@@ -505,7 +505,7 @@ function AssignTemplateDialog({
       const lunchStarches = ((tmplStarches ?? []) as any[]).filter(s => s.meal === "lunch").map(s => ({ ...s, starch: s.starch }));
       const dinnerStarches = ((tmplStarches ?? []) as any[]).filter(s => s.meal === "dinner").map(s => ({ ...s, starch: s.starch }));
 
-      // Générer le PDF
+      // GÃ©nÃ©rer le PDF
       const pdfBlob = await generateNutritionPdf(template, patient, lunchProteins, dinnerProteins, lunchStarches, dinnerStarches);
 
       // Upload dans message-attachments
@@ -517,7 +517,7 @@ function AssignTemplateDialog({
 
       if (uploadError) { toast.error("Erreur upload PDF : " + uploadError.message); setAssigning(false); return; }
 
-      // Insérer dans patient_documents
+      // InsÃ©rer dans patient_documents
       const { error: docError } = await supabase.from("patient_documents").insert({
         patient_id: patientId,
         pro_id: userId,
@@ -529,7 +529,7 @@ function AssignTemplateDialog({
 
       if (docError) { toast.error("Erreur sauvegarde : " + docError.message); setAssigning(false); return; }
 
-      // Créer aussi un nutrition_program lié
+      // CrÃ©er aussi un nutrition_program liÃ©
       await supabase.from("nutrition_programs").insert({
         pro_id: userId,
         patient_id: patientId,
@@ -537,10 +537,10 @@ function AssignTemplateDialog({
         daily_kcal_target: template.total_kcal,
         start_date: new Date().toISOString().slice(0, 10),
         is_active: true,
-        notes: `Généré depuis le template : ${template.name}`,
+        notes: `GÃ©nÃ©rÃ© depuis le template : ${template.name}`,
       });
 
-      toast.success(`✅ Programme assigné à ${patient.first_name} ${patient.last_name} et PDF généré !`);
+      toast.success(`âœ… Programme assignÃ© Ã  ${patient.first_name} ${patient.last_name} et PDF gÃ©nÃ©rÃ© !`);
       onDone();
     } catch (err) {
       toast.error("Erreur inattendue : " + String(err));
@@ -554,7 +554,7 @@ function AssignTemplateDialog({
         <DialogHeader>
           <DialogTitle>Assigner le template</DialogTitle>
           <DialogDescription>
-            <span className="font-medium text-foreground">"{template.name}"</span> · {template.total_kcal} kcal · {OBJECTIVE_LABEL[template.objective]}
+            <span className="font-medium text-foreground">"{template.name}"</span> Â· {template.total_kcal} kcal Â· {OBJECTIVE_LABEL[template.objective]}
           </DialogDescription>
         </DialogHeader>
 
@@ -562,7 +562,7 @@ function AssignTemplateDialog({
           <div className="space-y-1">
             <Label>Choisir le patient *</Label>
             <Select value={patientId} onValueChange={setPatientId}>
-              <SelectTrigger><SelectValue placeholder="Sélectionner un patient…" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="SÃ©lectionner un patientâ€¦" /></SelectTrigger>
               <SelectContent>
                 {patients.map((p) => <SelectItem key={p.id} value={p.id}>{p.first_name} {p.last_name}</SelectItem>)}
               </SelectContent>
@@ -570,16 +570,16 @@ function AssignTemplateDialog({
           </div>
 
           <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
-            <p>✅ Un <strong>programme nutrition</strong> sera créé pour ce patient</p>
-            <p>✅ Un <strong>PDF personnalisé</strong> sera généré automatiquement</p>
-            <p>✅ Le PDF apparaîtra dans le <strong>dashboard du patient</strong></p>
+            <p>âœ… Un <strong>programme nutrition</strong> sera crÃ©Ã© pour ce patient</p>
+            <p>âœ… Un <strong>PDF personnalisÃ©</strong> sera gÃ©nÃ©rÃ© automatiquement</p>
+            <p>âœ… Le PDF apparaÃ®tra dans le <strong>dashboard du patient</strong></p>
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Annuler</Button>
           <Button className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white" disabled={assigning || !patientId} onClick={handleAssign}>
-            {assigning ? "Génération en cours…" : "Assigner & Générer PDF"}
+            {assigning ? "GÃ©nÃ©ration en coursâ€¦" : "Assigner & GÃ©nÃ©rer PDF"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -587,7 +587,7 @@ function AssignTemplateDialog({
   );
 }
 
-// ─── Modal Nouveau Template (3 étapes) ────────────────────────────────────────
+// â”€â”€â”€ Modal Nouveau Template (3 Ã©tapes) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function NewTemplateDialog({
   open, onOpenChange, proteins, starches, userId, onCreated,
 }: {
@@ -636,8 +636,8 @@ function NewTemplateDialog({
 
   const submit = async () => {
     if (!name.trim()) { toast.error("Le nom est obligatoire"); return; }
-    if (totalPct !== 100) { toast.error("La répartition des repas doit totaliser 100%"); return; }
-    if (macroTotal !== 100) { toast.error("La répartition des macros doit totaliser 100%"); return; }
+    if (totalPct !== 100) { toast.error("La rÃ©partition des repas doit totaliser 100%"); return; }
+    if (macroTotal !== 100) { toast.error("La rÃ©partition des macros doit totaliser 100%"); return; }
     setSubmitting(true);
     const { data: tmpl, error } = await supabase.from("nutrition_templates").insert({
       pro_id: userId, name: name.trim(), objective, total_kcal: kcal,
@@ -662,7 +662,7 @@ function NewTemplateDialog({
     if (proteinRows.length > 0) await supabase.from("nutrition_template_proteins").insert(proteinRows);
     if (starchRows.length > 0) await supabase.from("nutrition_template_starches").insert(starchRows);
     setSubmitting(false);
-    toast.success("Template créé !");
+    toast.success("Template crÃ©Ã© !");
     reset(); onCreated();
   };
 
@@ -674,7 +674,7 @@ function NewTemplateDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nouveau template nutritionnel</DialogTitle>
-          <DialogDescription>Étape {step} / 3 — {step === 1 ? "Informations & petit-déjeuner" : step === 2 ? "Répartition & macros" : "Protéines & féculents"}</DialogDescription>
+          <DialogDescription>Ã‰tape {step} / 3 â€” {step === 1 ? "Informations & petit-dÃ©jeuner" : step === 2 ? "RÃ©partition & macros" : "ProtÃ©ines & fÃ©culents"}</DialogDescription>
         </DialogHeader>
 
         {step === 1 && (
@@ -687,29 +687,29 @@ function NewTemplateDialog({
                   <SelectContent>
                     <SelectItem value="perte_poids">Perte de poids</SelectItem>
                     <SelectItem value="prise_masse">Prise de masse</SelectItem>
-                    <SelectItem value="equilibre">Équilibre</SelectItem>
+                    <SelectItem value="equilibre">Ã‰quilibre</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1"><Label>Calories / jour</Label><Input type="number" min={800} max={5000} value={totalKcal} onChange={(e) => setTotalKcal(e.target.value)} /></div>
             </div>
             <div className="rounded-lg border p-4 space-y-3">
-              <h3 className="font-medium text-sm">🌅 Petit-déjeuner</h3>
+              <h3 className="font-medium text-sm">ðŸŒ… Petit-dÃ©jeuner</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1"><Label className="text-xs">Yaourt nature (g)</Label><Input type="number" value={yogurtG} onChange={(e) => setYogurtG(e.target.value)} /></div>
-                <div className="space-y-1"><Label className="text-xs">Pain aux céréales (g)</Label><Input type="number" value={breadG} onChange={(e) => setBreadG(e.target.value)} /></div>
+                <div className="space-y-1"><Label className="text-xs">Pain aux cÃ©rÃ©ales (g)</Label><Input type="number" value={breadG} onChange={(e) => setBreadG(e.target.value)} /></div>
                 <div className="space-y-1"><Label className="text-xs">Beurre ou confiture</Label>
                   <Select value={butterOrJam} onValueChange={setButterOrJam}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="beurre">Beurre</SelectItem><SelectItem value="confiture">Confiture</SelectItem></SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1"><Label className="text-xs">Quantité (g)</Label><Input type="number" value={butterOrJamG} onChange={(e) => setButterOrJamG(e.target.value)} /></div>
+                <div className="space-y-1"><Label className="text-xs">QuantitÃ© (g)</Label><Input type="number" value={butterOrJamG} onChange={(e) => setButterOrJamG(e.target.value)} /></div>
               </div>
-              <div className="space-y-1"><Label className="text-xs">Notes petit-déjeuner</Label><Textarea value={breakfastNotes} onChange={(e) => setBreakfastNotes(e.target.value)} rows={2} /></div>
+              <div className="space-y-1"><Label className="text-xs">Notes petit-dÃ©jeuner</Label><Textarea value={breakfastNotes} onChange={(e) => setBreakfastNotes(e.target.value)} rows={2} /></div>
             </div>
-            <div className="space-y-1"><Label className="text-xs">Notes déjeuner</Label><Textarea value={lunchNotes} onChange={(e) => setLunchNotes(e.target.value)} rows={2} /></div>
-            <div className="space-y-1"><Label className="text-xs">Notes dîner</Label><Textarea value={dinnerNotes} onChange={(e) => setDinnerNotes(e.target.value)} rows={2} /></div>
+            <div className="space-y-1"><Label className="text-xs">Notes dÃ©jeuner</Label><Textarea value={lunchNotes} onChange={(e) => setLunchNotes(e.target.value)} rows={2} /></div>
+            <div className="space-y-1"><Label className="text-xs">Notes dÃ®ner</Label><Textarea value={dinnerNotes} onChange={(e) => setDinnerNotes(e.target.value)} rows={2} /></div>
           </div>
         )}
 
@@ -717,12 +717,12 @@ function NewTemplateDialog({
           <div className="space-y-5">
             <div className="rounded-lg border p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="font-medium text-sm">Répartition des repas</h3>
-                <span className={`text-xs font-medium ${totalPct === 100 ? "text-green-600" : "text-red-500"}`}>Total : {totalPct}% {totalPct !== 100 ? "(doit être 100%)" : "✓"}</span>
+                <h3 className="font-medium text-sm">RÃ©partition des repas</h3>
+                <span className={`text-xs font-medium ${totalPct === 100 ? "text-green-600" : "text-red-500"}`}>Total : {totalPct}% {totalPct !== 100 ? "(doit Ãªtre 100%)" : "âœ“"}</span>
               </div>
-              {[{ label: "🌅 Petit-déjeuner", val: breakfastPct, set: setBreakfastPct, k: breakfastKcal },
-                { label: "☀️ Déjeuner", val: lunchPct, set: setLunchPct, k: lunchKcal },
-                { label: "🌙 Dîner", val: dinnerPct, set: setDinnerPct, k: dinnerKcal }].map(({ label, val, set, k }) => (
+              {[{ label: "ðŸŒ… Petit-dÃ©jeuner", val: breakfastPct, set: setBreakfastPct, k: breakfastKcal },
+                { label: "â˜€ï¸ DÃ©jeuner", val: lunchPct, set: setLunchPct, k: lunchKcal },
+                { label: "ðŸŒ™ DÃ®ner", val: dinnerPct, set: setDinnerPct, k: dinnerKcal }].map(({ label, val, set, k }) => (
                 <div key={label} className="flex items-center gap-3">
                   <span className="text-sm w-36 shrink-0">{label}</span>
                   <Input type="number" min={0} max={100} value={val} onChange={(e) => set(e.target.value)} className="w-20" />
@@ -732,12 +732,12 @@ function NewTemplateDialog({
             </div>
             <div className="rounded-lg border p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="font-medium text-sm">Répartition des macros</h3>
-                <span className={`text-xs font-medium ${macroTotal === 100 ? "text-green-600" : "text-red-500"}`}>Total : {macroTotal}% {macroTotal !== 100 ? "(doit être 100%)" : "✓"}</span>
+                <h3 className="font-medium text-sm">RÃ©partition des macros</h3>
+                <span className={`text-xs font-medium ${macroTotal === 100 ? "text-green-600" : "text-red-500"}`}>Total : {macroTotal}% {macroTotal !== 100 ? "(doit Ãªtre 100%)" : "âœ“"}</span>
               </div>
-              {[{ label: "🥩 Protéines", val: proteinPct, set: setProteinPct },
-                { label: "🍚 Glucides", val: carbsPct, set: setCarbsPct },
-                { label: "🫒 Lipides", val: fatPct, set: setFatPct }].map(({ label, val, set }) => (
+              {[{ label: "ðŸ¥© ProtÃ©ines", val: proteinPct, set: setProteinPct },
+                { label: "ðŸš Glucides", val: carbsPct, set: setCarbsPct },
+                { label: "ðŸ«’ Lipides", val: fatPct, set: setFatPct }].map(({ label, val, set }) => (
                 <div key={label} className="flex items-center gap-3">
                   <span className="text-sm w-28 shrink-0">{label}</span>
                   <Input type="number" min={0} max={100} value={val} onChange={(e) => set(e.target.value)} className="w-20" />
@@ -746,11 +746,11 @@ function NewTemplateDialog({
               ))}
             </div>
             <div className="rounded-lg bg-muted/30 p-4 space-y-2">
-              <h3 className="font-medium text-sm">Aperçu automatique</h3>
-              {[{ meal: "Déjeuner", mkcal: lunchKcal }, { meal: "Dîner", mkcal: dinnerKcal }].map(({ meal, mkcal }) => (
+              <h3 className="font-medium text-sm">AperÃ§u automatique</h3>
+              {[{ meal: "DÃ©jeuner", mkcal: lunchKcal }, { meal: "DÃ®ner", mkcal: dinnerKcal }].map(({ meal, mkcal }) => (
                 <div key={meal} className="text-xs space-y-0.5">
                   <p className="font-medium">{meal} ({mkcal} kcal)</p>
-                  <p className="text-muted-foreground">→ Protéine : ~{Math.round(mkcal * Number(proteinPct) / 100 / 4)}g · Glucides : ~{Math.round(mkcal * Number(carbsPct) / 100 / 4)}g · Lipides : ~{Math.round(mkcal * Number(fatPct) / 100 / 9)}g</p>
+                  <p className="text-muted-foreground">â†’ ProtÃ©ine : ~{Math.round(mkcal * Number(proteinPct) / 100 / 4)}g Â· Glucides : ~{Math.round(mkcal * Number(carbsPct) / 100 / 4)}g Â· Lipides : ~{Math.round(mkcal * Number(fatPct) / 100 / 9)}g</p>
                 </div>
               ))}
             </div>
@@ -760,8 +760,8 @@ function NewTemplateDialog({
         {step === 3 && (
           <div className="space-y-5">
             {[
-              { title: `🥩 Protéines au déjeuner (~${Math.round(lunchKcal * Number(proteinPct) / 100 / 4)}g)`, list: selectedLunchProteins, setList: setSelectedLunchProteins, prefix: "lp" },
-              { title: `🥩 Protéines au dîner (~${Math.round(dinnerKcal * Number(proteinPct) / 100 / 4)}g)`, list: selectedDinnerProteins, setList: setSelectedDinnerProteins, prefix: "dp" },
+              { title: `ðŸ¥© ProtÃ©ines au dÃ©jeuner (~${Math.round(lunchKcal * Number(proteinPct) / 100 / 4)}g)`, list: selectedLunchProteins, setList: setSelectedLunchProteins, prefix: "lp" },
+              { title: `ðŸ¥© ProtÃ©ines au dÃ®ner (~${Math.round(dinnerKcal * Number(proteinPct) / 100 / 4)}g)`, list: selectedDinnerProteins, setList: setSelectedDinnerProteins, prefix: "dp" },
             ].map(({ title, list, setList, prefix }) => (
               <div key={prefix} className="rounded-lg border p-4 space-y-3">
                 <h3 className="font-medium text-sm">{title}</h3>
@@ -777,8 +777,8 @@ function NewTemplateDialog({
               </div>
             ))}
             {[
-              { title: `🍚 Féculents au déjeuner (pour ~${Math.round(lunchKcal * Number(carbsPct) / 100 / 4)}g glucides)`, list: selectedLunchStarches, setList: setSelectedLunchStarches, prefix: "ls", carbsG: Math.round(lunchKcal * Number(carbsPct) / 100 / 4) },
-              { title: `🍚 Féculents au dîner (portion réduite — 60% du déj)`, list: selectedDinnerStarches, setList: setSelectedDinnerStarches, prefix: "ds", carbsG: Math.round(lunchKcal * Number(carbsPct) / 100 / 4 * 0.6) },
+              { title: `ðŸš FÃ©culents au dÃ©jeuner (pour ~${Math.round(lunchKcal * Number(carbsPct) / 100 / 4)}g glucides)`, list: selectedLunchStarches, setList: setSelectedLunchStarches, prefix: "ls", carbsG: Math.round(lunchKcal * Number(carbsPct) / 100 / 4) },
+              { title: `ðŸš FÃ©culents au dÃ®ner (portion rÃ©duite â€” 60% du dÃ©j)`, list: selectedDinnerStarches, setList: setSelectedDinnerStarches, prefix: "ds", carbsG: Math.round(lunchKcal * Number(carbsPct) / 100 / 4 * 0.6) },
             ].map(({ title, list, setList, prefix, carbsG }) => (
               <div key={prefix} className="rounded-lg border p-4 space-y-3">
                 <h3 className="font-medium text-sm">{title}</h3>
@@ -802,10 +802,10 @@ function NewTemplateDialog({
         <DialogFooter className="flex items-center justify-between gap-2 pt-2">
           <div className="flex gap-1">{[1, 2, 3].map((s) => <div key={s} className={`h-2 w-8 rounded-full ${step >= s ? "bg-[#6DB33F]" : "bg-muted"}`} />)}</div>
           <div className="flex gap-2">
-            {step > 1 && <Button variant="outline" onClick={() => setStep(step - 1)}>Précédent</Button>}
+            {step > 1 && <Button variant="outline" onClick={() => setStep(step - 1)}>PrÃ©cÃ©dent</Button>}
             {step < 3
               ? <Button className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white" onClick={() => setStep(step + 1)}>Suivant</Button>
-              : <Button className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white" disabled={submitting} onClick={submit}>{submitting ? "Création…" : "Créer le template"}</Button>}
+              : <Button className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white" disabled={submitting} onClick={submit}>{submitting ? "CrÃ©ationâ€¦" : "CrÃ©er le template"}</Button>}
           </div>
         </DialogFooter>
       </DialogContent>
@@ -813,7 +813,7 @@ function NewTemplateDialog({
   );
 }
 
-// ─── Modal Nouveau Programme ──────────────────────────────────────────────────
+// â”€â”€â”€ Modal Nouveau Programme â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function NewProgramDialog({ open, onOpenChange, patients, onCreated }: { open: boolean; onOpenChange: (v: boolean) => void; patients: PatientLite[]; onCreated: () => void }) {
   const { user } = useAuth();
   const [name, setName] = useState(""); const [patientId, setPatientId] = useState("");
@@ -836,7 +836,7 @@ function NewProgramDialog({ open, onOpenChange, patients, onCreated }: { open: b
     });
     setSubmitting(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Programme créé"); reset(); onCreated();
+    toast.success("Programme crÃ©Ã©"); reset(); onCreated();
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -846,7 +846,7 @@ function NewProgramDialog({ open, onOpenChange, patients, onCreated }: { open: b
           <div className="space-y-1"><Label>Nom *</Label><Input value={name} onChange={(e) => setName(e.target.value)} required maxLength={150} /></div>
           <div className="space-y-1"><Label>Patient *</Label>
             <Select value={patientId} onValueChange={setPatientId}>
-              <SelectTrigger><SelectValue placeholder="Sélectionner…" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="SÃ©lectionnerâ€¦" /></SelectTrigger>
               <SelectContent>{patients.map((p) => <SelectItem key={p.id} value={p.id}>{p.first_name} {p.last_name}</SelectItem>)}</SelectContent>
             </Select>
           </div>
@@ -861,7 +861,7 @@ function NewProgramDialog({ open, onOpenChange, patients, onCreated }: { open: b
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Annuler</Button>
-            <Button type="submit" disabled={submitting} className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white">{submitting ? "Création…" : "Créer"}</Button>
+            <Button type="submit" disabled={submitting} className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white">{submitting ? "CrÃ©ationâ€¦" : "CrÃ©er"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -247,7 +247,7 @@ function Content() {
               </CardHeader>
               <CardContent>
                 <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-                  Dès qu’un programme nutritionnel sera créé, vos repas, objectifs et consignes apparaîtront ici.
+                  Dès qu'un programme nutritionnel sera créé, vos repas, objectifs et consignes apparaîtront ici.
                 </div>
               </CardContent>
             </Card>

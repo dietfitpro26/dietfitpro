@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { differenceInYears, format } from "date-fns";
 import {
   User,
@@ -10,6 +10,8 @@ import {
   Target,
   Shield,
   BadgeCheck,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import {
   LineChart,
@@ -27,6 +29,14 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/subscriber/profile")({
   head: () => ({ meta: [{ title: "Profil — DietFitPro" }] }),
@@ -69,8 +79,11 @@ function SubscriberProfilePage() {
 
 function SubscriberProfileContent() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const [details, setDetails] = useState<SubscriberDetails | null | undefined>(undefined);
   const [measurements, setMeasurements] = useState<Measurement[] | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -110,6 +123,31 @@ function SubscriberProfileContent() {
         })),
     [measurements],
   );
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+
+    setDeleting(true);
+
+    try {
+      // Supprimer les mesures
+      await supabase.from("body_measurements").delete().eq("user_id", user.id);
+
+      // Supprimer le subscriber
+      await supabase.from("subscribers").delete().eq("user_id", user.id);
+
+      // Supprimer le profil
+      await supabase.from("profiles").delete().eq("id", user.id);
+
+      // Déconnexion
+      await supabase.auth.signOut();
+
+      navigate({ to: "/" });
+    } catch (err) {
+      console.error(err);
+      setDeleting(false);
+    }
+  };
 
   if (details === undefined) {
     return (
@@ -211,7 +249,7 @@ function SubscriberProfileContent() {
           <CardHeader>
             <CardTitle>Évolution du poids</CardTitle>
             <CardDescription>
-              Historique simple pour garder une expérience cohérente avec l’espace patient.
+              Historique simple pour garder une expérience cohérente avec l'espace patient.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -265,13 +303,50 @@ function SubscriberProfileContent() {
               Cette zone servira ensuite à regrouper mot de passe, sécurité du compte et préférences.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <Button variant="outline" className="rounded-2xl">
               Gérer mes informations de compte
             </Button>
+
+            <div className="border-t pt-4">
+              <Button
+                variant="destructive"
+                className="rounded-2xl"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Supprimer mon compte
+              </Button>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Cette action est irréversible. Toutes vos données seront supprimées.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog de confirmation */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Supprimer votre compte ?
+            </DialogTitle>
+            <DialogDescription>
+              Vous allez supprimer définitivement votre compte abonné et toutes vos données. Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+              Annuler
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteAccount} disabled={deleting}>
+              {deleting ? "Suppression…" : "Supprimer mon compte"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

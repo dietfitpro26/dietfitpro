@@ -19,7 +19,9 @@ import {
   BarChart2,
   Star,
   Loader2,
+  Trash2,
 } from "lucide-react";
+
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +32,12 @@ export const Route = createFileRoute("/pro/subscribers")({
   component: Page,
 });
 
-type SubscriberPlan = "basic" | "premium" | "visio" | "patient" | null;
+type SubscriberPlan =
+  | "basic"
+  | "premium"
+  | "visio"
+  | "patient"
+  | null;
 
 type Subscriber = {
   id: string;
@@ -89,7 +96,11 @@ const FEATURES: FeatureItem[] = [
 
 const GOAL_MAP: Record<
   string,
-  { label: string; icon: ReactNode; color: string }
+  {
+    label: string;
+    icon: ReactNode;
+    color: string;
+  }
 > = {
   weight_loss: {
     label: "Perte de poids",
@@ -119,22 +130,37 @@ const GOAL_MAP: Record<
 
 function getBMIInfo(bmi: number | null) {
   if (!bmi) {
-    return { label: "—", color: "text-muted-foreground" };
+    return {
+      label: "—",
+      color: "text-muted-foreground",
+    };
   }
 
   if (bmi < 18.5) {
-    return { label: `${bmi} · Insuffisance`, color: "text-blue-500" };
+    return {
+      label: `${bmi} · Insuffisance`,
+      color: "text-blue-500",
+    };
   }
 
   if (bmi < 25) {
-    return { label: `${bmi} · Normal ✅`, color: "text-green-600" };
+    return {
+      label: `${bmi} · Normal ✅`,
+      color: "text-green-600",
+    };
   }
 
   if (bmi < 30) {
-    return { label: `${bmi} · Surpoids`, color: "text-orange-500" };
+    return {
+      label: `${bmi} · Surpoids`,
+      color: "text-orange-500",
+    };
   }
 
-  return { label: `${bmi} · Obésité`, color: "text-red-500" };
+  return {
+    label: `${bmi} · Obésité`,
+    color: "text-red-500",
+  };
 }
 
 function getPlanBadge(plan: SubscriberPlan) {
@@ -154,19 +180,7 @@ function getPlanBadge(plan: SubscriberPlan) {
     );
   }
 
-  if (plan === "patient") {
-    return <Badge className="border-0 bg-primary/10 text-primary">Patient</Badge>;
-  }
-
   return <Badge variant="secondary">Basic</Badge>;
-}
-
-function getRoleBadge(role: string) {
-  if (role === "patient") {
-    return <Badge className="border-0 bg-primary/10 text-primary">Patient</Badge>;
-  }
-
-  return <Badge variant="outline">Abonné</Badge>;
 }
 
 function formatDate(iso: string) {
@@ -175,6 +189,38 @@ function formatDate(iso: string) {
     month: "short",
     year: "numeric",
   });
+}
+
+function getErrorMessage(error: unknown, data: unknown): string {
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "error" in data
+  ) {
+    const serverError = (data as { error?: unknown }).error;
+
+    if (typeof serverError === "string") {
+      return serverError;
+    }
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error
+  ) {
+    const message = (error as { message?: unknown }).message;
+
+    if (typeof message === "string" && message.length > 0) {
+      return message;
+    }
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Erreur inconnue lors de la suppression.";
 }
 
 function Toggle({
@@ -191,9 +237,12 @@ function Toggle({
       type="button"
       onClick={onChange}
       disabled={loading}
-      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
         enabled ? "bg-primary" : "bg-muted-foreground/30"
       } ${loading ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+      aria-label={
+        enabled ? "Désactiver l'accès" : "Activer l'accès"
+      }
     >
       <span
         className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
@@ -210,24 +259,37 @@ function OverridesPanel({ userId }: { userId: string }) {
   const [fetched, setFetched] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+
     const load = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("subscriber_overrides")
         .select("feature_key, enabled")
         .eq("user_id", userId);
 
-      if (data) {
-        const map: Overrides = {};
-        data.forEach((row: { feature_key: string; enabled: boolean }) => {
-          map[row.feature_key] = row.enabled;
-        });
-        setOverrides(map);
+      if (!mounted) return;
+
+      if (error) {
+        console.error("[OverridesPanel] Erreur :", error);
+        setFetched(true);
+        return;
       }
 
+      const map: Overrides = {};
+
+      for (const row of data ?? []) {
+        map[row.feature_key] = row.enabled;
+      }
+
+      setOverrides(map);
       setFetched(true);
     };
 
     void load();
+
+    return () => {
+      mounted = false;
+    };
   }, [userId]);
 
   const toggle = useCallback(
@@ -236,7 +298,10 @@ function OverridesPanel({ userId }: { userId: string }) {
       const next = !current;
 
       setLoadingKey(featureKey);
-      setOverrides((prev) => ({ ...prev, [featureKey]: next }));
+      setOverrides((previous) => ({
+        ...previous,
+        [featureKey]: next,
+      }));
 
       const { error } = await supabase
         .from("subscriber_overrides")
@@ -246,17 +311,23 @@ function OverridesPanel({ userId }: { userId: string }) {
             feature_key: featureKey,
             enabled: next,
           },
-          { onConflict: "user_id,feature_key" }
+          {
+            onConflict: "user_id,feature_key",
+          },
         );
 
       if (error) {
-        setOverrides((prev) => ({ ...prev, [featureKey]: current }));
-        console.error("Toggle error:", error);
+        setOverrides((previous) => ({
+          ...previous,
+          [featureKey]: current,
+        }));
+
+        console.error("[OverridesPanel] Erreur toggle :", error);
       }
 
       setLoadingKey(null);
     },
-    [overrides, userId]
+    [overrides, userId],
   );
 
   if (!fetched) {
@@ -285,24 +356,37 @@ function OverridesPanel({ userId }: { userId: string }) {
           return (
             <div
               key={feature.key}
-              className={`flex items-center justify-between rounded-lg border px-3 py-2 transition-colors ${
+              className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
                 enabled
                   ? "border-primary/30 bg-primary/5"
                   : "border-border bg-background"
               }`}
             >
               <div className="flex items-center gap-1.5 text-xs font-medium">
-                <span className={enabled ? "text-primary" : "text-muted-foreground"}>
+                <span
+                  className={
+                    enabled
+                      ? "text-primary"
+                      : "text-muted-foreground"
+                  }
+                >
                   {feature.icon}
                 </span>
-                <span className={enabled ? "text-foreground" : "text-muted-foreground"}>
+
+                <span
+                  className={
+                    enabled
+                      ? "text-foreground"
+                      : "text-muted-foreground"
+                  }
+                >
                   {feature.label}
                 </span>
               </div>
 
               <Toggle
                 enabled={enabled}
-                onChange={() => toggle(feature.key)}
+                onChange={() => void toggle(feature.key)}
                 loading={loadingKey === feature.key}
               />
             </div>
@@ -322,10 +406,7 @@ function PremiumToggleButton({
   loading: boolean;
   onToggle: (subscriber: Subscriber) => void;
 }) {
-  const isSubscriber = subscriber.role === "subscriber";
   const isPremium = subscriber.plan === "premium";
-
-  if (!isSubscriber) return null;
 
   return (
     <Button
@@ -338,20 +419,54 @@ function PremiumToggleButton({
           : "rounded-xl bg-[#6DB33F] text-white hover:bg-[#2D7A1F]"
       }
       disabled={loading}
-      onClick={(e) => {
-        e.stopPropagation();
+      onClick={(event) => {
+        event.stopPropagation();
         onToggle(subscriber);
       }}
     >
       {loading ? (
         <>
           <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-          Mise à jour...
+          Mise à jour…
         </>
       ) : isPremium ? (
         "Remettre Basic"
       ) : (
         "Passer Premium"
+      )}
+    </Button>
+  );
+}
+
+function DeleteButton({
+  subscriber,
+  loading,
+  onDelete,
+}: {
+  subscriber: Subscriber;
+  loading: boolean;
+  onDelete: (subscriber: Subscriber) => void;
+}) {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="destructive"
+      className="rounded-xl"
+      disabled={loading}
+      onClick={(event) => {
+        event.stopPropagation();
+        onDelete(subscriber);
+      }}
+      aria-label={`Supprimer ${subscriber.full_name ?? subscriber.email}`}
+    >
+      {loading ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <>
+          <Trash2 className="h-4 w-4 sm:mr-1" />
+          <span className="hidden sm:inline">Supprimer</span>
+        </>
       )}
     </Button>
   );
@@ -372,12 +487,16 @@ function Content() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterGoal, setFilterGoal] = useState("all");
-  const [filterRole, setFilterRole] = useState("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [updatingPlanId, setUpdatingPlanId] = useState<string | null>(null);
+  const [updatingPlanId, setUpdatingPlanId] =
+    useState<string | null>(null);
+  const [deletingSubscriberId, setDeletingSubscriberId] =
+    useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
+
+    let mounted = true;
 
     const fetchSubscribers = async () => {
       setLoading(true);
@@ -385,22 +504,34 @@ function Content() {
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "id, email, full_name, role, plan, age, weight_kg, height_cm, bmi, goal, created_at"
+          "id, email, full_name, role, plan, age, weight_kg, height_cm, bmi, goal, created_at",
         )
         .eq("pro_id", user.id)
-        .in("role", ["subscriber", "patient"])
-        .order("created_at", { ascending: false });
+        .eq("role", "subscriber")
+        .order("created_at", {
+          ascending: false,
+        });
+
+      if (!mounted) return;
 
       if (error) {
-        console.error("Fetch subscribers error:", error);
-      } else if (data) {
-        setSubscribers(data as Subscriber[]);
+        console.error(
+          "[pro.subscribers] Erreur chargement abonnés :",
+          error,
+        );
+        setSubscribers([]);
+      } else {
+        setSubscribers((data ?? []) as Subscriber[]);
       }
 
       setLoading(false);
     };
 
     void fetchSubscribers();
+
+    return () => {
+      mounted = false;
+    };
   }, [user]);
 
   const handleTogglePremium = useCallback(
@@ -410,109 +541,202 @@ function Content() {
       const currentPlan = subscriber.plan ?? "basic";
       const nextPlan: SubscriberPlan =
         currentPlan === "premium" ? "basic" : "premium";
-      const displayName = subscriber.full_name ?? subscriber.email;
+
+      const displayName =
+        subscriber.full_name ?? subscriber.email;
 
       const confirmed = window.confirm(
         nextPlan === "premium"
           ? `Passer ${displayName} en Premium ?`
-          : `Remettre ${displayName} en Basic ?`
+          : `Remettre ${displayName} en Basic ?`,
       );
 
       if (!confirmed) return;
 
       setUpdatingPlanId(subscriber.id);
 
-      const { error } = await supabase
-        .from("profiles")
-        .update({ plan: nextPlan })
-        .eq("id", subscriber.id)
-        .eq("pro_id", user.id)
-        .eq("role", "subscriber");
+      const { error } = await supabase.rpc(
+        "pro_set_subscriber_plan",
+        {
+          p_subscriber_id: subscriber.id,
+          p_new_plan: nextPlan,
+        },
+      );
 
       if (error) {
-        console.error("Plan update error:", error);
-        window.alert(`Impossible de mettre à jour le plan : ${error.message}`);
+        console.error(
+          "[pro.subscribers] Erreur changement plan :",
+          error,
+        );
+
+        window.alert(
+          `Impossible de mettre à jour le plan : ${error.message}`,
+        );
+
         setUpdatingPlanId(null);
         return;
       }
 
-      setSubscribers((prev) =>
-        prev.map((item) =>
-          item.id === subscriber.id ? { ...item, plan: nextPlan } : item
-        )
+      setSubscribers((previous) =>
+        previous.map((item) =>
+          item.id === subscriber.id
+            ? {
+                ...item,
+                plan: nextPlan,
+              }
+            : item,
+        ),
       );
 
       setUpdatingPlanId(null);
     },
-    [user]
+    [user],
+  );
+
+  const handleDeleteSubscriber = useCallback(
+    async (subscriber: Subscriber) => {
+      if (!user) return;
+
+      const displayName =
+        subscriber.full_name ?? subscriber.email;
+
+      const confirmed = window.confirm(
+        `Supprimer définitivement l'abonné ${displayName} ?\n\n` +
+          "Cette action supprimera son compte Auth et toutes ses données. " +
+          "Cette action est irréversible.",
+      );
+
+      if (!confirmed) return;
+
+      setDeletingSubscriberId(subscriber.id);
+
+      try {
+        const result = await supabase.functions.invoke(
+          "delete-account",
+          {
+            body: {
+              user_id: subscriber.id,
+            },
+          },
+        );
+
+        if (result.error || !result.data?.success) {
+          const message = getErrorMessage(
+            result.error,
+            result.data,
+          );
+
+          throw new Error(message);
+        }
+
+        setSubscribers((current) =>
+          current.filter(
+            (item) => item.id !== subscriber.id,
+          ),
+        );
+
+        setExpandedId((current) =>
+          current === subscriber.id ? null : current,
+        );
+
+        window.alert("Abonné supprimé avec succès.");
+      } catch (error) {
+        console.error(
+          "[pro.subscribers] Erreur suppression :",
+          error,
+        );
+
+        const message = getErrorMessage(error, null);
+
+        window.alert(
+          `Impossible de supprimer l'abonné : ${message}`,
+        );
+      } finally {
+        setDeletingSubscriberId(null);
+      }
+    },
+    [user],
   );
 
   const filtered = subscribers.filter((subscriber) => {
-    const query = search.toLowerCase();
+    const query = search.trim().toLowerCase();
 
     const matchSearch =
-      !search ||
-      subscriber.full_name?.toLowerCase().includes(query) ||
+      !query ||
+      subscriber.full_name
+        ?.toLowerCase()
+        .includes(query) ||
       subscriber.email.toLowerCase().includes(query);
 
-    const matchGoal = filterGoal === "all" || subscriber.goal === filterGoal;
-    const matchRole = filterRole === "all" || subscriber.role === filterRole;
+    const matchGoal =
+      filterGoal === "all" ||
+      subscriber.goal === filterGoal;
 
-    return matchSearch && matchGoal && matchRole;
+    return matchSearch && matchGoal;
   });
 
-  const totalSubscribers = subscribers.filter(
-    (subscriber) => subscriber.role === "subscriber"
-  ).length;
-
-  const totalPatients = subscribers.filter(
-    (subscriber) => subscriber.role === "patient"
-  ).length;
-
   const bmiValues = subscribers
-    .filter((subscriber) => subscriber.bmi !== null && subscriber.bmi !== undefined)
-    .map((subscriber) => Number(subscriber.bmi));
+    .filter(
+      (subscriber) =>
+        subscriber.bmi !== null &&
+        subscriber.bmi !== undefined,
+    )
+    .map((subscriber) => Number(subscriber.bmi))
+    .filter((value) => Number.isFinite(value));
 
   const avgBMI =
     bmiValues.length > 0
-      ? (bmiValues.reduce((acc, value) => acc + value, 0) / bmiValues.length).toFixed(1)
+      ? (
+          bmiValues.reduce(
+            (total, value) => total + value,
+            0,
+          ) / bmiValues.length
+        ).toFixed(1)
       : null;
 
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center gap-3">
         <UserCheck className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Abonnés & Patients</h1>
+
+        <h1 className="text-2xl font-bold">Abonnés</h1>
+
         <Badge variant="secondary" className="ml-auto">
           {subscribers.length} au total
         </Badge>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <div className="rounded-lg border bg-card p-4 text-center">
-          <p className="text-2xl font-bold text-primary">{totalSubscribers}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Abonnés</p>
+          <p className="text-2xl font-bold text-primary">
+            {subscribers.length}
+          </p>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            Abonnés
+          </p>
         </div>
 
         <div className="rounded-lg border bg-card p-4 text-center">
-          <p className="text-2xl font-bold text-primary">{totalPatients}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Patients</p>
-        </div>
+          <p className="text-2xl font-bold text-primary">
+            {avgBMI ?? "—"}
+          </p>
 
-        <div className="rounded-lg border bg-card p-4 text-center">
-          <p className="text-2xl font-bold text-primary">{avgBMI ?? "—"}</p>
-          <p className="mt-1 text-xs text-muted-foreground">IMC moyen</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            IMC moyen
+          </p>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-[200px] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
           <Input
             className="pl-9"
             placeholder="Rechercher par nom ou email…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
           />
         </div>
 
@@ -521,24 +745,22 @@ function Content() {
 
           <select
             className="rounded-md border bg-background px-3 py-2 text-sm"
-            value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value)}
-          >
-            <option value="all">Tous les rôles</option>
-            <option value="subscriber">Abonnés</option>
-            <option value="patient">Patients</option>
-          </select>
-
-          <select
-            className="rounded-md border bg-background px-3 py-2 text-sm"
             value={filterGoal}
-            onChange={(e) => setFilterGoal(e.target.value)}
+            onChange={(event) =>
+              setFilterGoal(event.target.value)
+            }
           >
             <option value="all">Tous les objectifs</option>
-            <option value="weight_loss">Perte de poids</option>
-            <option value="muscle_gain">Prise de masse</option>
+            <option value="weight_loss">
+              Perte de poids
+            </option>
+            <option value="muscle_gain">
+              Prise de masse
+            </option>
             <option value="maintenance">Maintien</option>
-            <option value="general_health">Santé générale</option>
+            <option value="general_health">
+              Santé générale
+            </option>
           </select>
         </div>
       </div>
@@ -546,7 +768,10 @@ function Content() {
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((item) => (
-            <div key={item} className="animate-pulse rounded-lg border bg-card p-4">
+            <div
+              key={item}
+              className="animate-pulse rounded-lg border bg-card p-4"
+            >
               <div className="mb-2 h-4 w-1/3 rounded bg-muted" />
               <div className="h-3 w-1/2 rounded bg-muted" />
             </div>
@@ -555,7 +780,9 @@ function Content() {
       ) : filtered.length === 0 ? (
         <div className="rounded-lg border bg-card p-12 text-center text-muted-foreground">
           <UserCheck className="mx-auto mb-3 h-10 w-10 opacity-30" />
+
           <p className="font-medium">Aucun résultat</p>
+
           <p className="mt-1 text-sm">
             {subscribers.length === 0
               ? "Vos abonnés apparaîtront ici après leur inscription"
@@ -566,10 +793,16 @@ function Content() {
         <div className="space-y-3">
           {filtered.map((subscriber) => {
             const bmiInfo = getBMIInfo(subscriber.bmi);
-            const goalInfo = subscriber.goal ? GOAL_MAP[subscriber.goal] : null;
-            const initials = (subscriber.full_name ?? subscriber.email)
+            const goalInfo = subscriber.goal
+              ? GOAL_MAP[subscriber.goal]
+              : null;
+
+            const initials = (
+              subscriber.full_name ?? subscriber.email
+            )
               .slice(0, 2)
               .toUpperCase();
+
             const isOpen = expandedId === subscriber.id;
 
             return (
@@ -579,7 +812,11 @@ function Content() {
               >
                 <div
                   className="flex cursor-pointer select-none items-center gap-4 p-4"
-                  onClick={() => setExpandedId(isOpen ? null : subscriber.id)}
+                  onClick={() =>
+                    setExpandedId(
+                      isOpen ? null : subscriber.id,
+                    )
+                  }
                 >
                   <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                     {initials}
@@ -590,21 +827,30 @@ function Content() {
                       <span className="truncate font-semibold">
                         {subscriber.full_name ?? "—"}
                       </span>
-                      {getRoleBadge(subscriber.role)}
+
                       {getPlanBadge(subscriber.plan)}
                     </div>
+
                     <p className="truncate text-sm text-muted-foreground">
                       {subscriber.email}
                     </p>
                   </div>
 
                   <div className="hidden min-w-[90px] flex-col items-center gap-1 md:flex">
-                    <span className={`text-sm font-medium ${bmiInfo.color}`}>
+                    <span
+                      className={`text-sm font-medium ${bmiInfo.color}`}
+                    >
                       {bmiInfo.label}
                     </span>
+
                     <span className="text-xs text-muted-foreground">
-                      {subscriber.weight_kg ? `${subscriber.weight_kg} kg` : "—"} ·{" "}
-                      {subscriber.height_cm ? `${subscriber.height_cm} cm` : "—"}
+                      {subscriber.weight_kg
+                        ? `${subscriber.weight_kg} kg`
+                        : "—"}{" "}
+                      ·{" "}
+                      {subscriber.height_cm
+                        ? `${subscriber.height_cm} cm`
+                        : "—"}
                     </span>
                   </div>
 
@@ -624,18 +870,42 @@ function Content() {
                   </div>
 
                   <div className="hidden min-w-[80px] flex-col items-end gap-1 text-xs text-muted-foreground xl:flex">
-                    {subscriber.age ? <span>{subscriber.age} ans</span> : null}
-                    <span>{formatDate(subscriber.created_at)}</span>
+                    {subscriber.age ? (
+                      <span>{subscriber.age} ans</span>
+                    ) : null}
+
+                    <span>
+                      {formatDate(subscriber.created_at)}
+                    </span>
                   </div>
 
                   <div
                     className="ml-2 flex-shrink-0"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(event) =>
+                      event.stopPropagation()
+                    }
                   >
                     <PremiumToggleButton
                       subscriber={subscriber}
-                      loading={updatingPlanId === subscriber.id}
+                      loading={
+                        updatingPlanId === subscriber.id
+                      }
                       onToggle={handleTogglePremium}
+                    />
+                  </div>
+
+                  <div
+                    className="ml-2 flex-shrink-0"
+                    onClick={(event) =>
+                      event.stopPropagation()
+                    }
+                  >
+                    <DeleteButton
+                      subscriber={subscriber}
+                      loading={
+                        deletingSubscriberId === subscriber.id
+                      }
+                      onDelete={handleDeleteSubscriber}
                     />
                   </div>
 
@@ -648,7 +918,9 @@ function Content() {
                   </div>
                 </div>
 
-                {isOpen ? <OverridesPanel userId={subscriber.id} /> : null}
+                {isOpen ? (
+                  <OverridesPanel userId={subscriber.id} />
+                ) : null}
               </div>
             );
           })}
