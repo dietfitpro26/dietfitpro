@@ -1,231 +1,135 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { useAuth, type Profile } from "./useAuth";
+import { useEffect, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
+import { supabase } from '../lib/supabase'
+import { useAuth } from './useAuth'
 
-export interface AccessRights {
-  plan_label: "basic" | "premium" | "patient";
-  access_recipes: boolean;
-  access_sport_programs: boolean;
-  access_nutrition_programs: boolean;
-  access_messaging: boolean;
-  access_visio: boolean;
-  access_ai_coach: boolean;
-  access_premium_content: boolean;
-  sport_session_limit: number | null;
-}
-
-type AccessKey =
-  | "access_recipes"
-  | "access_sport_programs"
-  | "access_nutrition_programs"
-  | "access_messaging"
-  | "access_visio"
-  | "access_ai_coach"
-  | "access_premium_content";
-
-type OverrideRow = {
-  feature_key: string | null;
-  enabled: boolean | null;
-  access_recipes?: boolean | null;
-  access_sport_programs?: boolean | null;
-  access_nutrition_programs?: boolean | null;
-  access_messaging?: boolean | null;
-  access_visio?: boolean | null;
-  access_premium_content?: boolean | null;
-  access_ai_coach?: boolean | null;
-  metadata?: Record<string, unknown> | null;
-};
-
-type FreshProfileRow = {
-  role: Profile["role"] | null;
-  plan: Profile["plan"] | null;
-};
-
-const ACCESS_KEYS: AccessKey[] = [
-  "access_recipes",
-  "access_sport_programs",
-  "access_nutrition_programs",
-  "access_messaging",
-  "access_visio",
-  "access_ai_coach",
-  "access_premium_content",
-];
-
-const BASIC_RIGHTS: AccessRights = {
-  plan_label: "basic",
-  access_recipes: false,
-  access_sport_programs: true,
-  access_nutrition_programs: false,
-  access_messaging: false,
-  access_visio: false,
-  access_ai_coach: false,
-  access_premium_content: false,
-  sport_session_limit: 3,
-};
-
-const PREMIUM_RIGHTS: AccessRights = {
-  plan_label: "premium",
-  access_recipes: true,
-  access_sport_programs: true,
-  access_nutrition_programs: true,
-  access_messaging: true,
-  access_visio: false,
-  access_ai_coach: true,
-  access_premium_content: true,
-  sport_session_limit: null,
-};
-
-const PATIENT_RIGHTS: AccessRights = {
-  plan_label: "patient",
-  access_recipes: true,
-  access_sport_programs: true,
-  access_nutrition_programs: true,
-  access_messaging: true,
-  access_visio: false,
-  access_ai_coach: true,
-  access_premium_content: true,
-  sport_session_limit: null,
-};
-
-const PRO_RIGHTS: AccessRights = {
-  plan_label: "patient",
-  access_recipes: true,
-  access_sport_programs: true,
-  access_nutrition_programs: true,
-  access_messaging: true,
-  access_visio: true,
-  access_ai_coach: true,
-  access_premium_content: true,
-  sport_session_limit: null,
-};
-
-function isAccessKey(value: string): value is AccessKey {
-  return ACCESS_KEYS.includes(value as AccessKey);
-}
-
-function getBaseRights(role: Profile["role"], plan: Profile["plan"]): AccessRights {
-  if (role === "patient") {
-    return { ...PATIENT_RIGHTS };
-  }
-
-  if (role === "subscriber" && plan === "premium") {
-    return { ...PREMIUM_RIGHTS };
-  }
-
-  return { ...BASIC_RIGHTS };
-}
-
-function applyBooleanOverride(
-  base: AccessRights,
-  key: AccessKey,
-  value: boolean | null | undefined
-) {
-  if (typeof value === "boolean") {
-    base[key] = value;
-  }
+interface Profile {
+  id: string
+  role: 'pro' | 'patient' | 'subscriber'
+  profile_complete: boolean
+  subscription_tier: 'basic' | 'premium'
 }
 
 export function useAccessRights() {
-  const { user, profile, loading: authLoading } = useAuth();
-  const [rights, setRights] = useState<AccessRights | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading } = useAuth()
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   useEffect(() => {
-    if (authLoading) return;
-
-    if (!user || !profile) {
-      setRights(null);
-      setLoading(false);
-      return;
+    if (!user || authLoading) {
+      setLoading(authLoading)
+      return
     }
 
-    if (profile.role === "pro") {
-      setRights(PRO_RIGHTS);
-      setLoading(false);
-      return;
-    }
+    async function loadProfile() {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, role, profile_complete, subscription_tier')
+          .eq('id', user.id)
+          .single()
 
-    let cancelled = false;
-
-    const loadRights = async () => {
-      setLoading(true);
-
-      let effectiveRole: Profile["role"] = profile.role;
-      let effectivePlan: Profile["plan"] = profile.plan;
-
-      const { data: freshProfile, error: freshProfileError } = await supabase
-        .from("profiles")
-        .select("role, plan")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (freshProfileError) {
-        console.error("[useAccessRights] fresh profile error", freshProfileError);
-      } else {
-        const row = freshProfile as FreshProfileRow | null;
-        if (row?.role) effectiveRole = row.role;
-        if (row?.plan) effectivePlan = row.plan;
-      }
-
-      const base = getBaseRights(effectiveRole, effectivePlan);
-
-      const { data: overrides, error: overridesError } = await supabase
-        .from("subscriber_overrides")
-        .select(`
-          feature_key,
-          enabled,
-          access_recipes,
-          access_sport_programs,
-          access_nutrition_programs,
-          access_messaging,
-          access_visio,
-          access_premium_content,
-          access_ai_coach,
-          metadata
-        `)
-        .eq("user_id", user.id);
-
-      if (cancelled) return;
-
-      if (overridesError) {
-        console.error("[useAccessRights] overrides error", overridesError);
-      } else if (overrides && overrides.length > 0) {
-        for (const row of overrides as OverrideRow[]) {
-          applyBooleanOverride(base, "access_recipes", row.access_recipes);
-          applyBooleanOverride(base, "access_sport_programs", row.access_sport_programs);
-          applyBooleanOverride(base, "access_nutrition_programs", row.access_nutrition_programs);
-          applyBooleanOverride(base, "access_messaging", row.access_messaging);
-          applyBooleanOverride(base, "access_visio", row.access_visio);
-          applyBooleanOverride(base, "access_premium_content", row.access_premium_content);
-          applyBooleanOverride(base, "access_ai_coach", row.access_ai_coach);
-
-          if (row.feature_key && isAccessKey(row.feature_key)) {
-            applyBooleanOverride(base, row.feature_key, row.enabled);
-          }
-
-          const sportLimit =
-            row.metadata &&
-            typeof row.metadata === "object" &&
-            typeof row.metadata["sport_session_limit"] === "number"
-              ? row.metadata["sport_session_limit"]
-              : null;
-
-          if (typeof sportLimit === "number") {
-            base.sport_session_limit = sportLimit;
-          }
+        if (error || !data) {
+          console.error('Profile not found:', error)
+          setProfile(null)
+          setLoading(false)
+          return
         }
+
+        setProfile(data)
+        setLoading(false)
+      } catch (err) {
+        console.error('Error loading profile:', err)
+        setLoading(false)
       }
+    }
 
-      setRights(base);
-      setLoading(false);
-    };
+    loadProfile()
+  }, [user, authLoading])
 
-    void loadRights();
+  // Vérifications
+  const isPro = profile?.role === 'pro'
+  const isPatient = profile?.role === 'patient'
+  const isSubscriber = profile?.role === 'subscriber'
+  const isPremium = profile?.subscription_tier === 'premium'
+  const profileComplete = profile?.profile_complete ?? false
 
-    return () => {
-      cancelled = true;
-    };
-  }, [user, profile, authLoading]);
+  // Hooks de redirection
+  const requireAuth = () => {
+    if (!user && !loading) {
+      navigate({ to: '/login' })
+      return false
+    }
+    return true
+  }
 
-  return { rights, loading: loading || authLoading };
+  const requireProfileComplete = () => {
+    if (!profileComplete && !loading) {
+      navigate({ to: '/bienvenue' })
+      return false
+    }
+    return true
+  }
+
+  const requireRole = (allowedRoles: ('pro' | 'patient' | 'subscriber')[]) => {
+    if (!profile && !loading) {
+      navigate({ to: '/login' })
+      return false
+    }
+
+    if (profile && !allowedRoles.includes(profile.role)) {
+      navigate({ to: '/unauthorized' })
+      return false
+    }
+
+    return true
+  }
+
+  const requirePremium = () => {
+    if (!isPremium && !loading) {
+      // Option: rediriger vers page upgrade
+      navigate({ to: '/unauthorized' })
+      return false
+    }
+    return true
+  }
+
+  // Redirection automatique selon rôle
+  const redirectToDashboard = () => {
+    if (!profile || loading) return
+
+    if (!profileComplete) {
+      navigate({ to: '/bienvenue' })
+      return
+    }
+
+    switch (profile.role) {
+      case 'pro':
+        navigate({ to: '/pro/dashboard' })
+        break
+      case 'patient':
+        navigate({ to: '/patient/dashboard' })
+        break
+      case 'subscriber':
+        navigate({ to: '/subscriber/nutrition' })
+        break
+    }
+  }
+
+  return {
+    user,
+    profile,
+    loading: loading || authLoading,
+    isPro,
+    isPatient,
+    isSubscriber,
+    isPremium,
+    profileComplete,
+    requireAuth,
+    requireProfileComplete,
+    requireRole,
+    requirePremium,
+    redirectToDashboard,
+  }
 }
