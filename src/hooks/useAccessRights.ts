@@ -55,7 +55,7 @@ const BASIC_RIGHTS: AccessRights = {
   plan_label: "basic",
   access_recipes: false,
   access_sport_programs: true,
-  access_nutrition_programs: false,
+  access_nutrition_programs: true, // ✅ CHANGÉ (était false)
   access_messaging: false,
   access_visio: false,
   access_ai_coach: false,

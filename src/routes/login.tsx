@@ -92,8 +92,8 @@ function LoginPage() {
 
       if (invitationError) throw invitationError;
 
-      // ✅ Nouveau patient avec code → /bienvenue pour finaliser
-      await navigate({ to: "/bienvenue" });
+      // ✅ Nouveau patient avec code → /patient/dashboard
+      void navigate({ to: "/patient/dashboard" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'activation du compte");
     } finally {

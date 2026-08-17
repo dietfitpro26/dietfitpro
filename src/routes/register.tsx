@@ -214,17 +214,6 @@ function RegisterPage() {
           ? calcBMI(targetWeight, height)
           : null;
 
-      /*
-       * Important :
-       * Toutes les données sont envoyées dans les métadonnées Auth.
-       *
-       * Nous ne faisons plus :
-       * - getSession() juste après signUp()
-       * - update() manuel de profiles
-       *
-       * Quand la confirmation email est active, Supabase ne fournit
-       * normalement pas encore de session après signUp().
-       */
       const result = await signUp(cleanEmail, password, {
         full_name: cleanName,
         role: "subscriber",
@@ -237,16 +226,15 @@ function RegisterPage() {
         target_bmi: calculatedTargetBmi,
         daily_kcal_target: DAILY_KCAL[goal],
         plan,
-        // ✅ Nouveau : profil incomplet par défaut
-        profile_complete: false,
+        profile_complete: true, // ✅ Profil complet par défaut pour subscribers
       });
 
       setSuccess(true);
 
       if (result.data.session) {
         window.setTimeout(() => {
-          // ✅ Rediriger vers /bienvenue pour finaliser le profil
-          void navigate({ to: "/bienvenue" as never });
+          // ✅ Rediriger vers /home pour les subscribers
+          void navigate({ to: "/home" });
         }, 1000);
 
         return;
