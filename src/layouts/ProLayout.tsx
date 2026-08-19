@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   Users,
@@ -9,9 +9,7 @@ import {
   MessageSquare,
   Video,
   Bell,
-  Rss,
   UserCheck,
-  BarChart3,
   Settings,
   LogOut,
   Menu,
@@ -28,16 +26,14 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { to: "/pro/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/pro/patients", label: "Mes Patients", icon: Users },
-  { to: "/pro/nutrition", label: "Programmes Nutrition", icon: Salad },
-  { to: "/pro/recipes", label: "Mes Recettes", icon: BookOpen },
-  { to: "/pro/sport", label: "Programmes Sport", icon: Dumbbell },
-  { to: "/pro/messages", label: "Messagerie", icon: MessageSquare },
+  { to: "/pro/patients", label: "Mes patients", icon: Users },
   { to: "/pro/consultations", label: "Consultations", icon: Video },
+  { to: "/pro/nutrition", label: "Programmes nutrition", icon: Salad },
+  { to: "/pro/sport", label: "Programmes sport", icon: Dumbbell },
+  { to: "/pro/messages", label: "Messagerie", icon: MessageSquare },
   { to: "/pro/notifications", label: "Notifications", icon: Bell },
-  { to: "/pro/feed", label: "Feed", icon: Rss },
   { to: "/pro/subscribers", label: "Abonnés", icon: UserCheck },
-  { to: "/pro/analytics", label: "Statistiques", icon: BarChart3 },
+  { to: "/pro/recipes", label: "Mes recettes", icon: BookOpen },
   { to: "/pro/settings", label: "Paramètres", icon: Settings },
 ] as const;
 
@@ -45,74 +41,94 @@ export function ProLayout({ children }: { children: ReactNode }) {
   const { profile, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
   const { totalUnread: unreadMessages } = useConversations();
 
   const initials = (profile?.full_name ?? profile?.email ?? "?")
     .split(" ")
-    .map((w) => w[0])
+    .map((word) => word[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
 
+  const handleSignOut = async () => {
+    await signOut();
+    void navigate({ to: "/login" });
+  };
+
   const SidebarInner = (
-    <div className="flex h-full w-60 flex-col bg-[#1A1A1A] text-white">
-      <div className="flex items-center justify-between p-4 border-b border-white/10">
+    <div className="flex h-full w-64 flex-col bg-[#1A1A1A] text-white">
+      <div className="flex items-center justify-between border-b border-white/10 p-4">
         <Logo className="[&_span]:text-white [&_span:last-child]:text-white/60" />
+
         <button
-          className="md:hidden text-white/70"
+          type="button"
+          className="text-white/70 transition-colors hover:text-white md:hidden"
           onClick={() => setOpen(false)}
-          aria-label="Fermer"
+          aria-label="Fermer le menu"
         >
           <X className="h-5 w-5" />
         </button>
       </div>
-      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
+
+      <nav
+        className="flex-1 space-y-1 overflow-y-auto px-3 py-4"
+        aria-label="Navigation professionnelle"
+      >
         {NAV.map((item) => {
-          const active = pathname === item.to || pathname.startsWith(item.to + "/");
+          const active =
+            pathname === item.to || pathname.startsWith(`${item.to}/`);
           const Icon = item.icon;
+
           return (
             <Link
               key={item.to}
               to={item.to}
               onClick={() => setOpen(false)}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
                 active
-                  ? "bg-[#6DB33F] text-white"
-                  : "text-white/80 hover:bg-white/5 hover:text-white",
+                  ? "bg-[#6DB33F] font-medium text-white shadow-sm"
+                  : "text-white/75 hover:bg-white/10 hover:text-white",
               )}
+              aria-current={active ? "page" : undefined}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              <span className="truncate flex-1">{item.label}</span>
-              {item.to === "/pro/messages" && unreadMessages > 0 && (
-                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#6DB33F] text-white text-[10px] font-semibold flex items-center justify-center">
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+
+              {item.to === "/pro/messages" && unreadMessages > 0 ? (
+                <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#6DB33F] px-1 text-[10px] font-semibold text-white">
                   {unreadMessages > 99 ? "99+" : unreadMessages}
                 </span>
-              )}
+              ) : null}
             </Link>
           );
         })}
       </nav>
-      <div className="border-t border-white/10 p-3 flex items-center gap-3">
+
+      <div className="flex items-center gap-3 border-t border-white/10 p-3">
         <Avatar className="h-9 w-9">
-          <AvatarFallback className="bg-[#6DB33F] text-white text-xs">
+          <AvatarFallback className="bg-[#6DB33F] text-xs text-white">
             {initials}
           </AvatarFallback>
         </Avatar>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">
-            {profile?.full_name ?? profile?.email ?? "Pro"}
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">
+            {profile?.full_name ?? profile?.email ?? "Professionnel"}
           </p>
-          <span className="inline-block mt-0.5 rounded-full bg-[#6DB33F] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-            Pro
+          <span className="mt-0.5 inline-block rounded-full bg-[#6DB33F] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+            Professionnel
           </span>
         </div>
+
         <Button
+          type="button"
           variant="ghost"
           size="icon"
           className="text-white/70 hover:bg-white/10 hover:text-white"
-          onClick={() => void signOut()}
-          aria-label="Déconnexion"
+          onClick={() => void handleSignOut()}
+          aria-label="Se déconnecter"
         >
           <LogOut className="h-4 w-4" />
         </Button>
@@ -123,22 +139,39 @@ export function ProLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-background">
       <UpcomingConsultationReminder />
-      <aside className="hidden md:block fixed inset-y-0 left-0 z-40">{SidebarInner}</aside>
-      {open && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
+
+      <aside className="fixed inset-y-0 left-0 z-40 hidden md:block">
+        {SidebarInner}
+      </aside>
+
+      {open ? (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setOpen(false)}
+            aria-label="Fermer le menu"
+          />
           <div className="relative">{SidebarInner}</div>
         </div>
-      )}
-      <div className="flex-1 md:ml-60 flex flex-col">
-        <header className="md:hidden h-14 flex items-center justify-between border-b px-4 bg-background">
-          <button onClick={() => setOpen(true)} aria-label="Ouvrir le menu">
+      ) : null}
+
+      <div className="flex min-w-0 flex-1 flex-col md:ml-64">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 backdrop-blur md:hidden">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="Ouvrir le menu"
+          >
             <Menu className="h-5 w-5" />
           </button>
+
           <Logo />
+
           <NotificationBell to="/pro/notifications" />
         </header>
-        <main className="flex-1">{children}</main>
+
+        <main className="min-w-0 flex-1">{children}</main>
       </div>
     </div>
   );

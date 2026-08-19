@@ -21,6 +21,7 @@ import {
   ChevronRight,
   BarChart2,
   Sparkles,
+  UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -34,7 +35,7 @@ function getBMIInfo(bmi: number | null) {
 
   if (bmi < 18.5) {
     return {
-      label: "Insuffisance pondérale",
+      label: "Repère inférieur",
       color: "text-blue-500",
       bg: "bg-blue-50 dark:bg-blue-900/20",
     };
@@ -42,7 +43,7 @@ function getBMIInfo(bmi: number | null) {
 
   if (bmi < 25) {
     return {
-      label: "Poids normal",
+      label: "Repère général",
       color: "text-green-600",
       bg: "bg-green-50 dark:bg-green-900/20",
     };
@@ -50,14 +51,14 @@ function getBMIInfo(bmi: number | null) {
 
   if (bmi < 30) {
     return {
-      label: "Surpoids",
+      label: "Repère supérieur",
       color: "text-orange-500",
       bg: "bg-orange-50 dark:bg-orange-900/20",
     };
   }
 
   return {
-    label: "Obésité",
+    label: "À interpréter avec un professionnel",
     color: "text-red-500",
     bg: "bg-red-50 dark:bg-red-900/20",
   };
@@ -110,7 +111,6 @@ function HomeContent() {
   const { rights, loading } = useAccessRights();
 
   const firstName = profile?.full_name?.split(" ")[0] ?? "vous";
-
   const weightKg = profile?.weight_kg ?? null;
   const targetWeightKg = profile?.target_weight_kg ?? null;
   const dailyKcalTarget = profile?.daily_kcal_target ?? null;
@@ -119,7 +119,6 @@ function HomeContent() {
   const currentBmi = calcBMI(weightKg, heightCm);
   const bmiInfo = getBMIInfo(currentBmi);
   const goalInfo = profile?.goal ? GOAL_LABELS[profile.goal] : null;
-
   const hasWeightGoal = weightKg != null && targetWeightKg != null;
 
   const weightDiff = useMemo(() => {
@@ -148,53 +147,105 @@ function HomeContent() {
     );
   }
 
+  const primaryAction = !profile?.goal
+    ? {
+        title: "Définissez votre objectif",
+        text: "Un objectif clair vous aide à personnaliser votre expérience.",
+        to: "/subscriber/profile" as const,
+        label: "Compléter mon profil",
+      }
+    : isBasic
+      ? {
+          title: "Passez à Premium",
+          text: "Débloquez un accompagnement plus complet pour progresser avec davantage de repères.",
+          to: "/subscriber/profile" as const,
+          label: "Voir mon offre",
+        }
+      : {
+          title: "Continuez votre progression",
+          text: "Retrouvez vos programmes nutrition et sport depuis votre espace personnel.",
+          to: rights.access_nutrition_programs
+            ? ("/subscriber/nutrition" as const)
+            : ("/subscriber/sport" as const),
+          label: "Ouvrir mon programme",
+        };
+
   return (
     <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
       <div className="mx-auto max-w-5xl space-y-6">
-        <section className="rounded-3xl border bg-card p-5 shadow-sm">
-          <div className="space-y-3">
-            <div>
-              <h1 className="text-2xl font-bold">Bonjour {firstName}</h1>
-              <p className="text-sm text-muted-foreground">
-                Bienvenue sur votre espace DietFitPro.
-              </p>
-            </div>
+        <section className="overflow-hidden rounded-3xl border bg-card shadow-sm">
+          <div className="bg-gradient-to-br from-primary/10 via-card to-card p-5 sm:p-7">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-3">
+                <div>
+                  <p className="mb-1 text-sm font-medium text-primary">Votre espace personnel</p>
+                  <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                    Bonjour {firstName}
+                  </h1>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Bienvenue sur votre espace DietFitPro.
+                  </p>
+                </div>
 
-            <div className="flex flex-wrap gap-2">
-              {goalInfo ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
-                  {goalInfo.icon}
-                  {goalInfo.label}
-                </span>
-              ) : null}
+                <div className="flex flex-wrap gap-2">
+                  {goalInfo ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
+                      {goalInfo.icon}
+                      {goalInfo.label}
+                    </span>
+                  ) : null}
 
-              {currentBmi != null && bmiInfo ? (
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ${bmiInfo.bg} ${bmiInfo.color}`}
-                >
-                  IMC {currentBmi} · {bmiInfo.label}
-                </span>
-              ) : null}
+                  {currentBmi != null && bmiInfo ? (
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ${bmiInfo.bg} ${bmiInfo.color}`}
+                      title="L'IMC est un indicateur général qui doit être interprété dans son contexte."
+                    >
+                      IMC {currentBmi} · {bmiInfo.label}
+                    </span>
+                  ) : null}
 
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground">
-                Plan {formatPlanLabel(displayedPlan)}
-              </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground">
+                    Plan {formatPlanLabel(displayedPlan)}
+                  </span>
 
-              {isBasic && sportLimit ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-700 dark:text-amber-300">
-                  <Bike className="h-4 w-4" />
-                  {sportLimit} séances incluses
-                </span>
-              ) : null}
+                  {isBasic && sportLimit ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-700 dark:text-amber-300">
+                      <Bike className="h-4 w-4" />
+                      {sportLimit} séances incluses
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              <Link
+                to="/subscriber/profile"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border bg-background/80 px-4 py-2 text-sm font-medium transition-colors hover:bg-background"
+              >
+                <UserRound className="h-4 w-4" />
+                Mon profil
+              </Link>
             </div>
           </div>
         </section>
 
-        {(weightKg != null ||
-          targetWeightKg != null ||
-          dailyKcalTarget != null ||
-          currentBmi != null) && (
-          <section className="rounded-3xl border bg-card p-5 shadow-sm">
+        <section className="rounded-3xl border border-primary/15 bg-primary/[0.04] p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-primary">Prochaine étape</p>
+              <h2 className="mt-1 text-xl font-semibold">{primaryAction.title}</h2>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{primaryAction.text}</p>
+            </div>
+            <Button asChild className="w-full rounded-2xl sm:w-auto">
+              <Link to={primaryAction.to}>
+                {primaryAction.label}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </section>
+
+        {(weightKg != null || targetWeightKg != null || dailyKcalTarget != null || currentBmi != null) && (
+          <section className="rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
             <div className="mb-4 flex items-center gap-2">
               <Target className="h-5 w-5 text-primary" />
               <h2 className="font-semibold">Mes objectifs</h2>
@@ -202,30 +253,14 @@ function HomeContent() {
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {weightKg != null ? (
-                <MetricCard
-                  label="Poids actuel"
-                  value={`${weightKg} kg`}
-                  hint="Mesure actuelle"
-                />
+                <MetricCard label="Poids actuel" value={`${weightKg} kg`} hint="Mesure actuelle" />
               ) : null}
-
               {targetWeightKg != null ? (
-                <MetricCard
-                  label="Poids cible"
-                  value={`${targetWeightKg} kg`}
-                  hint="Objectif défini"
-                  highlight
-                />
+                <MetricCard label="Poids cible" value={`${targetWeightKg} kg`} hint="Objectif défini" highlight />
               ) : null}
-
               {currentBmi != null ? (
-                <MetricCard
-                  label="IMC actuel"
-                  value={`${currentBmi}`}
-                  hint={bmiInfo?.label ?? "Indice de masse corporelle"}
-                />
+                <MetricCard label="IMC actuel" value={`${currentBmi}`} hint="Repère indicatif" />
               ) : null}
-
               {dailyKcalTarget != null ? (
                 <MetricCard
                   label="Calories / jour"
@@ -236,21 +271,27 @@ function HomeContent() {
               ) : null}
             </div>
 
-            {weightDiff !== null && weightDiff !== 0 ? (
+            {weightDiff !== null ? (
               <div className="mt-4 flex items-start gap-2 rounded-2xl bg-muted/40 px-4 py-3">
                 <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
-                  Il vous reste{" "}
-                  <span className="font-semibold text-foreground">
-                    {Math.abs(weightDiff)} kg
-                  </span>{" "}
-                  {weightDiff > 0 ? "à perdre" : "à prendre"} pour atteindre votre objectif.
+                  {weightDiff === 0 ? (
+                    <>
+                      Votre objectif de poids est atteint. Continuez à suivre votre progression.
+                    </>
+                  ) : (
+                    <>
+                      Il vous reste{" "}
+                      <span className="font-semibold text-foreground">{Math.abs(weightDiff)} kg</span>{" "}
+                      {weightDiff > 0 ? "à perdre" : "à prendre"} pour atteindre votre objectif.
+                    </>
+                  )}
                 </p>
               </div>
             ) : null}
 
             <p className="mt-4 text-xs text-muted-foreground">
-              Contactez votre coach pour ajuster vos objectifs.
+              Ces indicateurs sont des repères généraux. Contactez votre professionnel de santé pour les interpréter dans votre contexte.
             </p>
           </section>
         )}
@@ -291,7 +332,7 @@ function HomeContent() {
           />
         </section>
 
-        <section className="grid gap-4 md:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SecondaryModuleCard
             icon={<UtensilsCrossed className="h-5 w-5" />}
             title="Recettes"
@@ -390,7 +431,9 @@ function PrimaryModuleCard({
   const content = (
     <div
       className={`rounded-3xl border p-5 shadow-sm transition-all ${
-        active ? "bg-card hover:shadow-md" : "bg-muted/30 opacity-80"
+        active
+          ? "bg-card hover:-translate-y-0.5 hover:shadow-md"
+          : "bg-muted/30 opacity-80"
       }`}
     >
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -459,8 +502,8 @@ function SecondaryModuleCard({
     <div
       className={`rounded-3xl border p-4 shadow-sm transition-all ${
         isLocked
-          ? "bg-muted/25 opacity-55 grayscale"
-          : "bg-card hover:shadow-sm"
+          ? "bg-muted/25 opacity-60 grayscale"
+          : "bg-card hover:-translate-y-0.5 hover:shadow-md"
       }`}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -475,9 +518,7 @@ function SecondaryModuleCard({
         {isLocked ? <Lock className="h-4 w-4 text-muted-foreground" /> : null}
       </div>
 
-      <p className="mb-4 min-h-[48px] text-sm text-muted-foreground">
-        {text}
-      </p>
+      <p className="mb-4 min-h-[48px] text-sm text-muted-foreground">{text}</p>
 
       {isLocked ? (
         <div className="mb-3 inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
@@ -487,7 +528,7 @@ function SecondaryModuleCard({
       ) : null}
 
       <Button variant="outline" className="w-full rounded-2xl" disabled>
-        {isLocked ? lockedLabel : "Disponible"}
+        {isLocked ? lockedLabel : "Bientôt disponible"}
       </Button>
     </div>
   );
