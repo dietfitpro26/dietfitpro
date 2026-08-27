@@ -20,15 +20,19 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { MacroCalculator } from "@/components/MacroCalculator";
 import { Switch } from "@/components/ui/switch";
+import { BodyMetricsChart, MetricKey } from "@/components/BodyMetricsChart";
 
 export const Route = createFileRoute("/pro/patients/$patientId")({
-  head: () => ({ meta: [{ title: "Fiche patient — DietFitPro" }] }),
-  component: PatientDetailPage,
+  head: () => ({ meta: [{ title: "TEST fiche patient — DietFitPro" }] }),
+  component: () => (
+    <div className="p-10 text-2xl font-bold text-red-600">
+      TEST — La route fiche complète fonctionne
+    </div>
+  ),
 });
 
 // ── Interfaces ────────────────────────────────────────────
@@ -121,6 +125,13 @@ const ACCESS_FEATURES: {
   { key: "access_premium_content",    label: "Contenu premium",     description: "Accès au contenu exclusif du feed",         icon: "⭐" },
   { key: "access_ai_coach",           label: "Coach IA",            description: "Utilisation du coach nutritionnel IA",      icon: "🤖" },
 ];
+
+// Regroupement des métriques disponibles pour chacun des 3 blocs de courbes
+// de l'onglet Évolution. On garde exactement la même répartition visuelle
+// que l'ancienne version (3 cartes), seul le rendu du graphique change.
+const WEIGHT_METRICS: MetricKey[] = ["weight_kg", "bmi"];
+const COMPOSITION_METRICS: MetricKey[] = ["body_fat_pct", "muscle_mass_kg", "metabolic_age", "visceral_fat"];
+const MENSURATION_METRICS: MetricKey[] = ["waist_cm", "hip_cm", "arm_cm", "thigh_cm", "chest_cm"];
 
 function calcBmi(weight: number | null, height: number | null): string {
   if (!weight || !height) return "—";
@@ -323,6 +334,17 @@ function PatientDetailContent() {
   const goal = patient.goal ? (GOAL_LABEL[patient.goal] ?? "—") : "—";
   const bmi = calcBmi(patient.weight_kg, patient.height_cm);
 
+  // Données formatées pour BodyMetricsChart : on injecte height_cm sur chaque
+  // point pour permettre le calcul auto de l'IMC dans le composant.
+  const chartData = measurements.map((m) => ({ ...m, height_cm: patient.height_cm }));
+
+  const hasCompositionData = measurements.some(
+    (m) => m.body_fat_pct || m.muscle_mass_kg || m.metabolic_age || m.visceral_fat
+  );
+  const hasMensurationData = measurements.some(
+    (m) => m.waist_cm || m.hip_cm || m.arm_cm || m.thigh_cm || m.chest_cm
+  );
+
   return (
     <div className="flex flex-col">
       {/* HEADER */}
@@ -413,68 +435,36 @@ function PatientDetailContent() {
                 <Card>
                   <CardHeader className="pb-2"><CardTitle className="text-base">⚖️ Poids & IMC</CardTitle></CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <LineChart data={measurements.map((m) => ({
-                        date: new Date(m.measured_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }),
-                        Poids: m.weight_kg,
-                        IMC: m.weight_kg && patient.height_cm ? parseFloat(calcBmi(m.weight_kg, patient.height_cm)) : null,
-                      }))}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                        <YAxis yAxisId="left" tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
-                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
-                        <Tooltip /><Legend />
-                        <Line yAxisId="left" type="monotone" dataKey="Poids" stroke="#6DB33F" strokeWidth={2} dot={{ r: 4 }} unit=" kg" />
-                        <Line yAxisId="right" type="monotone" dataKey="IMC" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
-                        {patient.target_weight_kg && (
-                          <Line yAxisId="left" type="monotone" dataKey={() => patient.target_weight_kg} stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="5 5" dot={false} name="Objectif" unit=" kg" />
-                        )}
-                      </LineChart>
-                    </ResponsiveContainer>
+                    <BodyMetricsChart
+                      data={chartData}
+                      availableMetrics={WEIGHT_METRICS}
+                      height={220}
+                    />
                   </CardContent>
                 </Card>
-                {measurements.some((m) => m.body_fat_pct || m.muscle_mass_kg || m.metabolic_age || m.visceral_fat) && (
+
+                {hasCompositionData && (
                   <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-base">💪 Composition corporelle</CardTitle></CardHeader>
                     <CardContent>
-                      <ResponsiveContainer width="100%" height={220}>
-                        <LineChart data={measurements.map((m) => ({
-                          date: new Date(m.measured_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }),
-                          "% Graisse": m.body_fat_pct, "Masse musc. (kg)": m.muscle_mass_kg,
-                          "Âge métabo.": m.metabolic_age, "Graisse visc.": m.visceral_fat,
-                        }))}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                          <YAxis tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
-                          <Tooltip /><Legend />
-                          <Line type="monotone" dataKey="% Graisse" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="Masse musc. (kg)" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="Âge métabo." stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="Graisse visc." stroke="#ec4899" strokeWidth={2} dot={{ r: 3 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
+                      <BodyMetricsChart
+                        data={chartData}
+                        availableMetrics={COMPOSITION_METRICS}
+                        height={220}
+                      />
                     </CardContent>
                   </Card>
                 )}
-                {measurements.some((m) => m.waist_cm || m.hip_cm || m.arm_cm || m.thigh_cm) && (
+
+                {hasMensurationData && (
                   <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-base">📏 Mensurations (cm)</CardTitle></CardHeader>
                     <CardContent>
-                      <ResponsiveContainer width="100%" height={200}>
-                        <LineChart data={measurements.map((m) => ({
-                          date: new Date(m.measured_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }),
-                          "Taille": m.waist_cm, "Hanches": m.hip_cm, "Bras": m.arm_cm, "Cuisse": m.thigh_cm,
-                        }))}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                          <YAxis tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
-                          <Tooltip /><Legend />
-                          <Line type="monotone" dataKey="Taille" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="Hanches" stroke="#ec4899" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="Bras" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="Cuisse" stroke="#14b8a6" strokeWidth={2} dot={{ r: 3 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
+                      <BodyMetricsChart
+                        data={chartData}
+                        availableMetrics={MENSURATION_METRICS}
+                        height={200}
+                      />
                     </CardContent>
                   </Card>
                 )}

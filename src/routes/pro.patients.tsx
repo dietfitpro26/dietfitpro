@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Search, UserPlus, Bell, RefreshCw, Users } from "lucide-react";
+import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { Search, UserPlus, Bell, RefreshCw, Users, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { PatientQuickPanel } from "@/components/patients/PatientQuickPanel";
 import { ProLayout } from "@/layouts/ProLayout";
@@ -178,6 +178,12 @@ function PatientsContent() {
     setRefreshing(false);
   }
 
+  // Ouvre la fiche patient complète (page dédiée avec tous les onglets :
+  // Évolution, Infos, Programmes, Mesures, RDV, Accès).
+  function openFullProfile(patientId: string) {
+    void navigate({ to: "/pro/patients/$patientId", params: { patientId } });
+  }
+
   return (
     <div className="min-h-full bg-gradient-to-b from-background to-muted/20">
       <header className="border-b bg-card/95 px-4 py-5 shadow-sm backdrop-blur sm:px-6">
@@ -286,6 +292,7 @@ function PatientsContent() {
                   <TableHead>Objectif</TableHead>
                   <TableHead>Dernier rendez-vous</TableHead>
                   <TableHead>Statut</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -293,7 +300,7 @@ function PatientsContent() {
                 {filtered === null ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
-                      {Array.from({ length: 6 }).map((__, cellIndex) => (
+                      {Array.from({ length: 7 }).map((__, cellIndex) => (
                         <TableCell key={cellIndex}>
                           <Skeleton className="h-5 w-full" />
                         </TableCell>
@@ -303,7 +310,7 @@ function PatientsContent() {
                 ) : filtered.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="py-16 text-center text-muted-foreground"
                     >
                       <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
@@ -371,6 +378,23 @@ function PatientsContent() {
                           >
                             {patient.is_active ? "Actif" : "Inactif"}
                           </span>
+                        </TableCell>
+
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="rounded-lg"
+                            onClick={(event) => {
+                              // Empêche le clic sur la ligne (qui ouvre la
+                              // fiche rapide) de se déclencher en même temps.
+                              event.stopPropagation();
+                              openFullProfile(patient.id);
+                            }}
+                          >
+                            <FileText className="mr-1.5 h-3.5 w-3.5" />
+                            Fiche complète
+                          </Button>
                         </TableCell>
                       </TableRow>
                     );
