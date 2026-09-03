@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,13 +12,15 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { email, patient_id, pro_id, role, redirect_to } = await req.json();
-
-    // ✅ patient_id n'est plus obligatoire (abonnés sans fiche patient)
-    if (!email || !pro_id) {
+    // ──────────────────────────────────────────────────────────
+    // 1. AUTHENTIFICATION DE L'APPELANT
+    // ──────────────────────────────────────────────────────────
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const jwt = authHeader.replace("Bearer ", "");
+    if (!jwt) {
       return new Response(
-        JSON.stringify({ error: "Paramètres manquants (email et pro_id requis)" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Non autorisé — token manquant" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -28,18 +30,58 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
+    // Vérifier le JWT et récupérer l'utilisateur
+    const { data: { user: caller }, error: callerErr } = await supabaseAdmin.auth.getUser(jwt);
+    if (callerErr || !caller) {
+      return new Response(
+        JSON.stringify({ error: "Non autorisé — token invalide" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 2. VÉRIFIER QUE L'APPELANT EST UN PRO
+    // ──────────────────────────────────────────────────────────
+    const { data: callerProfile, error: profileErr } = await supabaseAdmin
+      .from("profiles")
+      .select("role")
+      .eq("id", caller.id)
+      .maybeSingle();
+
+    if (profileErr || !callerProfile || callerProfile.role !== "pro") {
+      return new Response(
+        JSON.stringify({ error: "Non autorisé — seuls les professionnels peuvent envoyer des invitations" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 3. PARAMÈTRES DU BODY (pro_id forcé au caller)
+    // ──────────────────────────────────────────────────────────
+    const { email, patient_id, redirect_to } = await req.json();
+    const pro_id = caller.id; // ⚠️ FORCÉ — on ignore tout pro_id du body
+
+    if (!email) {
+      return new Response(
+        JSON.stringify({ error: "Paramètre manquant (email requis)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const appUrl = Deno.env.get("APP_URL") ?? "http://localhost:8080";
     const finalRedirect = redirect_to ?? `${appUrl}/bienvenue`;
 
-    // ✅ Si role est passé → on l'utilise, sinon :
-    //    patient_id présent → "patient", sinon → "subscriber"
-    const finalRole: string = role ?? (patient_id ? "patient" : "subscriber");
+    // ⚠️ Le rôle est TOUJOURS déterminé côté serveur — jamais par le client
+    const finalRole: string = patient_id ? "patient" : "subscriber";
 
+    // ──────────────────────────────────────────────────────────
+    // 4. INVITATION + ÉCRITURES
+    // ──────────────────────────────────────────────────────────
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: {
-        pro_id,                                          // ✅ toujours présent
-        role: finalRole,                                 // ✅ rôle correct
-        ...(patient_id ? { patient_id } : {}),           // ✅ optionnel
+        pro_id,
+        role: finalRole,
+        ...(patient_id ? { patient_id } : {}),
       },
       redirectTo: finalRedirect,
     });
@@ -55,7 +97,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ✅ Si patient → met à jour user_id dans la table patients
     if (patient_id && data.user?.id) {
       await supabaseAdmin
         .from("patients")
@@ -63,7 +104,6 @@ Deno.serve(async (req) => {
         .eq("id", patient_id);
     }
 
-    // ✅ Double sécurité : écrit pro_id + role dans profiles immédiatement
     if (data.user?.id) {
       await supabaseAdmin
         .from("profiles")
