@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 
+
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
@@ -20,15 +21,16 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+
 function LoginPage() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
 
   const handleSignIn = async (event: FormEvent) => {
     event.preventDefault();
@@ -38,11 +40,9 @@ function LoginPage() {
     try {
       await signIn(email.trim(), password);
       
-      // ✅ Récupérer la session et le profil pour rediriger
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session) {
-        // Récupérer le profil pour connaître le rôle
         const { data: profile } = await supabase
           .from("profiles")
           .select("role")
@@ -51,7 +51,6 @@ function LoginPage() {
         
         const userRole = profile?.role as "pro" | "patient" | "subscriber" | null;
         
-        // ✅ Rediriger selon le rôle
         if (userRole === "pro") {
           void navigate({ to: "/pro/dashboard" });
         } else if (userRole === "patient") {
@@ -67,39 +66,6 @@ function LoginPage() {
     }
   };
 
-  const handleInvitation = async (event: FormEvent) => {
-    event.preventDefault();
-    setError(null);
-    const trimmedCode = code.trim().toUpperCase();
-
-    if (trimmedCode.length !== 8) {
-      setError("Le code d'invitation doit contenir 8 caractères.");
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      await signIn(email.trim(), password);
-
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!userData.user) throw new Error("Connexion impossible.");
-
-      const { error: invitationError } = await supabase.rpc("activate_invitation_code", {
-        p_code: trimmedCode,
-      });
-
-      if (invitationError) throw invitationError;
-
-      // ✅ Nouveau patient avec code → /patient/dashboard
-      void navigate({ to: "/patient/dashboard" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur lors de l'activation du compte");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
@@ -115,9 +81,8 @@ function LoginPage() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="login">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-1">
                 <TabsTrigger value="login">Connexion</TabsTrigger>
-                <TabsTrigger value="invitation">Code d'invitation</TabsTrigger>
               </TabsList>
               <TabsContent value="login" className="mt-4">
                 <form onSubmit={handleSignIn} className="space-y-4">
@@ -172,72 +137,6 @@ function LoginPage() {
                       S'inscrire
                     </Link>
                   </p>
-                </form>
-              </TabsContent>
-              <TabsContent value="invitation" className="mt-4">
-                <form onSubmit={handleInvitation} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email-inv">Email</Label>
-                    <Input
-                      id="email-inv"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      autoComplete="email"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password-inv">Mot de passe</Label>
-                    <div className="relative">
-                      <Input
-                        id="password-inv"
-                        type={showPassword ? "text" : "password"}
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        autoComplete="current-password"
-                      />
-                      <button
-                        type="button"
-                        className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
-                        onClick={() => setShowPassword((value) => !value)}
-                        aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
-                        disabled={submitting}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="code">Code d'invitation (8 caractères)</Label>
-                    <Input
-                      id="code"
-                      type="text"
-                      required
-                      maxLength={8}
-                      minLength={8}
-                      value={code}
-                      onChange={(e) => setCode(e.target.value.toUpperCase())}
-                      placeholder="ABCD1234"
-                      className="font-mono uppercase tracking-widest"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Saisissez le code fourni par votre coach pour activer votre compte patient.
-                    </p>
-                  </div>
-                  {error ? (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  ) : null}
-                  <Button type="submit" className="w-full" disabled={submitting}>
-                    {submitting ? "Validation…" : "Activer mon compte patient"}
-                  </Button>
                 </form>
               </TabsContent>
             </Tabs>
