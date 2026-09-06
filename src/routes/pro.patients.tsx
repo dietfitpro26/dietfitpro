@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Outlet,
+  useLocation,
+  useNavigate,
+} from "@tanstack/react-router";
 import { Search, UserPlus, Bell, RefreshCw, Users, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { PatientQuickPanel } from "@/components/patients/PatientQuickPanel";
@@ -72,10 +77,23 @@ function PatientsPage() {
   return (
     <ProtectedRoute allow={["pro"]}>
       <ProLayout>
-        <PatientsContent />
+        <PatientsRouteContent />
       </ProLayout>
     </ProtectedRoute>
   );
+}
+
+function PatientsRouteContent() {
+  const location = useLocation();
+  const isPatientDetailPage = /^\/pro\/patients\/[^/]+$/.test(
+    location.pathname,
+  );
+
+  if (isPatientDetailPage) {
+    return <Outlet />;
+  }
+
+  return <PatientsContent />;
 }
 
 function PatientsContent() {
@@ -178,8 +196,6 @@ function PatientsContent() {
     setRefreshing(false);
   }
 
-  // Ouvre la fiche patient complète (page dédiée avec tous les onglets :
-  // Évolution, Infos, Programmes, Mesures, RDV, Accès).
   function openFullProfile(patientId: string) {
     void navigate({ to: "/pro/patients/$patientId", params: { patientId } });
   }
@@ -386,8 +402,6 @@ function PatientsContent() {
                             size="sm"
                             className="rounded-lg"
                             onClick={(event) => {
-                              // Empêche le clic sur la ligne (qui ouvre la
-                              // fiche rapide) de se déclencher en même temps.
                               event.stopPropagation();
                               openFullProfile(patient.id);
                             }}

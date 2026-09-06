@@ -27,12 +27,10 @@ import { Switch } from "@/components/ui/switch";
 import { BodyMetricsChart, MetricKey } from "@/components/BodyMetricsChart";
 
 export const Route = createFileRoute("/pro/patients/$patientId")({
-  head: () => ({ meta: [{ title: "TEST fiche patient — DietFitPro" }] }),
-  component: () => (
-    <div className="p-10 text-2xl font-bold text-red-600">
-      TEST — La route fiche complète fonctionne
-    </div>
-  ),
+  head: () => ({
+    meta: [{ title: "Fiche patient — DietFitPro" }],
+  }),
+  component: PatientDetailPage,
 });
 
 // ── Interfaces ────────────────────────────────────────────
