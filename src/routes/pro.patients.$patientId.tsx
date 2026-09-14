@@ -1001,6 +1001,7 @@ function AddMeasureDialog({ open, onOpenChange, patient, proId, onSaved }: {
     setSaving(true);
     const { error } = await supabase.from("body_measurements").insert({
       patient_id: patient.id, user_id: patient.user_id ?? null,
+      created_by: proId,
       measured_at: date,
       weight_kg: weight ? Number(weight) : null,
       body_fat_pct: fat ? Number(fat) : null,
