@@ -26,6 +26,7 @@ import { MacroCalculator } from "@/components/MacroCalculator";
 import { Switch } from "@/components/ui/switch";
 import { BodyMetricsChart, MetricKey } from "@/components/BodyMetricsChart";
 
+import { PatientPlanControl } from "@/components/patients/PatientPlanControl";
 export const Route = createFileRoute("/pro/patients/$patientId")({
   head: () => ({
     meta: [{ title: "Fiche patient — DietFitPro" }],
@@ -182,9 +183,10 @@ function PatientDetailContent() {
       supabase.from("nutrition_programs")
         .select("id, name, is_active, start_date, end_date, daily_kcal_target")
         .eq("patient_id", patientRow.id).order("start_date", { ascending: false }),
-      supabase.from("sport_programs")
+      supabase.from("patient_sport_programs")
         .select("id, name, is_active, frequency_per_week, duration_min")
-        .eq("patient_id", patientRow.id).order("created_at", { ascending: false }),
+        .eq("patient_id", patientRow.id)
+        .order("created_at", { ascending: false }),
       supabase.from("body_measurements")
         .select("id, measured_at, weight_kg, body_fat_pct, muscle_mass_kg, metabolic_age, visceral_fat, waist_cm, hip_cm, arm_cm, thigh_cm, chest_cm, notes")
         .eq("patient_id", patientRow.id).order("measured_at", { ascending: true }),
@@ -287,7 +289,7 @@ function PatientDetailContent() {
     try {
       await supabase.from("body_measurements").delete().eq("patient_id", patientId);
       await supabase.from("nutrition_programs").delete().eq("patient_id", patientId);
-      await supabase.from("sport_programs").delete().eq("patient_id", patientId);
+      await supabase.from("patient_sport_programs").delete().eq("patient_id", patientId);
       await supabase.from("patient_documents").delete().eq("patient_id", patientId);
       if (patient?.user_id) {
         await supabase.from("appointments").delete().eq("patient_user_id", patient.user_id);
@@ -676,6 +678,10 @@ function PatientDetailContent() {
                 )}
               </CardHeader>
               <CardContent className="space-y-2">
+              <PatientPlanControl
+  patientUserId={patient.user_id}
+  patientName={`${patient.first_name} ${patient.last_name}`}
+/>
                 {accessLoading ? (
                   Array.from({ length: 7 }).map((_, i) => (
                     <Skeleton key={i} className="h-14 w-full rounded-lg" />
