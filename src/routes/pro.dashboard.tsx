@@ -165,7 +165,7 @@ function DashboardContent() {
             .eq("pro_id", user.id)
             .eq("is_active", true),
           supabase
-            .from("sport_programs")
+            .from("patient_sport_programs")
             .select("*", { count: "exact", head: true })
             .eq("pro_id", user.id)
             .eq("is_active", true),
@@ -306,13 +306,11 @@ function DashboardContent() {
     setUpdatingSubscriberId(subscriber.id);
 
     try {
-      const rights = PLAN_FEATURES[nextPlan];
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ plan: nextPlan })
-        .eq("id", subscriber.id)
-        .eq("pro_id", user.id);
-
+    const rights = PLAN_FEATURES[nextPlan];
+    const { error: profileError } = await supabase.rpc("set_patient_plan", {
+  p_patient_user_id: subscriber.id,
+  p_plan: nextPlan,
+});
       if (profileError) throw profileError;
 
       const overrideRows = Object.entries(rights).map(([feature_key, enabled]) => ({

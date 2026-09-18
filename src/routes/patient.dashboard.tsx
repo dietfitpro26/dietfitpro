@@ -18,6 +18,7 @@ import {
   Ruler,
   MessageCircle,
   Bell,
+  Crown,
 } from "lucide-react";
 import { PatientLayout } from "@/layouts/PatientLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -98,17 +99,45 @@ function DashboardContent() {
   const [patientLastName, setPatientLastName] = useState("");
   const [cancelling, setCancelling] = useState(false);
 
+  // Formule visible uniquement : Basic ou Premium.
+  // Le patient ne peut pas modifier sa formule depuis cette page.
+  const [patientPlan, setPatientPlan] = useState<"basic" | "premium">(
+    "basic",
+  );
+
   useEffect(() => {
     if (!user) return;
 
     void (async () => {
       const nowIso = new Date().toISOString();
 
-      const { data: patientRow } = await supabase
-        .from("patients")
-        .select("id, first_name, last_name")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      const [{ data: profilePlanRow, error: profilePlanError }, { data: patientRow }] =
+        await Promise.all([
+          supabase
+            .from("profiles")
+            .select("plan")
+            .eq("id", user.id)
+            .maybeSingle(),
+
+          supabase
+            .from("patients")
+            .select("id, first_name, last_name")
+            .eq("user_id", user.id)
+            .maybeSingle(),
+        ]);
+
+      if (profilePlanError) {
+        console.error(
+          "[PatientDashboard] Erreur chargement formule :",
+          profilePlanError,
+        );
+      } else {
+        setPatientPlan(
+          (profilePlanRow as { plan?: string } | null)?.plan === "premium"
+            ? "premium"
+            : "basic",
+        );
+      }
 
       const patient = patientRow as {
         id?: string;
@@ -290,6 +319,25 @@ function DashboardContent() {
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
                     <Activity className="h-4 w-4" />
                     Espace patient actif
+                  </span>
+
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold",
+                      patientPlan === "premium"
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                        : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
+                    )}
+                  >
+                    <Crown
+                      className={cn(
+                        "h-4 w-4",
+                        patientPlan === "premium"
+                          ? "text-amber-600"
+                          : "text-slate-500",
+                      )}
+                    />
+                    Formule {patientPlan === "premium" ? "Premium" : "Basic"}
                   </span>
 
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground">
@@ -506,7 +554,9 @@ function DashboardContent() {
                       onClick={handleCancelUpcoming}
                       disabled={!canCancelUpcoming || cancelling}
                     >
-                      {cancelling ? "Annulation..." : "Annuler le rendez-vous"}
+                      {cancelling
+                        ? "Annulation..."
+                        : "Annuler le rendez-vous"}
                     </Button>
                   </div>
                 </div>
