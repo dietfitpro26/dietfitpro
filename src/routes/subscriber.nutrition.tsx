@@ -1,5 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Utensils, Lock, Flame, Target, CheckCircle } from "lucide-react";
+import {
+  Utensils,
+  Lock,
+  Flame,
+  Target,
+  CheckCircle,
+} from "lucide-react";
 import { SubscriberLayout } from "@/layouts/SubscriberLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,31 +37,24 @@ function NutritionContent() {
   const { profile } = useAuth();
 
   const firstName = profile?.full_name?.split(" ")[0] ?? "vous";
-
-  // Vérification de l'accès : abonné actif (Basic ou Premium)
   const isSubscriber = profile?.role === "subscriber";
-  const isActive =
-    profile?.subscription_status === "active" ||
-    profile?.subscription_status === "trialing";
-  const isPremium = profile?.plan === "premium";
+  const isPremiumUser = isSubscriber && profile?.plan === "premium";
 
-  const hasAccess = isSubscriber && isActive;
-  const isPremiumUser = isSubscriber && isActive && isPremium;
-
-  if (!hasAccess) {
+  if (!isSubscriber) {
     return (
       <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
-        <div className="mx-auto max-w-5xl space-y-6">
+        <div className="mx-auto max-w-5xl">
           <Card className="rounded-3xl border shadow-sm">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
                   <Lock className="h-5 w-5" />
                 </div>
+
                 <div>
                   <CardTitle>Accès non disponible</CardTitle>
                   <CardDescription>
-                    Votre abonnement n'est pas actif. Veuillez contacter le support ou régulariser votre situation.
+                    Cette page est réservée aux abonnés DietFitPro.
                   </CardDescription>
                 </div>
               </div>
@@ -76,20 +75,27 @@ function NutritionContent() {
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                   <Utensils className="h-6 w-6" />
                 </div>
+
                 <div>
                   <CardTitle className="text-xl sm:text-2xl">
                     Nutrition
                   </CardTitle>
+
                   <CardDescription className="mt-1 text-sm sm:text-base">
                     Bonjour {firstName}, retrouvez ici votre cadre alimentaire,
-                    vos objectifs journaliers et votre organisation repas.
+                    vos objectifs journaliers et votre organisation des repas.
                   </CardDescription>
                 </div>
               </div>
-              {isPremiumUser && (
+
+              {isPremiumUser ? (
                 <div className="flex items-center gap-2 rounded-full bg-[#6DB33F]/10 px-3 py-1 text-xs font-medium text-[#2D7A1F]">
                   <CheckCircle className="h-4 w-4" />
                   Premium
+                </div>
+              ) : (
+                <div className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                  Basic
                 </div>
               )}
             </div>
@@ -100,20 +106,30 @@ function NutritionContent() {
           <InfoCard
             icon={<Flame className="h-5 w-5" />}
             title="Objectif kcal / jour"
-            value="À personnaliser"
-            subtitle="À relier ensuite à votre vrai plan"
+            value="À calculer"
+            subtitle="Calcul personnalisé à venir selon votre profil"
           />
+
           <InfoCard
             icon={<Target className="h-5 w-5" />}
-            title="Objectif nutrition"
-            value={isPremiumUser ? "Programme Premium" : "Programme Basic"}
-            subtitle={isPremiumUser ? "Fonctionnalités avancées" : "Version abonnés selon votre offre"}
+            title="Votre accompagnement"
+            value={
+              isPremiumUser
+                ? "Programme Premium"
+                : "Programme Basic"
+            }
+            subtitle={
+              isPremiumUser
+                ? "Programme personnalisé et suivi renforcé"
+                : "Programme général selon votre objectif"
+            }
           />
+
           <InfoCard
             icon={<Utensils className="h-5 w-5" />}
             title="Organisation repas"
             value="Matin · Midi · Soir"
-            subtitle="Collation si besoin"
+            subtitle="Collation selon vos besoins"
           />
         </div>
 
@@ -123,31 +139,34 @@ function NutritionContent() {
             items={[
               "Source de protéines",
               "Produit céréalier ou équivalent",
-              "Fruit ou laitage selon le plan",
+              "Fruit ou laitage selon le programme",
             ]}
           />
+
           <MealCard
             title="Déjeuner"
             items={[
               "Protéines",
-              "Féculents selon objectif",
-              "Légumes + matière grasse adaptée",
+              "Féculents selon votre objectif",
+              "Légumes et matière grasse adaptée",
             ]}
           />
+
           <MealCard
             title="Dîner"
             items={[
               "Repas structuré et digeste",
-              "Légumes systématiques",
-              "Répartition selon votre objectif kcal",
+              "Légumes à chaque repas",
+              "Répartition adaptée à votre objectif kcal",
             ]}
           />
+
           <MealCard
             title="Collation"
             items={[
-              "Seulement si prévue au plan",
-              "Protéines ou fruit selon besoin",
-              "Adaptée à votre journée",
+              "Uniquement si elle est prévue",
+              "Fruit ou source de protéines selon le besoin",
+              "Adaptée à l'organisation de votre journée",
             ]}
           />
         </div>
@@ -159,18 +178,24 @@ function NutritionContent() {
                 <CheckCircle className="h-5 w-5 text-[#6DB33F]" />
                 <CardTitle>Votre programme personnalisé</CardTitle>
               </div>
+
               <CardDescription>
-                Programme sur-mesure créé par David selon vos objectifs.
+                Votre programme Premium sera adapté à votre objectif, vos
+                mesures et vos préférences alimentaires.
               </CardDescription>
             </CardHeader>
+
             <CardContent>
               <div className="rounded-2xl border border-dashed bg-green-50 p-4 text-sm text-green-800">
-                <p className="font-semibold mb-2">✅ Inclus dans Premium :</p>
+                <p className="mb-2 font-semibold">
+                  Inclus dans Premium :
+                </p>
+
                 <ul className="space-y-1">
-                  <li>• Plan alimentaire personnalisé</li>
-                  <li>• Ajustements hebdomadaires</li>
-                  <li>• Recettes adaptées à vos goûts</li>
-                  <li>• Suivi et ajustements avec David</li>
+                  <li>• Plan alimentaire adapté à votre profil</li>
+                  <li>• Ajustements selon votre évolution</li>
+                  <li>• Prise en compte de vos goûts et contraintes</li>
+                  <li>• Suivi renforcé avec votre professionnel</li>
                 </ul>
               </div>
             </CardContent>
@@ -178,22 +203,33 @@ function NutritionContent() {
         ) : (
           <Card className="rounded-3xl border shadow-sm">
             <CardHeader>
-              <CardTitle>Programme Basic</CardTitle>
+              <CardTitle>Votre programme Basic</CardTitle>
+
               <CardDescription>
-                Programme général adapté à votre objectif.
+                Un cadre alimentaire général sera calculé selon votre objectif
+                et votre profil.
               </CardDescription>
             </CardHeader>
+
             <CardContent className="space-y-4">
               <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-                <p className="font-semibold mb-2">🥗 Programme Basic :</p>
+                <p className="mb-2 font-semibold">
+                  Inclus dans Basic :
+                </p>
+
                 <ul className="space-y-1">
-                  <li>• Structure de repas standard</li>
-                  <li>• Objectifs caloriques généraux</li>
+                  <li>• Structure de repas simple et équilibrée</li>
+                  <li>• Objectifs caloriques calculés selon votre profil</li>
                   <li>• Conseils nutritionnels de base</li>
+                  <li>• Programme général selon votre objectif</li>
                 </ul>
               </div>
-              <Button className="w-full rounded-2xl bg-[#6DB33F] text-white hover:bg-[#2D7A1F]" disabled>
-                Passer à Premium pour un programme personnalisé
+
+              <Button
+                className="w-full rounded-2xl bg-[#6DB33F] text-white hover:bg-[#2D7A1F]"
+                disabled
+              >
+                Programme personnalisé réservé à Premium
               </Button>
             </CardContent>
           </Card>
@@ -220,9 +256,14 @@ function InfoCard({
         <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
           {icon}
         </div>
+
         <div className="text-sm text-muted-foreground">{title}</div>
+
         <div className="mt-1 text-lg font-semibold">{value}</div>
-        <div className="mt-1 text-xs text-muted-foreground">{subtitle}</div>
+
+        <div className="mt-1 text-xs text-muted-foreground">
+          {subtitle}
+        </div>
       </CardContent>
     </Card>
   );
@@ -240,6 +281,7 @@ function MealCard({
       <CardHeader>
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
+
       <CardContent>
         <ul className="space-y-2 text-sm text-muted-foreground">
           {items.map((item) => (
