@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
-
+import { PENDING_PROFILE_KEY } from "@/routes/register";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -21,6 +21,33 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+// Si un profil nutrition (poids, taille, objectif, calculs BMR/TDEE...) a été
+// mis en attente lors de l'inscription (cas "confirmation email requise"),
+// on l'applique ici à la table profiles, une seule fois, puis on nettoie.
+async function applyPendingProfileIfAny(userId: string) {
+  if (typeof window === "undefined") return;
+
+  const raw = window.localStorage.getItem(PENDING_PROFILE_KEY);
+  if (!raw) return;
+
+  try {
+    const pendingProfile = JSON.parse(raw);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update(pendingProfile)
+      .eq("id", userId);
+
+    if (error) {
+      console.error("[login] Erreur application profil en attente :", error);
+      return; // on garde le pending en local, on retentera au prochain login
+    }
+
+    window.localStorage.removeItem(PENDING_PROFILE_KEY);
+  } catch (err) {
+    console.error("[login] Erreur lecture profil en attente :", err);
+  }
+}
 
 function LoginPage() {
   const { signIn } = useAuth();
@@ -30,7 +57,6 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
 
   const handleSignIn = async (event: FormEvent) => {
     event.preventDefault();
@@ -43,6 +69,10 @@ function LoginPage() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session) {
+        // Rattrapage : applique le profil nutrition resté en attente
+        // depuis une inscription qui nécessitait une confirmation email.
+        await applyPendingProfileIfAny(session.user.id);
+
         const { data: profile } = await supabase
           .from("profiles")
           .select("role")
@@ -65,7 +95,6 @@ function LoginPage() {
       setSubmitting(false);
     }
   };
-
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">

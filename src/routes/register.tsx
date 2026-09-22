@@ -14,6 +14,14 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
+import {
+  calculateNutritionProfile,
+  isMinor,
+  type ActivityLevel,
+  type Gender,
+  type NutritionGoal,
+} from "@/lib/nutritionCalc";
 
 export const Route = createFileRoute("/register")({
   head: () => ({
@@ -28,19 +36,18 @@ export const Route = createFileRoute("/register")({
   component: RegisterPage,
 });
 
-const GOALS = [
-  { value: "weight_loss", label: "🥗 Perte de poids" },
-  { value: "muscle_gain", label: "💪 Prise de masse" },
-  { value: "maintenance", label: "⚖️ Maintien du poids" },
-  { value: "general_health", label: "❤️ Santé générale" },
+const GOALS: { value: NutritionGoal; label: string }[] = [
+  { value: "perte_de_poids", label: "🥗 Perte de poids" },
+  { value: "prise_de_masse", label: "💪 Prise de masse" },
+  { value: "maintien", label: "⚖️ Maintien du poids" },
+  { value: "equilibre", label: "❤️ Santé générale" },
 ];
 
-const DAILY_KCAL: Record<string, number> = {
-  weight_loss: 1800,
-  muscle_gain: 2600,
-  maintenance: 2200,
-  general_health: 2000,
-};
+const ACTIVITY_LEVELS: { value: ActivityLevel; label: string; hint: string }[] = [
+  { value: "sedentaire", label: "🪑 Sédentaire", hint: "Bureau, peu ou pas de sport" },
+  { value: "actif", label: "🏃 Actif", hint: "Sport 2-3x / semaine" },
+  { value: "tres_actif", label: "🔥 Très actif", hint: "Sport 4-6x / semaine ou métier physique" },
+];
 
 function calcBMI(weight: number, height: number): number | null {
   if (!Number.isFinite(weight) || !Number.isFinite(height)) {
@@ -122,6 +129,42 @@ function getErrorMessage(error: unknown): string {
   return "Erreur inconnue pendant la création du compte.";
 }
 
+// Clé de stockage local temporaire : si l'email doit être confirmé avant la première
+// connexion, on garde le profil physique en attente pour le réinjecter au premier login.
+export const PENDING_PROFILE_KEY = "dietfitpro_pending_profile";
+
+// IMPORTANT : ces champs correspondent exactement aux colonnes existantes de la
+// table public.profiles ET sont autorisés par le trigger de sécurité
+// prevent_profile_security_changes(). Ne JAMAIS inclure ici : role, plan,
+// pro_id, subscription_status, stripe_customer_id, stripe_subscription_id.
+// Ces champs "sensibles" sont gérés uniquement via handle_new_user() à la
+// création, ou via set_patient_plan()/pro_set_subscriber_plan() après paiement.
+export interface PendingProfileData {
+  age: number;
+  gender: Gender | null;
+  weight_kg: number | null;
+  height_cm: number | null;
+  bmi: number | null;
+  goal: string;
+  activity_level: ActivityLevel | null;
+  is_pregnant_or_breastfeeding: boolean;
+  target_weight_kg: number | null;
+  program_start_date: string;
+  bmr_kcal: number | null;
+  tdee_kcal: number | null;
+  daily_kcal_target: number | null;
+  target_kcal: number | null;
+  target_protein_g: number | null;
+  target_carbs_g: number | null;
+  target_fat_g: number | null;
+  profile_complete: boolean;
+}
+
+function savePendingProfile(data: PendingProfileData) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(PENDING_PROFILE_KEY, JSON.stringify(data));
+}
+
 function RegisterPage() {
   const { signUp } = useAuth();
   const navigate = useNavigate();
@@ -135,10 +178,13 @@ function RegisterPage() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const [age, setAge] = useState("");
+  const [gender, setGender] = useState<Gender | "">("");
   const [weightKg, setWeightKg] = useState("");
   const [heightCm, setHeightCm] = useState("");
   const [targetWeightKg, setTargetWeightKg] = useState("");
-  const [goal, setGoal] = useState("");
+  const [goal, setGoal] = useState<NutritionGoal | "">("");
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel | "">("");
+  const [isPregnantOrBreastfeeding, setIsPregnantOrBreastfeeding] = useState(false);
   const [plan, setPlan] = useState<"basic" | "premium">("basic");
 
   const [error, setError] = useState<string | null>(null);
@@ -155,6 +201,33 @@ function RegisterPage() {
   );
   const targetBmiInfo =
     targetBmi !== null ? getBMILabel(targetBmi) : null;
+
+  const numericAgeForPreview = age ? Number(age) : null;
+  const isMinorProfile =
+    numericAgeForPreview !== null && Number.isFinite(numericAgeForPreview)
+      ? isMinor(numericAgeForPreview)
+      : false;
+
+  // Aperçu du calcul nutrition en direct, dès que tous les champs nécessaires sont remplis.
+  const nutritionPreview =
+    !isMinorProfile &&
+    weightKg &&
+    heightCm &&
+    age &&
+    gender &&
+    activityLevel &&
+    goal
+      ? calculateNutritionProfile({
+          weightKg: Number(weightKg),
+          heightCm: Number(heightCm),
+          age: Number(age),
+          gender: gender as Gender,
+          activityLevel: activityLevel as ActivityLevel,
+          goal: goal as NutritionGoal,
+          programStartDate: new Date().toISOString().slice(0, 10),
+          isPregnantOrBreastfeeding,
+        })
+      : null;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -194,6 +267,25 @@ function RegisterPage() {
       return;
     }
 
+    const numericAge = age ? Number(age) : null;
+
+    if (numericAge === null) {
+      setError("Veuillez renseigner votre âge.");
+      return;
+    }
+
+    if (!isMinor(numericAge)) {
+      if (!gender) {
+        setError("Veuillez indiquer votre sexe (nécessaire pour calculer vos besoins caloriques).");
+        return;
+      }
+
+      if (!activityLevel) {
+        setError("Veuillez sélectionner votre niveau d'activité physique.");
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
@@ -202,44 +294,92 @@ function RegisterPage() {
       const targetWeight = targetWeightKg
         ? Number(targetWeightKg)
         : null;
-      const numericAge = age ? Number(age) : null;
 
       const currentBmi =
         weight !== null && height !== null
           ? calcBMI(weight, height)
           : null;
 
-      const calculatedTargetBmi =
-        targetWeight !== null && height !== null
-          ? calcBMI(targetWeight, height)
-          : null;
+      const programStartDate = new Date().toISOString().slice(0, 10);
 
-      const result = await signUp(cleanEmail, password, {
-        full_name: cleanName,
-        role: "subscriber",
+      // Cas mineur : pas de calcul Black et al., profil marqué incomplet
+      // pour déclencher un suivi manuel côté Pro.
+      const minor = isMinor(numericAge);
+
+      const nutrition = minor
+        ? null
+        : calculateNutritionProfile({
+            weightKg: weight ?? 0,
+            heightCm: height ?? 0,
+            age: numericAge,
+            gender: gender as Gender,
+            activityLevel: activityLevel as ActivityLevel,
+            goal: goal as NutritionGoal,
+            programStartDate,
+            isPregnantOrBreastfeeding,
+          });
+
+      // NOTE IMPORTANTE : "plan" n'est jamais envoyé ici. Le compte est
+      // toujours créé en "basic" par handle_new_user() (sécurité anti-triche
+      // côté base). Le passage en Premium se fera après paiement confirmé,
+      // via le flux de paiement existant (Stripe / set_patient_plan).
+      const profileUpdate: PendingProfileData = {
         age: numericAge,
+        gender: minor ? null : (gender as Gender),
         weight_kg: weight,
         height_cm: height,
         bmi: currentBmi,
         goal,
+        activity_level: minor ? null : (activityLevel as ActivityLevel),
+        is_pregnant_or_breastfeeding: minor ? false : isPregnantOrBreastfeeding,
         target_weight_kg: targetWeight,
-        target_bmi: calculatedTargetBmi,
-        daily_kcal_target: DAILY_KCAL[goal],
-        plan,
-        profile_complete: true, // ✅ Profil complet par défaut pour subscribers
+        program_start_date: programStartDate,
+        bmr_kcal: nutrition?.bmrKcal ?? null,
+        tdee_kcal: nutrition?.tdeeKcal ?? null,
+        daily_kcal_target: nutrition?.targetKcal ?? null,
+        target_kcal: nutrition?.targetKcal ?? null,
+        target_protein_g: nutrition?.targetProteinG ?? null,
+        target_carbs_g: nutrition?.targetCarbsG ?? null,
+        target_fat_g: nutrition?.targetFatG ?? null,
+        profile_complete: !minor,
+      };
+
+      const result = await signUp(cleanEmail, password, {
+        full_name: cleanName,
       });
 
-      setSuccess(true);
-
       if (result.data.session) {
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update(profileUpdate)
+          .eq("id", result.data.session.user.id);
+
+        if (updateError) {
+          console.error("[register] Erreur mise à jour profil :", updateError);
+          setError(getErrorMessage(updateError));
+          setSubmitting(false);
+          return;
+        }
+
+        setSuccess(true);
+
+        // Si l'utilisateur a choisi Premium, on le redirige vers le paiement
+        // au lieu de /home directement. Le plan ne sera activé qu'après
+        // confirmation du paiement (voir patient.pay.$consultationId.tsx ou
+        // équivalent abonné).
         window.setTimeout(() => {
-          // ✅ Rediriger vers /home pour les subscribers
-          void navigate({ to: "/home" });
+          if (plan === "premium") {
+            void navigate({ to: "/home" }); // TODO: rediriger vers la page de paiement Premium quand elle existe
+          } else {
+            void navigate({ to: "/home" });
+          }
         }, 1000);
 
         return;
       }
 
+      savePendingProfile(profileUpdate);
+      setSuccess(true);
       setNeedsEmailConfirm(true);
     } catch (err) {
       console.error("[register] Erreur complète inscription :", err);
@@ -432,6 +572,10 @@ function RegisterPage() {
                 <p className="mt-2 text-center text-xs text-muted-foreground">
                   Sans engagement — Annulable à tout moment
                 </p>
+                <p className="mt-1 text-center text-xs text-muted-foreground">
+                  Votre compte démarre en formule Basic. Le passage en Premium
+                  sera confirmé après votre paiement.
+                </p>
               </div>
 
               <div className="border-t pt-4">
@@ -453,6 +597,67 @@ function RegisterPage() {
                   disabled={submitting || success}
                 />
               </div>
+
+              {isMinorProfile ? (
+                <Alert>
+                  <AlertDescription>
+                    Les moins de 18 ans nécessitent un accompagnement personnalisé.
+                    Après la création du compte, votre professionnel prendra contact
+                    avec vous directement pour établir votre programme.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label>Sexe</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setGender("homme")}
+                        disabled={submitting || success}
+                        className={`rounded-lg border px-4 py-2 text-center text-sm font-medium transition-all ${
+                          gender === "homme"
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                        }`}
+                      >
+                        👨 Homme
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGender("femme")}
+                        disabled={submitting || success}
+                        className={`rounded-lg border px-4 py-2 text-center text-sm font-medium transition-all ${
+                          gender === "femme"
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                        }`}
+                      >
+                        👩 Femme
+                      </button>
+                    </div>
+                  </div>
+
+                  {gender === "femme" ? (
+                    <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-3">
+                      <input
+                        id="pregnant"
+                        type="checkbox"
+                        checked={isPregnantOrBreastfeeding}
+                        onChange={(event) =>
+                          setIsPregnantOrBreastfeeding(event.target.checked)
+                        }
+                        disabled={submitting || success}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="pregnant" className="text-sm font-normal">
+                        Je suis enceinte ou j'allaite (facultatif — ajoute un bonus
+                        calorique adapté)
+                      </Label>
+                    </div>
+                  ) : null}
+                </>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -543,6 +748,32 @@ function RegisterPage() {
                 </div>
               ) : null}
 
+              {!isMinorProfile ? (
+                <div className="space-y-2">
+                  <Label>Niveau d'activité physique</Label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {ACTIVITY_LEVELS.map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => setActivityLevel(item.value)}
+                        disabled={submitting || success}
+                        className={`rounded-lg border px-3 py-2 text-left text-sm transition-all ${
+                          activityLevel === item.value
+                            ? "border-primary bg-primary/10 font-medium text-primary"
+                            : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                        }`}
+                      >
+                        {item.label}
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          — {item.hint}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="space-y-2">
                 <Label>Votre objectif principal</Label>
 
@@ -564,14 +795,27 @@ function RegisterPage() {
                   ))}
                 </div>
 
-                {goal ? (
-                  <p className="text-xs text-muted-foreground">
-                    Calories/jour estimées :{" "}
-                    <span className="font-medium text-foreground">
-                      {DAILY_KCAL[goal]} kcal
-                    </span>
-                  </p>
+                {nutritionPreview && nutritionPreview.warnings.length === 0 ? (
+                  <div className="space-y-1 rounded-lg border bg-muted/40 px-4 py-3">
+                    <p className="text-xs text-muted-foreground">
+                      Calories/jour estimées :{" "}
+                      <span className="font-medium text-foreground">
+                        {nutritionPreview.targetKcal} kcal
+                      </span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Protéines {nutritionPreview.targetProteinG}g — Glucides{" "}
+                      {nutritionPreview.targetCarbsG}g — Lipides{" "}
+                      {nutritionPreview.targetFatG}g
+                    </p>
+                  </div>
                 ) : null}
+
+                {nutritionPreview?.warnings.map((warning) => (
+                  <Alert key={warning}>
+                    <AlertDescription>{warning}</AlertDescription>
+                  </Alert>
+                ))}
               </div>
 
               {error ? (
