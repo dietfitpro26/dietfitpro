@@ -27,6 +27,7 @@ import { Switch } from "@/components/ui/switch";
 import { BodyMetricsChart, MetricKey } from "@/components/BodyMetricsChart";
 
 import { PatientPlanControl } from "@/components/patients/PatientPlanControl";
+import { AutoEvalPatientTab } from "@/components/patients/AutoEvalPatientTab";
 export const Route = createFileRoute("/pro/patients/$patientId")({
   head: () => ({
     meta: [{ title: "Fiche patient — DietFitPro" }],
@@ -406,6 +407,9 @@ function PatientDetailContent() {
             <TabsTrigger value="access">
               <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Accès & Options
             </TabsTrigger>
+            <TabsTrigger value="autoeval">
+              🎯 Auto-évaluation
+            </TabsTrigger>
           </TabsList>
 
           {/* ── ÉVOLUTION ── */}
@@ -722,6 +726,15 @@ function PatientDetailContent() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* ── AUTO-ÉVALUATION ── */}
+          <TabsContent value="autoeval" className="mt-4">
+            <AutoEvalPatientTab
+              userId={patient.user_id}
+              patientLabel={`${patient.first_name} ${patient.last_name}`}
+              proId={user?.id ?? ""}
+            />
           </TabsContent>
 
         </Tabs>

@@ -9,8 +9,10 @@ import {
   User,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { WeeklyCheckinDialog } from "@/components/gamification/WeeklyCheckinDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+
 
 type Tab = {
   to: string;
@@ -18,12 +20,14 @@ type Tab = {
   icon: React.ElementType;
 };
 
+
 const SUBSCRIBER_TABS: Tab[] = [
   { to: "/home", label: "Accueil", icon: Home },
   { to: "/subscriber/nutrition", label: "Nutrition", icon: Utensils },
   { to: "/subscriber/sport", label: "Sport", icon: Dumbbell },
   { to: "/progress", label: "Progression", icon: TrendingUp },
 ];
+
 
 export function SubscriberLayout({
   children,
@@ -37,10 +41,12 @@ export function SubscriberLayout({
   const navigate = useNavigate();
   const firstName = profile?.full_name?.split(" ")[0] ?? "";
 
+
   const handleSignOut = async () => {
     await signOut();
     void navigate({ to: "/login" });
   };
+
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -48,10 +54,12 @@ export function SubscriberLayout({
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
           <Logo />
 
+
           <div className="flex items-center gap-2 text-sm sm:gap-3">
             {firstName ? (
               <span className="hidden font-medium sm:inline">{firstName}</span>
             ) : null}
+
 
             {streak > 0 ? (
               <span
@@ -61,6 +69,7 @@ export function SubscriberLayout({
                 {streak} jours
               </span>
             ) : null}
+
 
             <Link
               to="/subscriber/profile"
@@ -73,6 +82,7 @@ export function SubscriberLayout({
             >
               <User className="h-4 w-4" />
             </Link>
+
 
             <button
               type="button"
@@ -90,7 +100,9 @@ export function SubscriberLayout({
         </div>
       </header>
 
+
       <main className="flex-1 pb-24">{children}</main>
+
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 shadow-[0_-4px_20px_rgba(0,0,0,0.04)] backdrop-blur">
         <div
@@ -101,6 +113,7 @@ export function SubscriberLayout({
             const active =
               pathname === tab.to || pathname.startsWith(`${tab.to}/`);
             const Icon = tab.icon;
+
 
             return (
               <Link
@@ -118,6 +131,7 @@ export function SubscriberLayout({
                   <span className="absolute top-0 h-0.5 w-10 rounded-full bg-[#6DB33F]" />
                 ) : null}
 
+
                 <Icon className="h-5 w-5" />
                 <span className="truncate">{tab.label}</span>
               </Link>
@@ -125,6 +139,9 @@ export function SubscriberLayout({
           })}
         </div>
       </nav>
+
+
+      <WeeklyCheckinDialog />
     </div>
   );
 }

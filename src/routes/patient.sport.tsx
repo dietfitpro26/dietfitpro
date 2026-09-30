@@ -5,7 +5,6 @@ import {
   Download,
   Dumbbell,
   FileText,
-  Lock,
   Sparkles,
   Target,
 } from "lucide-react";
@@ -122,7 +121,7 @@ function SportContent() {
     Record<string, Exercise[]>
   >({});
   const [schedule, setSchedule] = useState<ScheduleItem[]>(
-    DAYS.map((day) => ({ day, programId: null }))
+    DAYS.map((day) => ({ day, programId: null })),
   );
   const [docs, setDocs] = useState<PatientDocument[]>([]);
   const [proName, setProName] = useState("");
@@ -141,67 +140,87 @@ function SportContent() {
       setErrorMessage(null);
 
       try {
+        const { data: patientRow, error: patientError } = await supabase
+          .from("patients")
+          .select("id")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (patientError) {
+          throw patientError;
+        }
+
+        const patientId =
+          (patientRow as { id?: string } | null)?.id ?? null;
+
         const tiers: Array<"basic" | "premium"> = isPremium
           ? ["basic", "premium"]
           : ["basic"];
 
-        const [programsResponse, scheduleResponse, documentsResponse] =
-          await Promise.all([
-            supabase
-              .from("sport_programs")
-              .select(
-                "id, name, tier, location, level, duration_min, frequency_per_week, description, is_active"
-              )
-              .in("tier", tiers)
-              .eq("is_active", true)
-              .order("tier", { ascending: true })
-              .order("location", { ascending: true })
-              .order("level", { ascending: true })
-              .order("name", { ascending: true }),
+        const [programsResponse, scheduleResponse] = await Promise.all([
+          supabase
+            .from("sport_programs")
+            .select(
+              "id, name, tier, location, level, duration_min, frequency_per_week, description, is_active",
+            )
+            .in("tier", tiers)
+            .eq("is_active", true)
+            .order("tier", { ascending: true })
+            .order("location", { ascending: true })
+            .order("level", { ascending: true })
+            .order("name", { ascending: true }),
 
-            supabase
-              .from("user_sport_schedule")
-              .select("day_of_week, program_id")
-              .eq("user_id", userId)
-              .eq("is_active", true),
-
-            supabase
-              .from("patient_documents")
-              .select("id, title, file_url, file_name")
-              .eq("patient_id", userId)
-              .eq("category", "sport")
-              .order("created_at", { ascending: false }),
-          ]);
+          supabase
+            .from("user_sport_schedule")
+            .select("day_of_week, program_id")
+            .eq("user_id", userId)
+            .eq("is_active", true),
+        ]);
 
         if (programsResponse.error) {
           throw programsResponse.error;
-        }
-
-        const loadedPrograms = (programsResponse.data ?? []) as Program[];
-
-        if (!cancelled) {
-          setPrograms(loadedPrograms);
-          setDocs((documentsResponse.data ?? []) as PatientDocument[]);
-          setSchedule(
-            DAYS.map((day) => {
-              const row = scheduleResponse.data?.find(
-                (item) => item.day_of_week === day
-              );
-
-              return {
-                day,
-                programId: row?.program_id ?? null,
-              };
-            })
-          );
         }
 
         if (scheduleResponse.error) {
           console.error("Erreur planning patient :", scheduleResponse.error);
         }
 
-        if (documentsResponse.error) {
-          console.error("Erreur documents patient :", documentsResponse.error);
+        let loadedDocuments: PatientDocument[] = [];
+
+        if (patientId) {
+          const { data: documentsData, error: documentsError } =
+            await supabase
+              .from("patient_documents")
+              .select("id, title, file_url, file_name")
+              .eq("patient_id", patientId)
+              .eq("category", "sport")
+              .order("created_at", { ascending: false });
+
+          if (documentsError) {
+            console.error("Erreur documents patient :", documentsError);
+          } else {
+            loadedDocuments =
+              (documentsData as PatientDocument[] | null) ?? [];
+          }
+        }
+
+        const loadedPrograms = (programsResponse.data ?? []) as Program[];
+
+        if (!cancelled) {
+          setPrograms(loadedPrograms);
+          setDocs(loadedDocuments);
+          setSchedule(
+            DAYS.map((day) => {
+              const row = scheduleResponse.data?.find(
+                (item) => item.day_of_week === day,
+              );
+
+              return {
+                day,
+                programId: row?.program_id ?? null,
+              };
+            }),
+          );
         }
 
         if (loadedPrograms.length > 0) {
@@ -211,7 +230,7 @@ function SportContent() {
             await supabase
               .from("sport_exercises")
               .select(
-                "id, program_id, order_index, name, type, sets, reps, rest_sec, notes"
+                "id, program_id, order_index, name, type, sets, reps, rest_sec, notes",
               )
               .in("program_id", programIds)
               .order("program_id", { ascending: true })
@@ -232,6 +251,8 @@ function SportContent() {
 
             setExercisesByProgram(grouped);
           }
+        } else if (!cancelled) {
+          setExercisesByProgram({});
         }
 
         if (profile?.pro_id) {
@@ -243,16 +264,18 @@ function SportContent() {
 
           if (!cancelled) {
             setProName(
-              (proProfile as { full_name?: string } | null)?.full_name ?? ""
+              (proProfile as { full_name?: string } | null)?.full_name ?? "",
             );
           }
+        } else if (!cancelled) {
+          setProName("");
         }
       } catch (error) {
         console.error("Erreur chargement Sport patient :", error);
 
         if (!cancelled) {
           setErrorMessage(
-            "Impossible de charger vos programmes Sport pour le moment."
+            "Impossible de charger vos programmes Sport pour le moment.",
           );
         }
       } finally {
@@ -271,29 +294,31 @@ function SportContent() {
 
   const basicPrograms = useMemo(
     () => programs.filter((program) => program.tier === "basic"),
-    [programs]
+    [programs],
   );
 
   const premiumPrograms = useMemo(
     () => programs.filter((program) => program.tier === "premium"),
-    [programs]
+    [programs],
   );
 
   const updateDayProgram = async (
     day: string,
-    selectedValue: string
+    selectedValue: string,
   ) => {
     if (!userId) return;
 
     const programId =
       selectedValue === NO_PROGRAM_VALUE ? null : selectedValue;
+
     const previousSchedule = schedule;
 
     setSchedule((current) =>
       current.map((item) =>
-        item.day === day ? { ...item, programId } : item
-      )
+        item.day === day ? { ...item, programId } : item,
+      ),
     );
+
     setSavingDay(day);
 
     try {
@@ -304,7 +329,10 @@ function SportContent() {
           .eq("user_id", userId)
           .eq("day_of_week", day);
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
+
         return;
       }
 
@@ -317,10 +345,12 @@ function SportContent() {
             program_id: programId,
             is_active: true,
           },
-          { onConflict: "user_id,day_of_week" }
+          { onConflict: "user_id,day_of_week" },
         );
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
     } catch (error) {
       console.error("Erreur sauvegarde planning patient :", error);
       setSchedule(previousSchedule);
@@ -382,8 +412,11 @@ function SportContent() {
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 <Dumbbell className="h-6 w-6" />
               </div>
+
               <div>
-                <CardTitle className="text-xl sm:text-2xl">Sport</CardTitle>
+                <CardTitle className="text-xl sm:text-2xl">
+                  Sport
+                </CardTitle>
                 <CardDescription className="mt-1 text-sm sm:text-base">
                   Bonjour {profile?.full_name?.split(" ")[0] ?? "vous"}, voici
                   vos programmes et votre planning sportif.
@@ -398,14 +431,18 @@ function SportContent() {
             icon={<Target className="h-5 w-5" />}
             title="Programmes disponibles"
             value={`${programs.length} programme${programs.length > 1 ? "s" : ""}`}
-            subtitle={isPremium ? "3 Basic + 6 Premium" : "3 programmes Basic"}
+            subtitle={
+              isPremium ? "3 Basic + 6 Premium" : "3 programmes Basic"
+            }
           />
+
           <InfoCard
             icon={<Clock3 className="h-5 w-5" />}
             title="Ton planning"
             value={`${plannedDays} jour${plannedDays > 1 ? "s" : ""}`}
             subtitle="Programme choisi par jour"
           />
+
           <InfoCard
             icon={<FileText className="h-5 w-5" />}
             title="Documents"
@@ -414,26 +451,42 @@ function SportContent() {
           />
         </div>
 
-        {!isPremium ? (
-          <Card className="rounded-3xl border border-primary/20 bg-primary/5 shadow-sm">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Sparkles className="h-5 w-5 text-primary" />
-                <div>
-                  <CardTitle className="text-base">Formule Basic</CardTitle>
-                  <CardDescription>
-                    Votre professionnel peut activer Premium pour débloquer les
-                    6 programmes supplémentaires.
-                  </CardDescription>
-                </div>
+        <Card
+          className={
+            isPremium
+              ? "rounded-3xl border border-[#6DB33F]/30 bg-[#6DB33F]/5 shadow-sm"
+              : "rounded-3xl border border-primary/20 bg-primary/5 shadow-sm"
+          }
+        >
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Sparkles
+                className={
+                  isPremium
+                    ? "h-5 w-5 text-[#2D7A1F]"
+                    : "h-5 w-5 text-primary"
+                }
+              />
+
+              <div>
+                <CardTitle className="text-base">
+                  {isPremium ? "Premium actif" : "Formule Basic"}
+                </CardTitle>
+                <CardDescription>
+                  {isPremium
+                    ? "9 programmes disponibles : 3 programmes Basic et 6 programmes Premium. Organisez librement votre semaine dans votre planning."
+                    : "3 programmes Basic disponibles. Votre professionnel peut activer Premium pour débloquer 6 programmes supplémentaires."}
+                </CardDescription>
               </div>
-            </CardHeader>
-          </Card>
-        ) : null}
+            </div>
+          </CardHeader>
+        </Card>
 
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold">Ton planning de la semaine</h2>
+            <h2 className="text-lg font-semibold">
+              Ton planning de la semaine
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Choisis le programme que tu souhaites réaliser chaque jour.
             </p>
@@ -442,9 +495,10 @@ function SportContent() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {DAYS.map((day) => {
               const daySchedule = schedule.find((item) => item.day === day);
+
               const selectedProgram = daySchedule?.programId
                 ? programs.find(
-                    (program) => program.id === daySchedule.programId
+                    (program) => program.id === daySchedule.programId,
                   )
                 : null;
 
@@ -458,6 +512,7 @@ function SportContent() {
                         : "Jour de repos ou programme non défini"}
                     </CardDescription>
                   </CardHeader>
+
                   <CardContent>
                     <Select
                       value={daySchedule?.programId ?? NO_PROGRAM_VALUE}
@@ -469,13 +524,18 @@ function SportContent() {
                       <SelectTrigger className="w-full rounded-xl">
                         <SelectValue placeholder="Sélectionner un programme" />
                       </SelectTrigger>
+
                       <SelectContent>
                         <SelectItem value={NO_PROGRAM_VALUE}>
                           Aucun programme / repos
                         </SelectItem>
+
                         {programs.map((program) => (
                           <SelectItem key={program.id} value={program.id}>
-                            {program.name} · {program.tier === "premium" ? "Premium" : "Basic"}
+                            {program.name} ·{" "}
+                            {program.tier === "premium"
+                              ? "Premium"
+                              : "Basic"}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -515,6 +575,7 @@ function SportContent() {
               Pour une pratique progressive et adaptée.
             </CardDescription>
           </CardHeader>
+
           <CardContent>
             <p className="text-sm text-muted-foreground">
               Arrêtez l’exercice en cas de douleur, de malaise,
@@ -567,6 +628,7 @@ function ProgramSection({
   return (
     <div className="space-y-3">
       <h3 className="text-base font-medium">{title}</h3>
+
       <div className="grid gap-4 lg:grid-cols-2">
         {programs.map((program) => (
           <ProgramCard
@@ -600,6 +662,7 @@ function ProgramCard({
               {program.description ?? "Programme de renforcement progressif."}
             </CardDescription>
           </div>
+
           <span
             className={`rounded-full px-3 py-1 text-xs font-medium ${
               premium
@@ -615,12 +678,15 @@ function ProgramCard({
           <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
             {LOCATION_LABEL[program.location] ?? program.location}
           </span>
+
           <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
             {LEVEL_LABEL[program.level] ?? program.level}
           </span>
+
           <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
             {program.duration_min} min
           </span>
+
           <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
             {program.frequency_per_week}x / semaine
           </span>
@@ -694,6 +760,7 @@ function DocumentsCard({
               Fiches et documents PDF liés à votre suivi sportif.
             </CardDescription>
           </div>
+
           <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
             PDF
           </span>
@@ -713,6 +780,7 @@ function DocumentsCard({
                     {doc.title ?? doc.file_name ?? "Document sport"}
                   </div>
                 </div>
+
                 <Button
                   size="sm"
                   className="rounded-xl"

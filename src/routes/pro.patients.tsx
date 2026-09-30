@@ -39,9 +39,17 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import {
+  calculateNutritionProfile,
+  isMinor,
+  type ActivityLevel,
+  type Gender,
+  type NutritionGoal,
+} from "@/lib/nutritionCalc";
 
 export const Route = createFileRoute("/pro/patients")({
   head: () => ({ meta: [{ title: "Mes patients — DietFitPro" }] }),
@@ -66,11 +74,36 @@ const GOAL_LABEL: Record<string, string> = {
   perte_de_poids: "Perte de poids",
   prise_de_masse: "Prise de masse",
   maintien: "Maintien",
-  autre: "Autre",
+  equilibre: "Équilibre / santé générale",
 };
+
+const ACTIVITY_LEVELS: { value: ActivityLevel; label: string; hint: string }[] = [
+  { value: "sedentaire", label: "🪑 Sédentaire", hint: "Bureau, peu ou pas de sport" },
+  { value: "actif", label: "🏃 Actif", hint: "Sport 2-3x / semaine" },
+  { value: "tres_actif", label: "🔥 Très actif", hint: "Sport 4-6x / semaine ou métier physique" },
+];
 
 function getGoal(patient: PatientRow): string {
   return (patient.goal && GOAL_LABEL[patient.goal]) || "Non défini";
+}
+
+function computeAgeFromBirthDate(birthDate: string): number | null {
+  if (!birthDate) return null;
+
+  const birth = new Date(birthDate);
+  if (Number.isNaN(birth.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const hasNotHadBirthdayThisYear =
+    today.getMonth() < birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
+
+  if (hasNotHadBirthdayThisYear) {
+    age -= 1;
+  }
+
+  return age >= 0 ? age : null;
 }
 
 function PatientsPage() {
@@ -458,9 +491,61 @@ function NewPatientDialog({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [birthDate, setBirthDate] = useState("");
-  const [goal, setGoal] = useState("perte_de_poids");
+  const [gender, setGender] = useState<Gender | "">("");
+  const [weightKg, setWeightKg] = useState("");
+  const [heightCm, setHeightCm] = useState("");
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel | "">("");
+  const [isPregnantOrBreastfeeding, setIsPregnantOrBreastfeeding] = useState(false);
+  const [goal, setGoal] = useState<NutritionGoal>("perte_de_poids");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Champs éditables par le Pro : pré-remplis automatiquement par le calcul,
+  // mais ajustables avant validation (contrairement aux abonnés Premium où
+  // le calcul est appliqué automatiquement sans modification possible).
+  const [manualKcal, setManualKcal] = useState("");
+  const [manualProtein, setManualProtein] = useState("");
+  const [manualCarbs, setManualCarbs] = useState("");
+  const [manualFat, setManualFat] = useState("");
+  const [hasEditedManually, setHasEditedManually] = useState(false);
+
+  const age = useMemo(() => computeAgeFromBirthDate(birthDate), [birthDate]);
+  const isMinorPatient = age !== null ? isMinor(age) : false;
+
+  const nutritionSuggestion = useMemo(() => {
+    if (
+      isMinorPatient ||
+      age === null ||
+      !gender ||
+      !weightKg ||
+      !heightCm ||
+      !activityLevel
+    ) {
+      return null;
+    }
+
+    return calculateNutritionProfile({
+      weightKg: Number(weightKg),
+      heightCm: Number(heightCm),
+      age,
+      gender: gender as Gender,
+      activityLevel: activityLevel as ActivityLevel,
+      goal,
+      programStartDate: new Date().toISOString().slice(0, 10),
+      isPregnantOrBreastfeeding,
+    });
+  }, [age, isMinorPatient, gender, weightKg, heightCm, activityLevel, goal, isPregnantOrBreastfeeding]);
+
+  // Dès qu'une nouvelle suggestion est calculée, on pré-remplit les champs
+  // modifiables — sauf si le Pro a déjà commencé à les ajuster à la main.
+  useEffect(() => {
+    if (nutritionSuggestion && !hasEditedManually) {
+      setManualKcal(String(nutritionSuggestion.targetKcal));
+      setManualProtein(String(nutritionSuggestion.targetProteinG));
+      setManualCarbs(String(nutritionSuggestion.targetCarbsG));
+      setManualFat(String(nutritionSuggestion.targetFatG));
+    }
+  }, [nutritionSuggestion, hasEditedManually]);
 
   function reset() {
     setFirstName("");
@@ -468,8 +553,18 @@ function NewPatientDialog({
     setEmail("");
     setPhone("");
     setBirthDate("");
+    setGender("");
+    setWeightKg("");
+    setHeightCm("");
+    setActivityLevel("");
+    setIsPregnantOrBreastfeeding(false);
     setGoal("perte_de_poids");
     setNotes("");
+    setManualKcal("");
+    setManualProtein("");
+    setManualCarbs("");
+    setManualFat("");
+    setHasEditedManually(false);
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -484,6 +579,8 @@ function NewPatientDialog({
 
     setSubmitting(true);
 
+    const programStartDate = new Date().toISOString().slice(0, 10);
+
     const { data: inserted, error } = await supabase
       .from("patients")
       .insert({
@@ -496,6 +593,21 @@ function NewPatientDialog({
         medical_notes: notes.trim() || null,
         goal,
         is_active: true,
+        age,
+        gender: isMinorPatient ? null : gender || null,
+        weight_kg: weightKg ? Number(weightKg) : null,
+        height_cm: heightCm ? Number(heightCm) : null,
+        activity_level: isMinorPatient ? null : activityLevel || null,
+        is_pregnant_or_breastfeeding: isMinorPatient ? false : isPregnantOrBreastfeeding,
+        program_start_date: isMinorPatient ? null : programStartDate,
+        bmr_kcal: nutritionSuggestion?.bmrKcal ?? null,
+        tdee_kcal: nutritionSuggestion?.tdeeKcal ?? null,
+        // Les valeurs finales enregistrées sont celles ajustées par le Pro
+        // (manualKcal etc.), pas directement la suggestion automatique.
+        target_kcal: manualKcal ? Number(manualKcal) : null,
+        target_protein_g: manualProtein ? Number(manualProtein) : null,
+        target_carbs_g: manualCarbs ? Number(manualCarbs) : null,
+        target_fat_g: manualFat ? Number(manualFat) : null,
       })
       .select("id")
       .single();
@@ -552,7 +664,7 @@ function NewPatientDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nouveau patient</DialogTitle>
           <DialogDescription>
@@ -615,12 +727,126 @@ function NewPatientDialog({
                 value={birthDate}
                 onChange={(event) => setBirthDate(event.target.value)}
               />
+              {age !== null ? (
+                <p className="text-xs text-muted-foreground">{age} ans</p>
+              ) : null}
             </div>
           </div>
 
+          {isMinorPatient ? (
+            <Alert>
+              <AlertDescription>
+                Patient mineur (moins de 18 ans) : le calcul automatique
+                Black et al. ne s'applique pas. Renseignez ses besoins
+                caloriques manuellement si besoin, avec un suivi adapté.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <>
+              <div className="space-y-1">
+                <Label>Sexe</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setGender("homme")}
+                    className={cn(
+                      "rounded-lg border px-4 py-2 text-center text-sm font-medium transition-all",
+                      gender === "homme"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/50",
+                    )}
+                  >
+                    👨 Homme
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGender("femme")}
+                    className={cn(
+                      "rounded-lg border px-4 py-2 text-center text-sm font-medium transition-all",
+                      gender === "femme"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/50",
+                    )}
+                  >
+                    👩 Femme
+                  </button>
+                </div>
+              </div>
+
+              {gender === "femme" ? (
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-3">
+                  <input
+                    id="patient-pregnant"
+                    type="checkbox"
+                    checked={isPregnantOrBreastfeeding}
+                    onChange={(event) =>
+                      setIsPregnantOrBreastfeeding(event.target.checked)
+                    }
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="patient-pregnant" className="text-sm font-normal">
+                    Patiente enceinte ou allaitante (bonus calorique)
+                  </Label>
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="patient-weight">Poids actuel (kg)</Label>
+                  <Input
+                    id="patient-weight"
+                    type="number"
+                    min="30"
+                    max="300"
+                    step="0.1"
+                    value={weightKg}
+                    onChange={(event) => setWeightKg(event.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="patient-height">Taille (cm)</Label>
+                  <Input
+                    id="patient-height"
+                    type="number"
+                    min="100"
+                    max="250"
+                    step="0.5"
+                    value={heightCm}
+                    onChange={(event) => setHeightCm(event.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label>Niveau d'activité physique</Label>
+                <div className="grid grid-cols-1 gap-2">
+                  {ACTIVITY_LEVELS.map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setActivityLevel(item.value)}
+                      className={cn(
+                        "rounded-lg border px-3 py-2 text-left text-sm transition-all",
+                        activityLevel === item.value
+                          ? "border-primary bg-primary/10 font-medium text-primary"
+                          : "border-border bg-background text-muted-foreground hover:border-primary/50",
+                      )}
+                    >
+                      {item.label}
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        — {item.hint}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
           <div className="space-y-1">
             <Label htmlFor="patient-goal">Objectif</Label>
-            <Select value={goal} onValueChange={setGoal}>
+            <Select value={goal} onValueChange={(value) => setGoal(value as NutritionGoal)}>
               <SelectTrigger id="patient-goal">
                 <SelectValue />
               </SelectTrigger>
@@ -628,10 +854,94 @@ function NewPatientDialog({
                 <SelectItem value="perte_de_poids">Perte de poids</SelectItem>
                 <SelectItem value="prise_de_masse">Prise de masse</SelectItem>
                 <SelectItem value="maintien">Maintien</SelectItem>
-                <SelectItem value="autre">Autre</SelectItem>
+                <SelectItem value="equilibre">Équilibre / santé générale</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {!isMinorPatient && nutritionSuggestion ? (
+            <div className="space-y-2 rounded-2xl border bg-muted/40 p-3">
+              <p className="text-xs font-medium text-foreground">
+                Suggestion automatique (Black et al.) — modifiable ci-dessous
+              </p>
+              <p className="text-xs text-muted-foreground">
+                BMR {nutritionSuggestion.bmrKcal} kcal — TDEE{" "}
+                {nutritionSuggestion.tdeeKcal} kcal
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="manual-kcal" className="text-xs">
+                    Calories cibles/jour
+                  </Label>
+                  <Input
+                    id="manual-kcal"
+                    type="number"
+                    value={manualKcal}
+                    onChange={(event) => {
+                      setHasEditedManually(true);
+                      setManualKcal(event.target.value);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="manual-protein" className="text-xs">
+                    Protéines (g)
+                  </Label>
+                  <Input
+                    id="manual-protein"
+                    type="number"
+                    value={manualProtein}
+                    onChange={(event) => {
+                      setHasEditedManually(true);
+                      setManualProtein(event.target.value);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="manual-carbs" className="text-xs">
+                    Glucides (g)
+                  </Label>
+                  <Input
+                    id="manual-carbs"
+                    type="number"
+                    value={manualCarbs}
+                    onChange={(event) => {
+                      setHasEditedManually(true);
+                      setManualCarbs(event.target.value);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="manual-fat" className="text-xs">
+                    Lipides (g)
+                  </Label>
+                  <Input
+                    id="manual-fat"
+                    type="number"
+                    value={manualFat}
+                    onChange={(event) => {
+                      setHasEditedManually(true);
+                      setManualFat(event.target.value);
+                    }}
+                  />
+                </div>
+              </div>
+
+              {hasEditedManually ? (
+                <button
+                  type="button"
+                  className="text-xs text-primary underline"
+                  onClick={() => setHasEditedManually(false)}
+                >
+                  Revenir à la suggestion automatique
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="space-y-1">
             <Label htmlFor="patient-notes">Notes</Label>

@@ -22,12 +22,14 @@ import {
 } from "lucide-react";
 import { PatientLayout } from "@/layouts/PatientLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { LevelBadgesCard } from "@/components/gamification/LevelBadgesCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+
 
 export const Route = createFileRoute("/patient/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — DietFitPro" }] }),
@@ -40,6 +42,7 @@ export const Route = createFileRoute("/patient/dashboard")({
   ),
 });
 
+
 type Status =
   | "scheduled"
   | "completed"
@@ -47,12 +50,14 @@ type Status =
   | "refunded"
   | "no_show";
 
+
 type PayStatus =
   | "pending"
   | "paid"
   | "refunded"
   | "partial_refund"
   | "failed";
+
 
 interface Consultation {
   id: string;
@@ -65,6 +70,7 @@ interface Consultation {
   pro_id: string;
 }
 
+
 interface PatientDoc {
   id: string;
   title: string;
@@ -74,6 +80,7 @@ interface PatientDoc {
   created_at: string;
 }
 
+
 const STATUS_LABEL: Record<Status, string> = {
   scheduled: "Planifiée",
   completed: "Terminée",
@@ -82,9 +89,11 @@ const STATUS_LABEL: Record<Status, string> = {
   no_show: "Absent",
 };
 
+
 function DashboardContent() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+
 
   const [upcoming, setUpcoming] = useState<
     Consultation | null | undefined
@@ -99,17 +108,21 @@ function DashboardContent() {
   const [patientLastName, setPatientLastName] = useState("");
   const [cancelling, setCancelling] = useState(false);
 
+
   // Formule visible uniquement : Basic ou Premium.
   // Le patient ne peut pas modifier sa formule depuis cette page.
   const [patientPlan, setPatientPlan] = useState<"basic" | "premium">(
     "basic",
   );
 
+
   useEffect(() => {
     if (!user) return;
 
+
     void (async () => {
       const nowIso = new Date().toISOString();
+
 
       const [{ data: profilePlanRow, error: profilePlanError }, { data: patientRow }] =
         await Promise.all([
@@ -119,12 +132,14 @@ function DashboardContent() {
             .eq("id", user.id)
             .maybeSingle(),
 
+
           supabase
             .from("patients")
             .select("id, first_name, last_name")
             .eq("user_id", user.id)
             .maybeSingle(),
         ]);
+
 
       if (profilePlanError) {
         console.error(
@@ -139,16 +154,20 @@ function DashboardContent() {
         );
       }
 
+
       const patient = patientRow as {
         id?: string;
         first_name?: string;
         last_name?: string;
       } | null;
 
+
       const patientId = patient?.id ?? null;
+
 
       setPatientFirstName(patient?.first_name ?? "");
       setPatientLastName(patient?.last_name ?? "");
+
 
       const [upRes, histRes, nutriDocsRes, sportDocsRes] =
         await Promise.all([
@@ -162,6 +181,7 @@ function DashboardContent() {
             .gte("scheduled_at", nowIso)
             .order("scheduled_at", { ascending: true })
             .limit(1),
+
 
           supabase
             .from("visio_consultations")
@@ -178,6 +198,7 @@ function DashboardContent() {
             .order("scheduled_at", { ascending: false })
             .limit(10),
 
+
           patientId
             ? supabase
                 .from("patient_documents")
@@ -189,6 +210,7 @@ function DashboardContent() {
                 .order("created_at", { ascending: false })
                 .limit(3)
             : Promise.resolve({ data: [] }),
+
 
           patientId
             ? supabase
@@ -203,10 +225,13 @@ function DashboardContent() {
             : Promise.resolve({ data: [] }),
         ]);
 
+
       const next =
         (upRes.data?.[0] as Consultation | undefined) ?? null;
 
+
       setUpcoming(next);
+
 
       if (next?.pro_id) {
         const { data: professional } = await supabase
@@ -215,6 +240,7 @@ function DashboardContent() {
           .eq("id", next.pro_id)
           .maybeSingle();
 
+
         setProName(
           (professional as { full_name?: string } | null)?.full_name ?? "",
         );
@@ -222,27 +248,33 @@ function DashboardContent() {
         setProName("");
       }
 
+
       setPast((histRes.data ?? []) as Consultation[]);
       setNutritionDocs((nutriDocsRes.data ?? []) as PatientDoc[]);
       setSportDocs((sportDocsRes.data ?? []) as PatientDoc[]);
     })();
   }, [user]);
 
+
   const displayName = patientFirstName
     ? `${patientFirstName} ${patientLastName}`.trim()
     : profile?.full_name ?? user?.email ?? "";
 
+
   const firstName = patientFirstName || displayName.split(" ")[0] || "vous";
+
 
   const completedCount = useMemo(
     () => (past ?? []).filter((item) => item.status === "completed").length,
     [past],
   );
 
+
   const documentsCount = useMemo(
     () => (nutritionDocs?.length ?? 0) + (sportDocs?.length ?? 0),
     [nutritionDocs, sportDocs],
   );
+
 
   const nextConsultationLabel = upcoming?.scheduled_at
     ? format(new Date(upcoming.scheduled_at), "EEEE dd MMMM 'à' HH:mm", {
@@ -250,38 +282,48 @@ function DashboardContent() {
       })
     : null;
 
+
   const hoursBeforeUpcoming = upcoming?.scheduled_at
     ? differenceInHours(new Date(upcoming.scheduled_at), new Date())
     : null;
+
 
   const canCancelUpcoming =
     upcoming?.status === "scheduled" &&
     typeof hoursBeforeUpcoming === "number" &&
     hoursBeforeUpcoming >= 24;
 
+
   const latestNutritionDoc = nutritionDocs?.[0] ?? null;
   const latestSportDoc = sportDocs?.[0] ?? null;
 
+
   async function handleCancelUpcoming() {
     if (!upcoming?.id || !canCancelUpcoming) return;
+
 
     const confirmed = window.confirm(
       "Confirmez-vous l’annulation de ce rendez-vous ?",
     );
 
+
     if (!confirmed) return;
 
+
     setCancelling(true);
+
 
     const cancelledItem: Consultation = {
       ...upcoming,
       status: "cancelled",
     };
 
+
     const { error } = await supabase
       .from("visio_consultations")
       .update({ status: "cancelled" })
       .eq("id", upcoming.id);
+
 
     if (error) {
       setCancelling(false);
@@ -289,11 +331,13 @@ function DashboardContent() {
       return;
     }
 
+
     setUpcoming(null);
     setPast((previous) => [cancelledItem, ...(previous ?? [])]);
     setProName("");
     setCancelling(false);
   }
+
 
   return (
     <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
@@ -306,6 +350,7 @@ function DashboardContent() {
                   Votre accompagnement
                 </p>
 
+
                 <div>
                   <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
                     Bonjour {firstName}
@@ -315,11 +360,13 @@ function DashboardContent() {
                   </p>
                 </div>
 
+
                 <div className="flex flex-wrap gap-2">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
                     <Activity className="h-4 w-4" />
                     Espace patient actif
                   </span>
+
 
                   <span
                     className={cn(
@@ -340,11 +387,13 @@ function DashboardContent() {
                     Formule {patientPlan === "premium" ? "Premium" : "Basic"}
                   </span>
 
+
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground">
                     <FolderOpen className="h-4 w-4" />
                     {documentsCount} document
                     {documentsCount > 1 ? "s" : ""}
                   </span>
+
 
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground">
                     <CalendarIcon className="h-4 w-4" />
@@ -354,6 +403,7 @@ function DashboardContent() {
                   </span>
                 </div>
               </div>
+
 
               <div className="rounded-2xl border border-primary/10 bg-background/70 px-4 py-3 text-sm backdrop-blur">
                 <p className="font-medium text-foreground">
@@ -371,6 +421,10 @@ function DashboardContent() {
           </div>
         </section>
 
+
+        {user ? <LevelBadgesCard userId={user.id} /> : null}
+
+
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <MetricCard
             label="Prochaine consultation"
@@ -386,12 +440,14 @@ function DashboardContent() {
             highlight={Boolean(upcoming?.scheduled_at)}
           />
 
+
           <MetricCard
             label="Documents disponibles"
             value={`${documentsCount}`}
             hint="Nutrition et sport"
             icon={<FileText className="h-4 w-4 text-primary" />}
           />
+
 
           <MetricCard
             label="Consultations terminées"
@@ -400,6 +456,7 @@ function DashboardContent() {
             icon={<Clock3 className="h-4 w-4 text-primary" />}
           />
         </section>
+
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <QuickCard
@@ -424,6 +481,7 @@ function DashboardContent() {
           />
         </section>
 
+
         <Card className="rounded-3xl border-primary/20 bg-primary/5 shadow-sm">
           <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
@@ -436,6 +494,7 @@ function DashboardContent() {
               </p>
             </div>
 
+
             <Button
               className="shrink-0 rounded-2xl"
               onClick={() => navigate({ to: "/patient/consultations" })}
@@ -446,6 +505,7 @@ function DashboardContent() {
           </CardContent>
         </Card>
 
+
         <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <Card className="rounded-3xl shadow-sm">
             <CardHeader className="pb-3">
@@ -453,6 +513,7 @@ function DashboardContent() {
                 Prochaine consultation
               </CardTitle>
             </CardHeader>
+
 
             <CardContent>
               {upcoming === undefined ? (
@@ -466,6 +527,7 @@ function DashboardContent() {
                     Consultez vos consultations pour retrouver les créneaux
                     disponibles.
                   </p>
+
 
                   <Button
                     variant="outline"
@@ -484,6 +546,7 @@ function DashboardContent() {
                       <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                         <Video className="h-5 w-5" />
                       </div>
+
 
                       <div className="min-w-0 flex-1 space-y-1">
                         <p className="text-sm font-semibold">
@@ -508,6 +571,7 @@ function DashboardContent() {
                     </div>
                   </div>
 
+
                   {!canCancelUpcoming && upcoming.scheduled_at ? (
                     <p className="text-xs text-muted-foreground">
                       Annulation indisponible à moins de 24 h du rendez-vous.
@@ -518,6 +582,7 @@ function DashboardContent() {
                       l’horaire prévu.
                     </p>
                   )}
+
 
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Button
@@ -538,6 +603,7 @@ function DashboardContent() {
                       Rejoindre
                     </Button>
 
+
                     <Button
                       variant="outline"
                       className="rounded-2xl"
@@ -547,6 +613,7 @@ function DashboardContent() {
                     >
                       Voir le détail
                     </Button>
+
 
                     <Button
                       variant="destructive"
@@ -564,10 +631,12 @@ function DashboardContent() {
             </CardContent>
           </Card>
 
+
           <Card className="rounded-3xl shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Accès rapides</CardTitle>
             </CardHeader>
+
 
             <CardContent className="grid gap-3">
               <QuickCard
@@ -594,6 +663,7 @@ function DashboardContent() {
           </Card>
         </section>
 
+
         <section className="grid gap-4 lg:grid-cols-2">
           <DocumentCard
             title="Mon plan nutritionnel"
@@ -604,6 +674,7 @@ function DashboardContent() {
             emptyTitle="Aucun plan nutritionnel disponible"
             emptyText="Vos documents nutrition apparaîtront ici dès leur mise à disposition."
           />
+
 
           <DocumentCard
             title="Mon programme sport"
@@ -616,12 +687,14 @@ function DashboardContent() {
           />
         </section>
 
+
         <Card className="rounded-3xl shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">
               Historique des consultations
             </CardTitle>
           </CardHeader>
+
 
           <CardContent>
             {past === null ? (
@@ -654,6 +727,7 @@ function DashboardContent() {
                       </div>
                     </div>
 
+
                     <PaymentBadge status={consultation.payment_status} />
                   </li>
                 ))}
@@ -665,6 +739,7 @@ function DashboardContent() {
     </div>
   );
 }
+
 
 function DocumentCard({
   title,
@@ -691,6 +766,7 @@ function DocumentCard({
           {title}
         </CardTitle>
 
+
         <Link
           to={to}
           className="flex items-center gap-0.5 text-xs text-primary hover:underline"
@@ -699,6 +775,7 @@ function DocumentCard({
           <ChevronRight className="h-3 w-3" />
         </Link>
       </CardHeader>
+
 
       <CardContent>
         {documents === null ? (
@@ -723,6 +800,7 @@ function DocumentCard({
               </div>
             ) : null}
 
+
             <ul className="divide-y">
               {documents.map((document) => (
                 <li
@@ -745,6 +823,7 @@ function DocumentCard({
                     </div>
                   </div>
 
+
                   <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                     PDF
                   </span>
@@ -757,6 +836,7 @@ function DocumentCard({
     </Card>
   );
 }
+
 
 function MetricCard({
   label,
@@ -790,6 +870,7 @@ function MetricCard({
   );
 }
 
+
 function QuickCard({
   icon: Icon,
   label,
@@ -814,6 +895,7 @@ function QuickCard({
   );
 }
 
+
 function EmptyState({ title, text }: { title: string; text: string }) {
   return (
     <div className="rounded-2xl bg-muted/40 p-4">
@@ -823,6 +905,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
   );
 }
 
+
 function PaymentBadge({ status }: { status: PayStatus }) {
   const label: Record<PayStatus, string> = {
     pending: "En attente",
@@ -831,6 +914,7 @@ function PaymentBadge({ status }: { status: PayStatus }) {
     partial_refund: "Remb. partiel",
     failed: "Échec",
   };
+
 
   return (
     <span
