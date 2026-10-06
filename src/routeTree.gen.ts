@@ -41,6 +41,7 @@ import { Route as PatientHomeRouteImport } from './routes/patient.home'
 import { Route as PatientFeedRouteImport } from './routes/patient.feed'
 import { Route as PatientDashboardRouteImport } from './routes/patient.dashboard'
 import { Route as PatientConsultationsRouteImport } from './routes/patient.consultations'
+import { Route as PatientAnamneseRouteImport } from './routes/patient.anamnese'
 import { Route as PatientAgendaRouteImport } from './routes/patient.agenda'
 import { Route as ProSportProgramIdRouteImport } from './routes/pro.sport.$programId'
 import { Route as ProRecipesNewRouteImport } from './routes/pro.recipes.new'
@@ -209,6 +210,11 @@ const PatientConsultationsRoute = PatientConsultationsRouteImport.update({
   path: '/patient/consultations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PatientAnamneseRoute = PatientAnamneseRouteImport.update({
+  id: '/patient/anamnese',
+  path: '/patient/anamnese',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PatientAgendaRoute = PatientAgendaRouteImport.update({
   id: '/patient/agenda',
   path: '/patient/agenda',
@@ -255,6 +261,7 @@ export interface FileRoutesByFullPath {
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
   '/patient/agenda': typeof PatientAgendaRoute
+  '/patient/anamnese': typeof PatientAnamneseRoute
   '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
   '/patient/feed': typeof PatientFeedRoute
@@ -296,6 +303,7 @@ export interface FileRoutesByTo {
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
   '/patient/agenda': typeof PatientAgendaRoute
+  '/patient/anamnese': typeof PatientAnamneseRoute
   '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
   '/patient/feed': typeof PatientFeedRoute
@@ -338,6 +346,7 @@ export interface FileRoutesById {
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
   '/patient/agenda': typeof PatientAgendaRoute
+  '/patient/anamnese': typeof PatientAnamneseRoute
   '/patient/consultations': typeof PatientConsultationsRoute
   '/patient/dashboard': typeof PatientDashboardRoute
   '/patient/feed': typeof PatientFeedRoute
@@ -381,6 +390,7 @@ export interface FileRouteTypes {
     | '/progress'
     | '/register'
     | '/patient/agenda'
+    | '/patient/anamnese'
     | '/patient/consultations'
     | '/patient/dashboard'
     | '/patient/feed'
@@ -422,6 +432,7 @@ export interface FileRouteTypes {
     | '/progress'
     | '/register'
     | '/patient/agenda'
+    | '/patient/anamnese'
     | '/patient/consultations'
     | '/patient/dashboard'
     | '/patient/feed'
@@ -463,6 +474,7 @@ export interface FileRouteTypes {
     | '/progress'
     | '/register'
     | '/patient/agenda'
+    | '/patient/anamnese'
     | '/patient/consultations'
     | '/patient/dashboard'
     | '/patient/feed'
@@ -505,6 +517,7 @@ export interface RootRouteChildren {
   ProgressRoute: typeof ProgressRoute
   RegisterRoute: typeof RegisterRoute
   PatientAgendaRoute: typeof PatientAgendaRoute
+  PatientAnamneseRoute: typeof PatientAnamneseRoute
   PatientConsultationsRoute: typeof PatientConsultationsRoute
   PatientDashboardRoute: typeof PatientDashboardRoute
   PatientFeedRoute: typeof PatientFeedRoute
@@ -759,6 +772,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PatientConsultationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/patient/anamnese': {
+      id: '/patient/anamnese'
+      path: '/patient/anamnese'
+      fullPath: '/patient/anamnese'
+      preLoaderRoute: typeof PatientAnamneseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/patient/agenda': {
       id: '/patient/agenda'
       path: '/patient/agenda'
@@ -879,6 +899,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProgressRoute: ProgressRoute,
   RegisterRoute: RegisterRoute,
   PatientAgendaRoute: PatientAgendaRoute,
+  PatientAnamneseRoute: PatientAnamneseRoute,
   PatientConsultationsRoute: PatientConsultationsRoute,
   PatientDashboardRoute: PatientDashboardRoute,
   PatientFeedRoute: PatientFeedRoute,

@@ -3,9 +3,11 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
+
 export const Route = createFileRoute("/bienvenue")({
   component: Bienvenue,
 });
+
 
 function Bienvenue() {
   const navigate = useNavigate();
@@ -18,56 +20,71 @@ function Bienvenue() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
+
   useEffect(() => {
     let isMounted = true;
+
 
     const loadSession = async () => {
       const { data, error: sessionError } = await supabase.auth.getSession();
 
+
       if (!isMounted) return;
+
 
       if (sessionError || !data.session?.user?.email) {
         setError("Session invalide ou expirée. Demandez une nouvelle invitation à votre professionnel.");
         return;
       }
 
+
       setUserEmail(data.session.user.email);
     };
 
+
     void loadSession();
+
 
     return () => {
       isMounted = false;
     };
   }, []);
 
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+
 
     if (password.length < 8) {
       setError("Le mot de passe doit contenir au moins 8 caractères.");
       return;
     }
 
+
     if (password !== confirmPassword) {
       setError("Les mots de passe ne correspondent pas.");
       return;
     }
 
+
     setLoading(true);
+
 
     try {
       const { error: updateError } = await supabase.auth.updateUser({ password });
+
 
       if (updateError) {
         throw updateError;
       }
 
+
       setSuccess(true);
+      // Étape suivante : le questionnaire santé (anamnèse), 5 à 7 minutes.
       window.setTimeout(() => {
-        void navigate({ to: "/login" });
-      }, 1500);
+        void navigate({ to: "/patient/anamnese" });
+      }, 1800);
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "Une erreur est survenue.";
       setError(message);
@@ -76,22 +93,28 @@ function Bienvenue() {
     }
   };
 
+
   if (success) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <section className="w-full max-w-md rounded-lg bg-white p-8 text-center shadow-md">
           <h1 className="mb-3 text-2xl font-bold text-green-700">Mot de passe enregistré</h1>
-          <p className="text-gray-600">Vous allez être redirigé vers la page de connexion.</p>
+          <p className="text-gray-600">
+            Dernière étape : quelques questions (5 à 7 minutes) pour préparer votre accompagnement.
+            Vous allez être redirigé.
+          </p>
         </section>
       </main>
     );
   }
+
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <section className="w-full max-w-md rounded-lg bg-white p-8 shadow-md">
         <h1 className="mb-2 text-center text-2xl font-bold text-gray-900">Bienvenue sur DietFit Pro</h1>
         <p className="mb-6 text-center text-sm text-gray-600">Créez votre mot de passe pour activer votre espace patient.</p>
+
 
         {userEmail && (
           <div className="mb-4">
@@ -108,11 +131,13 @@ function Bienvenue() {
           </div>
         )}
 
+
         {error && (
           <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
             {error}
           </div>
         )}
+
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
@@ -141,6 +166,7 @@ function Bienvenue() {
             </div>
           </div>
 
+
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700" htmlFor="confirm-password">
               Confirmer le mot de passe
@@ -166,6 +192,7 @@ function Bienvenue() {
               </button>
             </div>
           </div>
+
 
           <button
             type="submit"

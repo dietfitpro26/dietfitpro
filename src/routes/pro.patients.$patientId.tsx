@@ -28,6 +28,9 @@ import { BodyMetricsChart, MetricKey } from "@/components/BodyMetricsChart";
 
 import { PatientPlanControl } from "@/components/patients/PatientPlanControl";
 import { AutoEvalPatientTab } from "@/components/patients/AutoEvalPatientTab";
+import { NutritionProgramHistory } from "@/components/patients/NutritionProgramHistory";
+import { AnamnesePatientTab } from "@/components/patients/AnamnesePatientTab";
+import type { AnamneseAnswers } from "@/lib/anamneseSchema";
 export const Route = createFileRoute("/pro/patients/$patientId")({
   head: () => ({
     meta: [{ title: "Fiche patient — DietFitPro" }],
@@ -51,6 +54,9 @@ interface Patient {
   medical_notes: string | null;
   allergies: string[] | null;
   goal: string | null;
+  anamnese: AnamneseAnswers | null;
+  anamnese_completed_at: string | null;
+  anamnese_consent_at: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -164,6 +170,7 @@ function PatientDetailContent() {
   const [inviting, setInviting]         = useState(false);
   const [deleteOpen, setDeleteOpen]     = useState(false);
   const [deleting, setDeleting]         = useState(false);
+  const [programRefresh, setProgramRefresh] = useState(0);
 
   // ── Accès & Options ──
   const [access, setAccess]               = useState<PatientAccess>(DEFAULT_ACCESS);
@@ -401,6 +408,7 @@ function PatientDetailContent() {
           <TabsList className="mb-4 flex-wrap">
             <TabsTrigger value="evolution">📈 Évolution</TabsTrigger>
             <TabsTrigger value="info">Infos générales</TabsTrigger>
+            <TabsTrigger value="anamnese">📋 Dossier santé</TabsTrigger>
             <TabsTrigger value="programs">Programmes</TabsTrigger>
             <TabsTrigger value="measurements">Mesures</TabsTrigger>
             <TabsTrigger value="appointments">Historique RDV</TabsTrigger>
@@ -498,6 +506,18 @@ function PatientDetailContent() {
             </Card>
           </TabsContent>
 
+          {/* ── DOSSIER SANTÉ (ANAMNÈSE) ── */}
+          <TabsContent value="anamnese" className="mt-4">
+            <AnamnesePatientTab
+              patientId={patient.id}
+              gender={patient.gender}
+              anamnese={patient.anamnese}
+              completedAt={patient.anamnese_completed_at}
+              consentAt={patient.anamnese_consent_at}
+              onSaved={loadPatient}
+            />
+          </TabsContent>
+
           {/* ── PROGRAMMES ── */}
           <TabsContent value="programs" className="mt-4 space-y-4">
          <Card>
@@ -523,51 +543,82 @@ function PatientDetailContent() {
         ? patient.gender
         : null}
       onValidate={async (result) => {
+        if (!user) return;
+
+        const mealsPayload = {
+          phase:          result.phase,
+          mb:             result.mb,
+          tdee:           result.tdee,
+          matin: {
+            pain_cereales_g: result.feculent_matin_pain_g,
+            proteines:       true,
+            lipides_crus_g:  10,
+          },
+          midi: {
+            feculent_nom:    result.feculent_label,
+            feculent_cru_g:  result.feculent_midi_cru_g,
+            feculent_cuit_g: result.feculent_midi_cru_g * 2,
+            legumes:         "à volonté",
+            proteines:       true,
+            lipides_crus_g:  10,
+          },
+          soir: {
+            feculent_nom:    result.feculent_label,
+            feculent_cru_g:  result.feculent_soir_cru_g,
+            feculent_cuit_g: result.feculent_soir_cru_g * 2,
+            legumes:         "à volonté",
+            proteines:       true,
+            lipides_crus_g:  10,
+          },
+        };
+
+        const programName = `Programme Phase ${result.phase}`;
+
         const { error } = await supabase
           .from("nutrition_programs")
           .upsert({
-            patient_id:       patientId,
-            pro_id:           user?.id,
-            name:             `Programme Phase ${result.phase}`,
+            patient_id:        patientId,
+            pro_id:            user.id,
+            name:              programName,
             daily_kcal_target: result.target_kcal,
-            daily_protein_g:  result.protein_g,
-            daily_carbs_g:    result.carbs_g,
-            daily_fat_g:      result.fat_g,
-            is_active:        true,
-            start_date:       new Date().toISOString().split("T")[0],
-            meals: {
-              phase:          result.phase,
-              mb:             result.mb,
-              tdee:           result.tdee,
-              matin: {
-                pain_cereales_g: result.feculent_matin_pain_g,
-                proteines:       true,
-                lipides_crus_g:  10,
-              },
-              midi: {
-                feculent_cru_g:  result.feculent_midi_cru_g,
-                feculent_cuit_g: result.feculent_midi_cru_g * 2,
-                legumes:         "à volonté",
-                proteines:       true,
-                lipides_crus_g:  10,
-              },
-              soir: {
-                feculent_cru_g:  result.feculent_soir_cru_g,
-                feculent_cuit_g: result.feculent_soir_cru_g * 2,
-                legumes:         "à volonté",
-                proteines:       true,
-                lipides_crus_g:  10,
-              },
-            },
+            daily_protein_g:   result.protein_g,
+            daily_carbs_g:     result.carbs_g,
+            daily_fat_g:       result.fat_g,
+            is_active:         true,
+            start_date:        new Date().toISOString().split("T")[0],
+            meals:             mealsPayload,
           }, { onConflict: "patient_id" });
 
         if (error) {
           toast.error("Erreur : " + error.message);
+          return;
+        }
+
+        const { error: histError } = await supabase
+          .from("nutrition_program_history")
+          .insert({
+            patient_id:        patientId,
+            pro_id:            user.id,
+            name:              programName,
+            phase:             result.phase,
+            daily_kcal_target: result.target_kcal,
+            daily_protein_g:   result.protein_g,
+            daily_carbs_g:     result.carbs_g,
+            daily_fat_g:       result.fat_g,
+            meals:             mealsPayload,
+          });
+
+        if (histError) {
+          toast.error("Programme enregistré, mais l'historique n'a pas été sauvegardé : " + histError.message);
         } else {
           toast.success("✅ Programme nutrition enregistré !");
         }
+
+        setProgramRefresh((n) => n + 1);
       }}
     />
+
+    <NutritionProgramHistory patientId={patientId} refreshKey={programRefresh} />
 
     <PdfList
       documents={documents.filter((d) => d.category === "nutrition")}
