@@ -30,6 +30,7 @@ import { PatientPlanControl } from "@/components/patients/PatientPlanControl";
 import { AutoEvalPatientTab } from "@/components/patients/AutoEvalPatientTab";
 import { NutritionProgramHistory } from "@/components/patients/NutritionProgramHistory";
 import { AnamnesePatientTab } from "@/components/patients/AnamnesePatientTab";
+import { DailyJournal } from "@/components/nutrition/DailyJournal";
 import type { AnamneseAnswers } from "@/lib/anamneseSchema";
 export const Route = createFileRoute("/pro/patients/$patientId")({
   head: () => ({
@@ -409,6 +410,7 @@ function PatientDetailContent() {
             <TabsTrigger value="evolution">📈 Évolution</TabsTrigger>
             <TabsTrigger value="info">Infos générales</TabsTrigger>
             <TabsTrigger value="anamnese">📋 Dossier santé</TabsTrigger>
+            <TabsTrigger value="journal">📓 Journal</TabsTrigger>
             <TabsTrigger value="programs">Programmes</TabsTrigger>
             <TabsTrigger value="measurements">Mesures</TabsTrigger>
             <TabsTrigger value="appointments">Historique RDV</TabsTrigger>
@@ -516,6 +518,22 @@ function PatientDetailContent() {
               consentAt={patient.anamnese_consent_at}
               onSaved={loadPatient}
             />
+          </TabsContent>
+
+          {/* ── JOURNAL ALIMENTAIRE ── */}
+          <TabsContent value="journal" className="mt-4">
+            {patient.user_id ? (
+              <DailyJournal
+                userId={patient.user_id}
+                retentionDays={270}
+                readOnly
+                title="Journal alimentaire du patient"
+              />
+            ) : (
+              <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
+                Ce patient n'a pas encore de compte : il pourra tenir son journal après son invitation.
+              </div>
+            )}
           </TabsContent>
 
           {/* ── PROGRAMMES ── */}

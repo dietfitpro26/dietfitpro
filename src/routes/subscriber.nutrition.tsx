@@ -13,7 +13,9 @@ import {
 import { toast } from "sonner";
 import { SubscriberLayout } from "@/layouts/SubscriberLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { DailyJournal } from "@/components/nutrition/DailyJournal";
 import { NutritionTips } from "@/components/nutrition/NutritionTips";
+import { SubscriberDocuments } from "@/components/nutrition/SubscriberDocuments";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -45,10 +47,12 @@ import {
 } from "@/lib/nutritionPlans";
 
 
+
 export const Route = createFileRoute("/subscriber/nutrition")({
   head: () => ({ meta: [{ title: "Nutrition — DietFitPro" }] }),
   component: SubscriberNutritionPage,
 });
+
 
 
 function SubscriberNutritionPage() {
@@ -60,6 +64,7 @@ function SubscriberNutritionPage() {
     </ProtectedRoute>
   );
 }
+
 
 
 interface ProfileRow {
@@ -76,8 +81,10 @@ interface ProfileRow {
 }
 
 
+
 const GOALS: NutritionGoal[] = ["perte_de_poids", "prise_de_masse", "maintien", "equilibre"];
 const ACTIVITIES: ActivityLevel[] = ["sedentaire", "actif", "tres_actif"];
+
 
 
 function asGoal(value: unknown): NutritionGoal | null {
@@ -85,14 +92,17 @@ function asGoal(value: unknown): NutritionGoal | null {
 }
 
 
+
 function asActivity(value: unknown): ActivityLevel | null {
   return ACTIVITIES.includes(value as ActivityLevel) ? (value as ActivityLevel) : null;
 }
 
 
+
 function asGender(value: unknown): Gender | null {
   return value === "homme" || value === "femme" ? value : null;
 }
+
 
 
 type CalcState =
@@ -101,12 +111,15 @@ type CalcState =
   | { status: "incomplete" };
 
 
+
 function computeTargets(prof: ProfileRow, goal: NutritionGoal | null): CalcState {
   if (typeof prof.age === "number" && isMinor(prof.age)) return { status: "minor" };
 
 
+
   const gender = asGender(prof.gender);
   const activity = asActivity(prof.activity_level);
+
 
 
   if (
@@ -121,6 +134,7 @@ function computeTargets(prof: ProfileRow, goal: NutritionGoal | null): CalcState
   }
 
 
+
   const result = calculateNutritionProfile({
     weightKg: prof.weight_kg,
     heightCm: prof.height_cm,
@@ -133,12 +147,15 @@ function computeTargets(prof: ProfileRow, goal: NutritionGoal | null): CalcState
   });
 
 
+
   return { status: "ok", result };
 }
 
 
+
 function NutritionContent() {
   const { user } = useAuth();
+
 
 
   const [loading, setLoading] = useState(true);
@@ -148,13 +165,16 @@ function NutritionContent() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
 
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
 
 
+
     void (async () => {
       setLoading(true);
+
 
 
       const [profRes, choiceRes] = await Promise.all([
@@ -173,11 +193,14 @@ function NutritionContent() {
       ]);
 
 
+
       if (cancelled) return;
+
 
 
       if (profRes.error) setLoadError(profRes.error.message);
       if (choiceRes.error) console.error("Erreur lecture choix nutrition :", choiceRes.error);
+
 
 
       setProf((profRes.data as ProfileRow | null) ?? null);
@@ -186,15 +209,18 @@ function NutritionContent() {
     })();
 
 
+
     return () => {
       cancelled = true;
     };
   }, [user]);
 
 
+
   const isPremium = prof?.plan === "premium";
   const firstName = prof?.full_name?.split(" ")[0] ?? "vous";
   const profileGoal = asGoal(prof?.goal);
+
 
 
   // Plan actif : le choix enregistré, sauf s'il est Premium alors que le compte est Basic.
@@ -205,10 +231,12 @@ function NutritionContent() {
   }, [choice, isPremium, profileGoal]);
 
 
+
   const calc: CalcState = useMemo(() => {
     if (!prof) return { status: "incomplete" };
     return computeTargets(prof, activePlan.goal ?? profileGoal);
   }, [prof, activePlan, profileGoal]);
+
 
 
   const meals: ComputedMeal[] = useMemo(() => {
@@ -222,14 +250,17 @@ function NutritionContent() {
   }, [calc, activePlan]);
 
 
+
   const choosePlan = async (plan: NutritionPlan) => {
     if (!user) return;
     if (plan.tier === "premium" && !isPremium) return;
 
 
+
     const previous = choice;
     setChoice(plan.id);
     setSavingId(plan.id);
+
 
 
     const { error } = await supabase
@@ -240,7 +271,9 @@ function NutritionContent() {
       );
 
 
+
     setSavingId(null);
+
 
 
     if (error) {
@@ -250,8 +283,10 @@ function NutritionContent() {
     }
 
 
+
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
 
 
   if (loading) {
@@ -269,6 +304,7 @@ function NutritionContent() {
       </div>
     );
   }
+
 
 
   return (
@@ -291,6 +327,7 @@ function NutritionContent() {
               </div>
 
 
+
               {isPremium ? (
                 <div className="flex items-center gap-2 rounded-full bg-[#6DB33F]/10 px-3 py-1 text-xs font-medium text-[#2D7A1F]">
                   <CheckCircle className="h-4 w-4" />
@@ -306,6 +343,7 @@ function NutritionContent() {
         </Card>
 
 
+
         {loadError ? (
           <Card className="rounded-3xl border border-destructive/40 shadow-sm">
             <CardHeader>
@@ -314,6 +352,7 @@ function NutritionContent() {
             </CardHeader>
           </Card>
         ) : null}
+
 
 
         {calc.status === "minor" ? (
@@ -327,6 +366,7 @@ function NutritionContent() {
             </CardHeader>
           </Card>
         ) : null}
+
 
 
         {calc.status === "incomplete" ? (
@@ -345,6 +385,7 @@ function NutritionContent() {
             </CardContent>
           </Card>
         ) : null}
+
 
 
         {/* 2. Objectifs du jour */}
@@ -378,6 +419,7 @@ function NutritionContent() {
             </div>
 
 
+
             {calc.result.warnings.map((warning) => (
               <div
                 key={warning}
@@ -386,6 +428,7 @@ function NutritionContent() {
                 {warning}
               </div>
             ))}
+
 
 
             {/* 3. Programme proposé */}
@@ -407,11 +450,35 @@ function NutritionContent() {
               </div>
 
 
+
               <div className="grid gap-4 lg:grid-cols-2">
                 {meals.map((meal) => (
                   <MealCard key={meal.slot} meal={meal} />
                 ))}
               </div>
+
+
+
+              {user ? (
+                <DailyJournal
+                  userId={user.id}
+                  retentionDays={isPremium ? 90 : 30}
+                  footerNote={
+                    isPremium
+                      ? undefined
+                      : "Historique conservé 1 mois en Basic. Passez Premium pour 3 mois."
+                  }
+                />
+              ) : null}
+
+
+
+              {isPremium ? (
+                <div className="rounded-2xl border border-dashed bg-muted/20 px-4 py-3 text-center text-xs text-muted-foreground">
+                  📷 Journal par photo : prochainement
+                </div>
+              ) : null}
+
 
 
               <NutritionTips planName={activePlan.name} planTips={activePlan.tips} />
@@ -420,16 +487,23 @@ function NutritionContent() {
         ) : null}
 
 
+
+        {/* Documents de votre diététicien (Premium) */}
+        {user ? <SubscriberDocuments userId={user.id} isPremium={isPremium} /> : null}
+
+
+
         {/* 4. Gamme de programmes (Basic puis Premium) */}
         <section id="programmes" className="scroll-mt-20 space-y-4">
           <div>
             <h2 className="text-lg font-semibold">Changer de programme</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {isPremium
-                ? "Choisissez parmi les 3 programmes Basic et les 9 programmes Premium."
+                ? "Des menus personnalisés selon votre objectif : choisissez parmi 12 programmes (3 Basic + 9 Premium)."
                 : "Choisissez l'un de vos 3 programmes Basic."}
             </p>
           </div>
+
 
 
           <h3 className="text-base font-medium">Programmes Basic</h3>
@@ -448,7 +522,9 @@ function NutritionContent() {
           </div>
 
 
+
           <h3 className="pt-2 text-base font-medium">Programmes Premium</h3>
+
 
 
           {!isPremium ? (
@@ -461,15 +537,17 @@ function NutritionContent() {
                   <div>
                     <CardTitle className="text-base">Passez à Premium</CardTitle>
                     <CardDescription>
-                      Débloquez 9 programmes supplémentaires (méditerranéen, végétarien, sans
-                      gluten, sportif…), le journal par photo, l'historique sur 3 mois, ainsi que
-                      les PDF et notes.
+                      Des menus personnalisés en fonction de votre objectif : 9 programmes
+                      supplémentaires (méditerranéen, végétarien, sans gluten, sportif…), un
+                      historique de journal sur 3 mois, et les PDF de votre diététicien. Journal
+                      par photo : prochainement.
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
             </Card>
           ) : null}
+
 
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -487,6 +565,7 @@ function NutritionContent() {
           </div>
 
 
+
           {isPremium ? (
             <Card className="rounded-3xl border border-dashed shadow-sm">
               <CardHeader>
@@ -501,6 +580,7 @@ function NutritionContent() {
         </section>
 
 
+
         <p className="text-center text-xs text-muted-foreground">
           Ces repères sont indicatifs et ne remplacent pas un avis médical. En cas de pathologie,
           de grossesse ou de doute, consultez votre professionnel de santé.
@@ -509,6 +589,7 @@ function NutritionContent() {
     </div>
   );
 }
+
 
 
 function PlanCard({
@@ -571,6 +652,7 @@ function PlanCard({
 }
 
 
+
 function MealCard({ meal }: { meal: ComputedMeal }) {
   return (
     <Card className="rounded-3xl border shadow-sm">
@@ -605,6 +687,7 @@ function MealCard({ meal }: { meal: ComputedMeal }) {
     </Card>
   );
 }
+
 
 
 function InfoCard({

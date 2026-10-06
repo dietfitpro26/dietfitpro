@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { PatientLayout } from "@/layouts/PatientLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { DailyJournal } from "@/components/nutrition/DailyJournal";
 import { NutritionTips } from "@/components/nutrition/NutritionTips";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+
 
 
 export const Route = createFileRoute("/patient/nutrition")({
@@ -26,7 +28,9 @@ export const Route = createFileRoute("/patient/nutrition")({
 });
 
 
+
 type SlotKey = "matin" | "midi" | "soir";
+
 
 
 const SLOTS: { key: SlotKey; title: string; emoji: string }[] = [
@@ -36,11 +40,13 @@ const SLOTS: { key: SlotKey; title: string; emoji: string }[] = [
 ];
 
 
+
 const PHASE_LABEL: Record<number, string> = {
   1: "Phase 1 — déficit léger",
   2: "Phase 2 — déficit modéré",
   3: "Phase 3 — déficit important",
 };
+
 
 
 interface MealSlot {
@@ -54,12 +60,14 @@ interface MealSlot {
 }
 
 
+
 interface StructuredMeals {
   phase?: number | null;
   matin?: MealSlot;
   midi?: MealSlot;
   soir?: MealSlot;
 }
+
 
 
 interface LegacyMeal {
@@ -71,6 +79,7 @@ interface LegacyMeal {
   carbs_g: number;
   fat_g: number;
 }
+
 
 
 interface ProgramRow {
@@ -87,10 +96,12 @@ interface ProgramRow {
 }
 
 
+
 interface ParsedMeals {
   structured: StructuredMeals | null;
   legacy: LegacyMeal[];
 }
+
 
 
 function parseMeals(raw: unknown): ParsedMeals {
@@ -111,14 +122,17 @@ function parseMeals(raw: unknown): ParsedMeals {
 }
 
 
+
 function num(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 
+
 function buildLines(key: SlotKey, slot: MealSlot | undefined): string[] {
   if (!slot) return ["Aucune indication pour ce repas."];
   const lines: string[] = [];
+
 
 
   if (key === "matin") {
@@ -138,6 +152,7 @@ function buildLines(key: SlotKey, slot: MealSlot | undefined): string[] {
   }
 
 
+
   const lipides = num(slot.lipides_crus_g);
   if (lipides) {
     if (key === "matin") {
@@ -148,8 +163,10 @@ function buildLines(key: SlotKey, slot: MealSlot | undefined): string[] {
   }
 
 
+
   return lines;
 }
+
 
 
 function todayIso() {
@@ -157,9 +174,11 @@ function todayIso() {
 }
 
 
+
 function doneKey(programId: string, date: string) {
   return `dfp:meal-done:${programId}:${date}`;
 }
+
 
 
 function loadDone(programId: string, date: string): Set<string> {
@@ -172,10 +191,12 @@ function loadDone(programId: string, date: string): Set<string> {
 }
 
 
+
 function saveDone(programId: string, date: string, set: Set<string>) {
   if (typeof window === "undefined") return;
   localStorage.setItem(doneKey(programId, date), JSON.stringify([...set]));
 }
+
 
 
 function Content() {
@@ -186,9 +207,11 @@ function Content() {
   const [done, setDone] = useState<Set<string>>(new Set());
 
 
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+
 
 
     void (async () => {
@@ -199,7 +222,9 @@ function Content() {
         .maybeSingle();
 
 
+
       if (cancelled) return;
+
 
 
       if (patErr) {
@@ -209,11 +234,13 @@ function Content() {
       }
 
 
+
       const patientId = (pat as { id?: string } | null)?.id;
       if (!patientId) {
         setProgram(null);
         return;
       }
+
 
 
       const { data, error } = await supabase
@@ -227,7 +254,9 @@ function Content() {
         .limit(1);
 
 
+
       if (cancelled) return;
+
 
 
       if (error) {
@@ -237,14 +266,18 @@ function Content() {
       }
 
 
+
       const row = (data?.[0] as ProgramRow | undefined) ?? null;
       setProgram(row);
+
 
 
       if (!row) return;
 
 
+
       setDone(loadDone(row.id, todayIso()));
+
 
 
       if (row.pro_id) {
@@ -260,13 +293,16 @@ function Content() {
     })();
 
 
+
     return () => {
       cancelled = true;
     };
   }, [user]);
 
 
+
   const firstName = profile?.full_name?.split(" ")[0] ?? "vous";
+
 
 
   const toggleDone = (slotKey: string) => {
@@ -277,6 +313,7 @@ function Content() {
     setDone(next);
     saveDone(program.id, todayIso(), next);
   };
+
 
 
   if (program === undefined) {
@@ -301,9 +338,11 @@ function Content() {
   }
 
 
+
   const parsed = program ? parseMeals(program.meals) : { structured: null, legacy: [] };
   const phase = parsed.structured?.phase ?? null;
   const hasMeals = parsed.structured !== null || parsed.legacy.length > 0;
+
 
 
   return (
@@ -327,6 +366,7 @@ function Content() {
         </Card>
 
 
+
         {errorMsg ? (
           <Card className="rounded-3xl border border-destructive/40 shadow-sm">
             <CardHeader>
@@ -337,6 +377,7 @@ function Content() {
         ) : null}
 
 
+
         {!program ? (
           <>
             <div className="grid gap-4 md:grid-cols-4">
@@ -345,6 +386,7 @@ function Content() {
               <InfoCard icon={<Wheat className="h-5 w-5" />} title="Glucides" value="À définir" subtitle="Adapté à votre profil" />
               <InfoCard icon={<Droplets className="h-5 w-5" />} title="Lipides" value="À définir" subtitle="Répartition à venir" />
             </div>
+
 
 
             <Card className="rounded-3xl border shadow-sm">
@@ -360,6 +402,7 @@ function Content() {
                 </div>
               </CardContent>
             </Card>
+
 
 
             <NutritionTips />
@@ -394,6 +437,7 @@ function Content() {
             </div>
 
 
+
             <Card className="rounded-3xl border shadow-sm">
               <CardHeader>
                 <CardTitle>{program.name}</CardTitle>
@@ -408,9 +452,11 @@ function Content() {
             </Card>
 
 
+
             <p className="text-xs text-muted-foreground">
               Aujourd'hui — {format(new Date(), "EEEE dd MMMM", { locale: fr })}
             </p>
+
 
 
             {!hasMeals ? (
@@ -439,6 +485,7 @@ function Content() {
             )}
 
 
+
             {program.notes ? (
               <Card className="rounded-3xl border shadow-sm">
                 <CardHeader>
@@ -456,7 +503,13 @@ function Content() {
             ) : null}
 
 
+
+            {user ? <DailyJournal userId={user.id} retentionDays={270} /> : null}
+
+
+
             <NutritionTips />
+
 
 
             <p className="text-center text-xs text-muted-foreground">
@@ -468,6 +521,7 @@ function Content() {
     </div>
   );
 }
+
 
 
 function SlotCard({
@@ -514,6 +568,7 @@ function SlotCard({
 }
 
 
+
 function LegacyMeals({ meals }: { meals: LegacyMeal[] }) {
   return (
     <Card className="rounded-3xl border shadow-sm">
@@ -533,6 +588,7 @@ function LegacyMeals({ meals }: { meals: LegacyMeal[] }) {
     </Card>
   );
 }
+
 
 
 function InfoCard({

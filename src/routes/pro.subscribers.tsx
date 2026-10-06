@@ -22,15 +22,19 @@ import {
   Trash2,
 } from "lucide-react";
 
+
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { SubscriberDocumentsManager } from "@/components/subscribers/SubscriberDocumentsManager";
+
 
 export const Route = createFileRoute("/pro/subscribers")({
   component: Page,
 });
+
 
 type SubscriberPlan =
   | "basic"
@@ -38,6 +42,7 @@ type SubscriberPlan =
   | "visio"
   | "patient"
   | null;
+
 
 type Subscriber = {
   id: string;
@@ -53,13 +58,16 @@ type Subscriber = {
   created_at: string;
 };
 
+
 type Overrides = Record<string, boolean>;
+
 
 type FeatureItem = {
   key: string;
   label: string;
   icon: ReactNode;
 };
+
 
 const FEATURES: FeatureItem[] = [
   {
@@ -94,6 +102,8 @@ const FEATURES: FeatureItem[] = [
   },
 ];
 
+
+// Les objectifs sont enregistrés sous les valeurs de l'inscription (perte_de_poids, etc.).
 const GOAL_MAP: Record<
   string,
   {
@@ -102,31 +112,47 @@ const GOAL_MAP: Record<
     color: string;
   }
 > = {
-  weight_loss: {
+  perte_de_poids: {
     label: "Perte de poids",
     icon: <TrendingDown className="h-3 w-3" />,
     color:
       "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   },
-  muscle_gain: {
+  prise_de_masse: {
     label: "Prise de masse",
     icon: <Dumbbell className="h-3 w-3" />,
     color:
       "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   },
-  maintenance: {
+  maintien: {
     label: "Maintien",
     icon: <Scale className="h-3 w-3" />,
     color:
       "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
   },
-  general_health: {
+  equilibre: {
     label: "Santé générale",
     icon: <Heart className="h-3 w-3" />,
     color:
       "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   },
 };
+
+
+// Anciennes valeurs encore présentes dans certains comptes.
+const LEGACY_GOALS: Record<string, string> = {
+  weight_loss: "perte_de_poids",
+  muscle_gain: "prise_de_masse",
+  maintenance: "maintien",
+  general_health: "equilibre",
+};
+
+
+function normalizeGoal(goal: string | null): string | null {
+  if (!goal) return null;
+  return LEGACY_GOALS[goal] ?? goal;
+}
+
 
 function getBMIInfo(bmi: number | null) {
   if (!bmi) {
@@ -136,12 +162,14 @@ function getBMIInfo(bmi: number | null) {
     };
   }
 
+
   if (bmi < 18.5) {
     return {
       label: `${bmi} · Insuffisance`,
       color: "text-blue-500",
     };
   }
+
 
   if (bmi < 25) {
     return {
@@ -150,6 +178,7 @@ function getBMIInfo(bmi: number | null) {
     };
   }
 
+
   if (bmi < 30) {
     return {
       label: `${bmi} · Surpoids`,
@@ -157,11 +186,13 @@ function getBMIInfo(bmi: number | null) {
     };
   }
 
+
   return {
     label: `${bmi} · Obésité`,
     color: "text-red-500",
   };
 }
+
 
 function getPlanBadge(plan: SubscriberPlan) {
   if (plan === "premium") {
@@ -172,6 +203,7 @@ function getPlanBadge(plan: SubscriberPlan) {
     );
   }
 
+
   if (plan === "visio") {
     return (
       <Badge className="border-0 bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300">
@@ -180,8 +212,10 @@ function getPlanBadge(plan: SubscriberPlan) {
     );
   }
 
+
   return <Badge variant="secondary">Basic</Badge>;
 }
+
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("fr-FR", {
@@ -191,6 +225,7 @@ function formatDate(iso: string) {
   });
 }
 
+
 function getErrorMessage(error: unknown, data: unknown): string {
   if (
     typeof data === "object" &&
@@ -199,10 +234,12 @@ function getErrorMessage(error: unknown, data: unknown): string {
   ) {
     const serverError = (data as { error?: unknown }).error;
 
+
     if (typeof serverError === "string") {
       return serverError;
     }
   }
+
 
   if (
     typeof error === "object" &&
@@ -211,17 +248,21 @@ function getErrorMessage(error: unknown, data: unknown): string {
   ) {
     const message = (error as { message?: unknown }).message;
 
+
     if (typeof message === "string" && message.length > 0) {
       return message;
     }
   }
 
+
   if (error instanceof Error && error.message) {
     return error.message;
   }
 
+
   return "Erreur inconnue lors de la suppression.";
 }
+
 
 function Toggle({
   enabled,
@@ -253,13 +294,16 @@ function Toggle({
   );
 }
 
+
 function OverridesPanel({ userId }: { userId: string }) {
   const [overrides, setOverrides] = useState<Overrides>({});
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [fetched, setFetched] = useState(false);
 
+
   useEffect(() => {
     let mounted = true;
+
 
     const load = async () => {
       const { data, error } = await supabase
@@ -267,7 +311,9 @@ function OverridesPanel({ userId }: { userId: string }) {
         .select("feature_key, enabled")
         .eq("user_id", userId);
 
+
       if (!mounted) return;
+
 
       if (error) {
         console.error("[OverridesPanel] Erreur :", error);
@@ -275,33 +321,41 @@ function OverridesPanel({ userId }: { userId: string }) {
         return;
       }
 
+
       const map: Overrides = {};
+
 
       for (const row of data ?? []) {
         map[row.feature_key] = row.enabled;
       }
 
+
       setOverrides(map);
       setFetched(true);
     };
 
+
     void load();
+
 
     return () => {
       mounted = false;
     };
   }, [userId]);
 
+
   const toggle = useCallback(
     async (featureKey: string) => {
       const current = overrides[featureKey] ?? false;
       const next = !current;
+
 
       setLoadingKey(featureKey);
       setOverrides((previous) => ({
         ...previous,
         [featureKey]: next,
       }));
+
 
       const { error } = await supabase
         .from("subscriber_overrides")
@@ -316,19 +370,23 @@ function OverridesPanel({ userId }: { userId: string }) {
           },
         );
 
+
       if (error) {
         setOverrides((previous) => ({
           ...previous,
           [featureKey]: current,
         }));
 
+
         console.error("[OverridesPanel] Erreur toggle :", error);
       }
+
 
       setLoadingKey(null);
     },
     [overrides, userId],
   );
+
 
   if (!fetched) {
     return (
@@ -343,15 +401,18 @@ function OverridesPanel({ userId }: { userId: string }) {
     );
   }
 
+
   return (
     <div className="border-t px-4 pb-4 pt-2">
       <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         Accès activés
       </p>
 
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {FEATURES.map((feature) => {
           const enabled = overrides[feature.key] ?? false;
+
 
           return (
             <div
@@ -373,6 +434,7 @@ function OverridesPanel({ userId }: { userId: string }) {
                   {feature.icon}
                 </span>
 
+
                 <span
                   className={
                     enabled
@@ -383,6 +445,7 @@ function OverridesPanel({ userId }: { userId: string }) {
                   {feature.label}
                 </span>
               </div>
+
 
               <Toggle
                 enabled={enabled}
@@ -397,6 +460,7 @@ function OverridesPanel({ userId }: { userId: string }) {
   );
 }
 
+
 function PremiumToggleButton({
   subscriber,
   loading,
@@ -407,6 +471,7 @@ function PremiumToggleButton({
   onToggle: (subscriber: Subscriber) => void;
 }) {
   const isPremium = subscriber.plan === "premium";
+
 
   return (
     <Button
@@ -437,6 +502,7 @@ function PremiumToggleButton({
     </Button>
   );
 }
+
 
 function DeleteButton({
   subscriber,
@@ -472,6 +538,7 @@ function DeleteButton({
   );
 }
 
+
 function Page() {
   return (
     <ProLayout>
@@ -480,8 +547,10 @@ function Page() {
   );
 }
 
+
 function Content() {
   const { user } = useAuth();
+
 
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [loading, setLoading] = useState(true);
@@ -493,13 +562,17 @@ function Content() {
   const [deletingSubscriberId, setDeletingSubscriberId] =
     useState<string | null>(null);
 
+
   useEffect(() => {
     if (!user) return;
 
+
     let mounted = true;
+
 
     const fetchSubscribers = async () => {
       setLoading(true);
+
 
       const { data, error } = await supabase
         .from("profiles")
@@ -512,7 +585,9 @@ function Content() {
           ascending: false,
         });
 
+
       if (!mounted) return;
+
 
       if (error) {
         console.error(
@@ -524,26 +599,33 @@ function Content() {
         setSubscribers((data ?? []) as Subscriber[]);
       }
 
+
       setLoading(false);
     };
 
+
     void fetchSubscribers();
+
 
     return () => {
       mounted = false;
     };
   }, [user]);
 
+
   const handleTogglePremium = useCallback(
     async (subscriber: Subscriber) => {
       if (!user) return;
+
 
       const currentPlan = subscriber.plan ?? "basic";
       const nextPlan: SubscriberPlan =
         currentPlan === "premium" ? "basic" : "premium";
 
+
       const displayName =
         subscriber.full_name ?? subscriber.email;
+
 
       const confirmed = window.confirm(
         nextPlan === "premium"
@@ -551,9 +633,12 @@ function Content() {
           : `Remettre ${displayName} en Basic ?`,
       );
 
+
       if (!confirmed) return;
 
+
       setUpdatingPlanId(subscriber.id);
+
 
       const { error } = await supabase.rpc(
         "pro_set_subscriber_plan",
@@ -563,19 +648,23 @@ function Content() {
         },
       );
 
+
       if (error) {
         console.error(
           "[pro.subscribers] Erreur changement plan :",
           error,
         );
 
+
         window.alert(
           `Impossible de mettre à jour le plan : ${error.message}`,
         );
 
+
         setUpdatingPlanId(null);
         return;
       }
+
 
       setSubscribers((previous) =>
         previous.map((item) =>
@@ -588,17 +677,21 @@ function Content() {
         ),
       );
 
+
       setUpdatingPlanId(null);
     },
     [user],
   );
 
+
   const handleDeleteSubscriber = useCallback(
     async (subscriber: Subscriber) => {
       if (!user) return;
 
+
       const displayName =
         subscriber.full_name ?? subscriber.email;
+
 
       const confirmed = window.confirm(
         `Supprimer définitivement l'abonné ${displayName} ?\n\n` +
@@ -606,9 +699,12 @@ function Content() {
           "Cette action est irréversible.",
       );
 
+
       if (!confirmed) return;
 
+
       setDeletingSubscriberId(subscriber.id);
+
 
       try {
         const result = await supabase.functions.invoke(
@@ -620,14 +716,17 @@ function Content() {
           },
         );
 
+
         if (result.error || !result.data?.success) {
           const message = getErrorMessage(
             result.error,
             result.data,
           );
 
+
           throw new Error(message);
         }
+
 
         setSubscribers((current) =>
           current.filter(
@@ -635,9 +734,11 @@ function Content() {
           ),
         );
 
+
         setExpandedId((current) =>
           current === subscriber.id ? null : current,
         );
+
 
         window.alert("Abonné supprimé avec succès.");
       } catch (error) {
@@ -646,7 +747,9 @@ function Content() {
           error,
         );
 
+
         const message = getErrorMessage(error, null);
+
 
         window.alert(
           `Impossible de supprimer l'abonné : ${message}`,
@@ -658,8 +761,10 @@ function Content() {
     [user],
   );
 
+
   const filtered = subscribers.filter((subscriber) => {
     const query = search.trim().toLowerCase();
+
 
     const matchSearch =
       !query ||
@@ -668,12 +773,15 @@ function Content() {
         .includes(query) ||
       subscriber.email.toLowerCase().includes(query);
 
+
     const matchGoal =
       filterGoal === "all" ||
-      subscriber.goal === filterGoal;
+      normalizeGoal(subscriber.goal) === filterGoal;
+
 
     return matchSearch && matchGoal;
   });
+
 
   const bmiValues = subscribers
     .filter(
@@ -683,6 +791,7 @@ function Content() {
     )
     .map((subscriber) => Number(subscriber.bmi))
     .filter((value) => Number.isFinite(value));
+
 
   const avgBMI =
     bmiValues.length > 0
@@ -694,17 +803,21 @@ function Content() {
         ).toFixed(1)
       : null;
 
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center gap-3">
         <UserCheck className="h-6 w-6 text-primary" />
 
+
         <h1 className="text-2xl font-bold">Abonnés</h1>
+
 
         <Badge variant="secondary" className="ml-auto">
           {subscribers.length} au total
         </Badge>
       </div>
+
 
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-lg border bg-card p-4 text-center">
@@ -712,15 +825,18 @@ function Content() {
             {subscribers.length}
           </p>
 
+
           <p className="mt-1 text-xs text-muted-foreground">
             Abonnés
           </p>
         </div>
 
+
         <div className="rounded-lg border bg-card p-4 text-center">
           <p className="text-2xl font-bold text-primary">
             {avgBMI ?? "—"}
           </p>
+
 
           <p className="mt-1 text-xs text-muted-foreground">
             IMC moyen
@@ -728,9 +844,11 @@ function Content() {
         </div>
       </div>
 
+
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-[200px] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
 
           <Input
             className="pl-9"
@@ -740,8 +858,10 @@ function Content() {
           />
         </div>
 
+
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+
 
           <select
             className="rounded-md border bg-background px-3 py-2 text-sm"
@@ -751,19 +871,20 @@ function Content() {
             }
           >
             <option value="all">Tous les objectifs</option>
-            <option value="weight_loss">
+            <option value="perte_de_poids">
               Perte de poids
             </option>
-            <option value="muscle_gain">
+            <option value="prise_de_masse">
               Prise de masse
             </option>
-            <option value="maintenance">Maintien</option>
-            <option value="general_health">
+            <option value="maintien">Maintien</option>
+            <option value="equilibre">
               Santé générale
             </option>
           </select>
         </div>
       </div>
+
 
       {loading ? (
         <div className="space-y-3">
@@ -781,7 +902,9 @@ function Content() {
         <div className="rounded-lg border bg-card p-12 text-center text-muted-foreground">
           <UserCheck className="mx-auto mb-3 h-10 w-10 opacity-30" />
 
+
           <p className="font-medium">Aucun résultat</p>
+
 
           <p className="mt-1 text-sm">
             {subscribers.length === 0
@@ -793,9 +916,11 @@ function Content() {
         <div className="space-y-3">
           {filtered.map((subscriber) => {
             const bmiInfo = getBMIInfo(subscriber.bmi);
-            const goalInfo = subscriber.goal
-              ? GOAL_MAP[subscriber.goal]
+            const goalKey = normalizeGoal(subscriber.goal);
+            const goalInfo = goalKey
+              ? GOAL_MAP[goalKey]
               : null;
+
 
             const initials = (
               subscriber.full_name ?? subscriber.email
@@ -803,7 +928,9 @@ function Content() {
               .slice(0, 2)
               .toUpperCase();
 
+
             const isOpen = expandedId === subscriber.id;
+
 
             return (
               <div
@@ -822,19 +949,23 @@ function Content() {
                     {initials}
                   </div>
 
+
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="truncate font-semibold">
                         {subscriber.full_name ?? "—"}
                       </span>
 
+
                       {getPlanBadge(subscriber.plan)}
                     </div>
+
 
                     <p className="truncate text-sm text-muted-foreground">
                       {subscriber.email}
                     </p>
                   </div>
+
 
                   <div className="hidden min-w-[90px] flex-col items-center gap-1 md:flex">
                     <span
@@ -842,6 +973,7 @@ function Content() {
                     >
                       {bmiInfo.label}
                     </span>
+
 
                     <span className="text-xs text-muted-foreground">
                       {subscriber.weight_kg
@@ -853,6 +985,7 @@ function Content() {
                         : "—"}
                     </span>
                   </div>
+
 
                   <div className="hidden min-w-[130px] lg:block">
                     {goalInfo ? (
@@ -869,15 +1002,18 @@ function Content() {
                     )}
                   </div>
 
+
                   <div className="hidden min-w-[80px] flex-col items-end gap-1 text-xs text-muted-foreground xl:flex">
                     {subscriber.age ? (
                       <span>{subscriber.age} ans</span>
                     ) : null}
 
+
                     <span>
                       {formatDate(subscriber.created_at)}
                     </span>
                   </div>
+
 
                   <div
                     className="ml-2 flex-shrink-0"
@@ -894,6 +1030,7 @@ function Content() {
                     />
                   </div>
 
+
                   <div
                     className="ml-2 flex-shrink-0"
                     onClick={(event) =>
@@ -909,6 +1046,7 @@ function Content() {
                     />
                   </div>
 
+
                   <div className="ml-1 text-muted-foreground">
                     {isOpen ? (
                       <ChevronUp className="h-4 w-4" />
@@ -918,8 +1056,22 @@ function Content() {
                   </div>
                 </div>
 
+
                 {isOpen ? (
-                  <OverridesPanel userId={subscriber.id} />
+                  <>
+                    <OverridesPanel userId={subscriber.id} />
+
+
+                    <div className="border-t px-4 pb-4 pt-3">
+                      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Documents PDF
+                      </p>
+                      <SubscriberDocumentsManager
+                        subscriberUserId={subscriber.id}
+                        proId={user?.id ?? ""}
+                      />
+                    </div>
+                  </>
                 ) : null}
               </div>
             );
