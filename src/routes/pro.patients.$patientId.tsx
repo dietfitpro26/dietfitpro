@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft, Pencil, TrendingUp, Plus, Save, X,
-  ChevronDown, ChevronUp, Mail, Trash2, AlertTriangle,
+  ChevronDown, ChevronUp, Trash2, AlertTriangle,
   FileText, Upload, ExternalLink, Loader2, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,6 +31,7 @@ import { AutoEvalPatientTab } from "@/components/patients/AutoEvalPatientTab";
 import { NutritionProgramHistory } from "@/components/patients/NutritionProgramHistory";
 import { AnamnesePatientTab } from "@/components/patients/AnamnesePatientTab";
 import { DailyJournal } from "@/components/nutrition/DailyJournal";
+import { PatientAccountBadge, PatientInviteButton } from "@/components/patients/PatientInviteControl";
 import type { AnamneseAnswers } from "@/lib/anamneseSchema";
 export const Route = createFileRoute("/pro/patients/$patientId")({
   head: () => ({
@@ -168,7 +169,6 @@ function PatientDetailContent() {
   const [documents, setDocuments]                 = useState<PatientDocument[]>([]);
   const [editOpen, setEditOpen]         = useState(false);
   const [measureOpen, setMeasureOpen]   = useState(false);
-  const [inviting, setInviting]         = useState(false);
   const [deleteOpen, setDeleteOpen]     = useState(false);
   const [deleting, setDeleting]         = useState(false);
   const [programRefresh, setProgramRefresh] = useState(0);
@@ -278,21 +278,6 @@ function PatientDetailContent() {
     return () => { cancelled = true; };
   }, [patientId, user]);
 
-  const handleInvite = async () => {
-    if (!patient?.email) { toast.error("Ce patient n'a pas d'email renseigné."); return; }
-    setInviting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("invite-patient", {
-        body: {
-          email: patient.email, patient_id: patient.id,
-          pro_id: user?.id, redirect_to: `${window.location.origin}/bienvenue`,
-        },
-      });
-      if (error || data?.error) { toast.error(data?.error ?? error?.message ?? "Erreur inconnue"); return; }
-      toast.success(`Invitation envoyée à ${patient.email} ✉️`);
-    } finally { setInviting(false); }
-  };
-
   const handleDelete = async () => {
     setDeleting(true);
     try {
@@ -367,21 +352,17 @@ function PatientDetailContent() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold">{patient.first_name} {patient.last_name}</h1>
-            {patient.user_id
-              ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">✅ Compte actif</span>
-              : <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">⏳ Sans compte</span>
-            }
+            <PatientAccountBadge patientId={patient.id} hasAccount={Boolean(patient.user_id)} />
           </div>
           <p className="text-sm text-muted-foreground">Objectif : {goal}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {!patient.user_id && patient.email && (
-            <Button variant="outline" onClick={handleInvite} disabled={inviting}
-              className="border-amber-300 text-amber-700 hover:bg-amber-50">
-              <Mail className="h-4 w-4 mr-1" />
-              {inviting ? "Envoi…" : "Envoyer l'invitation"}
-            </Button>
-          )}
+          <PatientInviteButton
+            patientId={patient.id}
+            email={patient.email}
+            hasAccount={Boolean(patient.user_id)}
+            onSent={() => void loadPatient()}
+          />
           <Button variant="outline" onClick={() => setMeasureOpen(true)}>
             <Plus className="h-4 w-4 mr-1" /> Ajouter une mesure
           </Button>
