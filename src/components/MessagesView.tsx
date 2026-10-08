@@ -391,7 +391,12 @@ export function MessagesView() {
 
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
+        <div
+      className={cn(
+        "flex overflow-hidden",
+        isPro ? "h-[calc(100dvh-3.5rem)]" : "h-[calc(100dvh-7.5rem)]",
+      )}
+    >
       <aside className="w-full max-w-xs hidden md:block">
         <ConversationList
           conversations={conversations}
