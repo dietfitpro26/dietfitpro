@@ -10,8 +10,12 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { WeeklyCheckinDialog } from "@/components/gamification/WeeklyCheckinDialog";
+import { PastDueBanner } from "@/components/billing/PastDueBanner";
+import { SuspendedAccountScreen } from "@/components/billing/SuspendedAccountScreen";
 import { useAuth } from "@/hooks/useAuth";
+import { useAccessState } from "@/hooks/useAccessState";
 import { cn } from "@/lib/utils";
+
 
 
 type Tab = {
@@ -21,12 +25,17 @@ type Tab = {
 };
 
 
+
 const SUBSCRIBER_TABS: Tab[] = [
   { to: "/home", label: "Accueil", icon: Home },
   { to: "/subscriber/nutrition", label: "Nutrition", icon: Utensils },
   { to: "/subscriber/sport", label: "Sport", icon: Dumbbell },
   { to: "/progress", label: "Progression", icon: TrendingUp },
 ];
+
+// Pages encore visibles quand l'abonnement est suspendu : uniquement le profil.
+const PROFILE_PATH = "/subscriber/profile";
+
 
 
 export function SubscriberLayout({
@@ -37,15 +46,22 @@ export function SubscriberLayout({
   streak?: number;
 }) {
   const { profile, signOut } = useAuth();
+  const { state } = useAccessState();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const firstName = profile?.full_name?.split(" ")[0] ?? "";
+
+  const isProfilePage = pathname === PROFILE_PATH || pathname.startsWith(`${PROFILE_PATH}/`);
+  const isSuspended = state === "suspended";
+  const showSuspendedScreen = isSuspended && !isProfilePage;
+
 
 
   const handleSignOut = async () => {
     await signOut();
     void navigate({ to: "/login" });
   };
+
 
 
   return (
@@ -55,13 +71,15 @@ export function SubscriberLayout({
           <Logo />
 
 
+
           <div className="flex items-center gap-2 text-sm sm:gap-3">
             {firstName ? (
               <span className="hidden font-medium sm:inline">{firstName}</span>
             ) : null}
 
 
-            {streak > 0 ? (
+
+            {streak > 0 && !isSuspended ? (
               <span
                 className="hidden items-center gap-1 rounded-full bg-[#6DB33F]/10 px-2.5 py-1 font-semibold text-[#6DB33F] sm:flex"
                 title={`${streak} jours consécutifs`}
@@ -69,6 +87,7 @@ export function SubscriberLayout({
                 {streak} jours
               </span>
             ) : null}
+
 
 
             <Link
@@ -82,6 +101,7 @@ export function SubscriberLayout({
             >
               <User className="h-4 w-4" />
             </Link>
+
 
 
             <button
@@ -101,7 +121,15 @@ export function SubscriberLayout({
       </header>
 
 
-      <main className="flex-1 pb-24">{children}</main>
+
+      {state === "past_due" ? <PastDueBanner /> : null}
+
+
+
+      <main className="flex-1 pb-24">
+        {showSuspendedScreen ? <SuspendedAccountScreen /> : children}
+      </main>
+
 
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 shadow-[0_-4px_20px_rgba(0,0,0,0.04)] backdrop-blur">
@@ -115,6 +143,7 @@ export function SubscriberLayout({
             const Icon = tab.icon;
 
 
+
             return (
               <Link
                 key={tab.to}
@@ -124,12 +153,14 @@ export function SubscriberLayout({
                   active
                     ? "font-semibold text-[#6DB33F]"
                     : "text-muted-foreground hover:text-foreground",
+                  isSuspended && "opacity-50",
                 )}
                 aria-current={active ? "page" : undefined}
               >
                 {active ? (
                   <span className="absolute top-0 h-0.5 w-10 rounded-full bg-[#6DB33F]" />
                 ) : null}
+
 
 
                 <Icon className="h-5 w-5" />
@@ -141,7 +172,8 @@ export function SubscriberLayout({
       </nav>
 
 
-      <WeeklyCheckinDialog />
+
+      {!isSuspended ? <WeeklyCheckinDialog /> : null}
     </div>
   );
 }
