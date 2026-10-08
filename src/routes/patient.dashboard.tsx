@@ -23,12 +23,14 @@ import {
 import { PatientLayout } from "@/layouts/PatientLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { LevelBadgesCard } from "@/components/gamification/LevelBadgesCard";
+import { AnamneseReminderBanner } from "@/components/patients/AnamneseReminderBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+
 
 
 export const Route = createFileRoute("/patient/dashboard")({
@@ -43,6 +45,7 @@ export const Route = createFileRoute("/patient/dashboard")({
 });
 
 
+
 type Status =
   | "scheduled"
   | "completed"
@@ -51,12 +54,14 @@ type Status =
   | "no_show";
 
 
+
 type PayStatus =
   | "pending"
   | "paid"
   | "refunded"
   | "partial_refund"
   | "failed";
+
 
 
 interface Consultation {
@@ -71,6 +76,7 @@ interface Consultation {
 }
 
 
+
 interface PatientDoc {
   id: string;
   title: string;
@@ -79,6 +85,7 @@ interface PatientDoc {
   category: string;
   created_at: string;
 }
+
 
 
 const STATUS_LABEL: Record<Status, string> = {
@@ -90,9 +97,11 @@ const STATUS_LABEL: Record<Status, string> = {
 };
 
 
+
 function DashboardContent() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+
 
 
   const [upcoming, setUpcoming] = useState<
@@ -109,6 +118,7 @@ function DashboardContent() {
   const [cancelling, setCancelling] = useState(false);
 
 
+
   // Formule visible uniquement : Basic ou Premium.
   // Le patient ne peut pas modifier sa formule depuis cette page.
   const [patientPlan, setPatientPlan] = useState<"basic" | "premium">(
@@ -116,12 +126,15 @@ function DashboardContent() {
   );
 
 
+
   useEffect(() => {
     if (!user) return;
 
 
+
     void (async () => {
       const nowIso = new Date().toISOString();
+
 
 
       const [{ data: profilePlanRow, error: profilePlanError }, { data: patientRow }] =
@@ -133,12 +146,14 @@ function DashboardContent() {
             .maybeSingle(),
 
 
+
           supabase
             .from("patients")
             .select("id, first_name, last_name")
             .eq("user_id", user.id)
             .maybeSingle(),
         ]);
+
 
 
       if (profilePlanError) {
@@ -155,6 +170,7 @@ function DashboardContent() {
       }
 
 
+
       const patient = patientRow as {
         id?: string;
         first_name?: string;
@@ -162,11 +178,14 @@ function DashboardContent() {
       } | null;
 
 
+
       const patientId = patient?.id ?? null;
+
 
 
       setPatientFirstName(patient?.first_name ?? "");
       setPatientLastName(patient?.last_name ?? "");
+
 
 
       const [upRes, histRes, nutriDocsRes, sportDocsRes] =
@@ -181,6 +200,7 @@ function DashboardContent() {
             .gte("scheduled_at", nowIso)
             .order("scheduled_at", { ascending: true })
             .limit(1),
+
 
 
           supabase
@@ -199,6 +219,7 @@ function DashboardContent() {
             .limit(10),
 
 
+
           patientId
             ? supabase
                 .from("patient_documents")
@@ -210,6 +231,7 @@ function DashboardContent() {
                 .order("created_at", { ascending: false })
                 .limit(3)
             : Promise.resolve({ data: [] }),
+
 
 
           patientId
@@ -226,11 +248,14 @@ function DashboardContent() {
         ]);
 
 
+
       const next =
         (upRes.data?.[0] as Consultation | undefined) ?? null;
 
 
+
       setUpcoming(next);
+
 
 
       if (next?.pro_id) {
@@ -241,12 +266,14 @@ function DashboardContent() {
           .maybeSingle();
 
 
+
         setProName(
           (professional as { full_name?: string } | null)?.full_name ?? "",
         );
       } else {
         setProName("");
       }
+
 
 
       setPast((histRes.data ?? []) as Consultation[]);
@@ -256,12 +283,15 @@ function DashboardContent() {
   }, [user]);
 
 
+
   const displayName = patientFirstName
     ? `${patientFirstName} ${patientLastName}`.trim()
     : profile?.full_name ?? user?.email ?? "";
 
 
+
   const firstName = patientFirstName || displayName.split(" ")[0] || "vous";
+
 
 
   const completedCount = useMemo(
@@ -270,10 +300,12 @@ function DashboardContent() {
   );
 
 
+
   const documentsCount = useMemo(
     () => (nutritionDocs?.length ?? 0) + (sportDocs?.length ?? 0),
     [nutritionDocs, sportDocs],
   );
+
 
 
   const nextConsultationLabel = upcoming?.scheduled_at
@@ -283,9 +315,11 @@ function DashboardContent() {
     : null;
 
 
+
   const hoursBeforeUpcoming = upcoming?.scheduled_at
     ? differenceInHours(new Date(upcoming.scheduled_at), new Date())
     : null;
+
 
 
   const canCancelUpcoming =
@@ -294,12 +328,15 @@ function DashboardContent() {
     hoursBeforeUpcoming >= 24;
 
 
+
   const latestNutritionDoc = nutritionDocs?.[0] ?? null;
   const latestSportDoc = sportDocs?.[0] ?? null;
 
 
+
   async function handleCancelUpcoming() {
     if (!upcoming?.id || !canCancelUpcoming) return;
+
 
 
     const confirmed = window.confirm(
@@ -307,10 +344,13 @@ function DashboardContent() {
     );
 
 
+
     if (!confirmed) return;
 
 
+
     setCancelling(true);
+
 
 
     const cancelledItem: Consultation = {
@@ -319,10 +359,12 @@ function DashboardContent() {
     };
 
 
+
     const { error } = await supabase
       .from("visio_consultations")
       .update({ status: "cancelled" })
       .eq("id", upcoming.id);
+
 
 
     if (error) {
@@ -332,11 +374,13 @@ function DashboardContent() {
     }
 
 
+
     setUpcoming(null);
     setPast((previous) => [cancelledItem, ...(previous ?? [])]);
     setProName("");
     setCancelling(false);
   }
+
 
 
   return (
@@ -351,6 +395,7 @@ function DashboardContent() {
                 </p>
 
 
+
                 <div>
                   <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
                     Bonjour {firstName}
@@ -361,11 +406,13 @@ function DashboardContent() {
                 </div>
 
 
+
                 <div className="flex flex-wrap gap-2">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
                     <Activity className="h-4 w-4" />
                     Espace patient actif
                   </span>
+
 
 
                   <span
@@ -388,11 +435,13 @@ function DashboardContent() {
                   </span>
 
 
+
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground">
                     <FolderOpen className="h-4 w-4" />
                     {documentsCount} document
                     {documentsCount > 1 ? "s" : ""}
                   </span>
+
 
 
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground">
@@ -403,6 +452,7 @@ function DashboardContent() {
                   </span>
                 </div>
               </div>
+
 
 
               <div className="rounded-2xl border border-primary/10 bg-background/70 px-4 py-3 text-sm backdrop-blur">
@@ -422,7 +472,13 @@ function DashboardContent() {
         </section>
 
 
+
+        <AnamneseReminderBanner />
+
+
+
         {user ? <LevelBadgesCard userId={user.id} /> : null}
+
 
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -441,12 +497,14 @@ function DashboardContent() {
           />
 
 
+
           <MetricCard
             label="Documents disponibles"
             value={`${documentsCount}`}
             hint="Nutrition et sport"
             icon={<FileText className="h-4 w-4 text-primary" />}
           />
+
 
 
           <MetricCard
@@ -456,6 +514,7 @@ function DashboardContent() {
             icon={<Clock3 className="h-4 w-4 text-primary" />}
           />
         </section>
+
 
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -482,6 +541,7 @@ function DashboardContent() {
         </section>
 
 
+
         <Card className="rounded-3xl border-primary/20 bg-primary/5 shadow-sm">
           <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
@@ -495,6 +555,7 @@ function DashboardContent() {
             </div>
 
 
+
             <Button
               className="shrink-0 rounded-2xl"
               onClick={() => navigate({ to: "/patient/consultations" })}
@@ -506,6 +567,7 @@ function DashboardContent() {
         </Card>
 
 
+
         <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <Card className="rounded-3xl shadow-sm">
             <CardHeader className="pb-3">
@@ -513,6 +575,7 @@ function DashboardContent() {
                 Prochaine consultation
               </CardTitle>
             </CardHeader>
+
 
 
             <CardContent>
@@ -527,6 +590,7 @@ function DashboardContent() {
                     Consultez vos consultations pour retrouver les créneaux
                     disponibles.
                   </p>
+
 
 
                   <Button
@@ -546,6 +610,7 @@ function DashboardContent() {
                       <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                         <Video className="h-5 w-5" />
                       </div>
+
 
 
                       <div className="min-w-0 flex-1 space-y-1">
@@ -572,6 +637,7 @@ function DashboardContent() {
                   </div>
 
 
+
                   {!canCancelUpcoming && upcoming.scheduled_at ? (
                     <p className="text-xs text-muted-foreground">
                       Annulation indisponible à moins de 24 h du rendez-vous.
@@ -582,6 +648,7 @@ function DashboardContent() {
                       l’horaire prévu.
                     </p>
                   )}
+
 
 
                   <div className="flex flex-col gap-2 sm:flex-row">
@@ -604,6 +671,7 @@ function DashboardContent() {
                     </Button>
 
 
+
                     <Button
                       variant="outline"
                       className="rounded-2xl"
@@ -613,6 +681,7 @@ function DashboardContent() {
                     >
                       Voir le détail
                     </Button>
+
 
 
                     <Button
@@ -632,10 +701,12 @@ function DashboardContent() {
           </Card>
 
 
+
           <Card className="rounded-3xl shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Accès rapides</CardTitle>
             </CardHeader>
+
 
 
             <CardContent className="grid gap-3">
@@ -664,6 +735,7 @@ function DashboardContent() {
         </section>
 
 
+
         <section className="grid gap-4 lg:grid-cols-2">
           <DocumentCard
             title="Mon plan nutritionnel"
@@ -674,6 +746,7 @@ function DashboardContent() {
             emptyTitle="Aucun plan nutritionnel disponible"
             emptyText="Vos documents nutrition apparaîtront ici dès leur mise à disposition."
           />
+
 
 
           <DocumentCard
@@ -688,12 +761,14 @@ function DashboardContent() {
         </section>
 
 
+
         <Card className="rounded-3xl shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">
               Historique des consultations
             </CardTitle>
           </CardHeader>
+
 
 
           <CardContent>
@@ -728,6 +803,7 @@ function DashboardContent() {
                     </div>
 
 
+
                     <PaymentBadge status={consultation.payment_status} />
                   </li>
                 ))}
@@ -739,6 +815,7 @@ function DashboardContent() {
     </div>
   );
 }
+
 
 
 function DocumentCard({
@@ -767,6 +844,7 @@ function DocumentCard({
         </CardTitle>
 
 
+
         <Link
           to={to}
           className="flex items-center gap-0.5 text-xs text-primary hover:underline"
@@ -775,6 +853,7 @@ function DocumentCard({
           <ChevronRight className="h-3 w-3" />
         </Link>
       </CardHeader>
+
 
 
       <CardContent>
@@ -801,6 +880,7 @@ function DocumentCard({
             ) : null}
 
 
+
             <ul className="divide-y">
               {documents.map((document) => (
                 <li
@@ -824,6 +904,7 @@ function DocumentCard({
                   </div>
 
 
+
                   <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                     PDF
                   </span>
@@ -836,6 +917,7 @@ function DocumentCard({
     </Card>
   );
 }
+
 
 
 function MetricCard({
@@ -871,6 +953,7 @@ function MetricCard({
 }
 
 
+
 function QuickCard({
   icon: Icon,
   label,
@@ -896,6 +979,7 @@ function QuickCard({
 }
 
 
+
 function EmptyState({ title, text }: { title: string; text: string }) {
   return (
     <div className="rounded-2xl bg-muted/40 p-4">
@@ -906,6 +990,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
 }
 
 
+
 function PaymentBadge({ status }: { status: PayStatus }) {
   const label: Record<PayStatus, string> = {
     pending: "En attente",
@@ -914,6 +999,7 @@ function PaymentBadge({ status }: { status: PayStatus }) {
     partial_refund: "Remb. partiel",
     failed: "Échec",
   };
+
 
 
   return (
