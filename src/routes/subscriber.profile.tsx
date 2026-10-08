@@ -25,7 +25,9 @@ import {
 import { toast } from "sonner";
 import { SubscriberLayout } from "@/layouts/SubscriberLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { SubscriptionOfferCard } from "@/components/billing/SubscriptionOfferCard";
 import { useAuth } from "@/hooks/useAuth";
+import { useAccessState } from "@/hooks/useAccessState";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -49,10 +51,12 @@ import {
   type NutritionGoal,
 } from "@/lib/nutritionCalc";
 
+
 export const Route = createFileRoute("/subscriber/profile")({
   head: () => ({ meta: [{ title: "Profil — DietFitPro" }] }),
   component: SubscriberProfilePage,
 });
+
 
 interface ProfileRow {
   age: number | null;
@@ -66,11 +70,13 @@ interface ProfileRow {
   program_start_date: string | null;
 }
 
+
 type Measurement = {
   id: string;
   measured_at: string;
   weight_kg: number | null;
 };
+
 
 const GOALS: { value: NutritionGoal; label: string }[] = [
   { value: "perte_de_poids", label: "🥗 Perte de poids" },
@@ -79,27 +85,33 @@ const GOALS: { value: NutritionGoal; label: string }[] = [
   { value: "equilibre", label: "❤️ Santé générale" },
 ];
 
+
 const ACTIVITY_LEVELS: { value: ActivityLevel; label: string; hint: string }[] = [
   { value: "sedentaire", label: "🪑 Sédentaire", hint: "Bureau, peu ou pas de sport" },
   { value: "actif", label: "🏃 Actif", hint: "Sport 2-3x / semaine" },
   { value: "tres_actif", label: "🔥 Très actif", hint: "Sport 4-6x / semaine ou métier physique" },
 ];
 
+
 const GOAL_LABELS: Record<string, string> = Object.fromEntries(
   GOALS.map((g) => [g.value, g.label.replace(/^\S+\s/, "")]),
 );
+
 
 const ACTIVITY_LABELS: Record<string, string> = Object.fromEntries(
   ACTIVITY_LEVELS.map((a) => [a.value, a.label.replace(/^\S+\s/, "")]),
 );
 
-const STATUS_LABELS: Record<string, string> = {
-  none: "Aucun abonnement actif",
+
+const ACCESS_STATE_LABELS: Record<string, string> = {
+  unrestricted: "Accès actif",
+  managed: "Géré par votre professionnel",
   active: "Actif",
-  trialing: "Période d'essai",
+  trial: "Période d'essai",
   past_due: "Paiement en retard",
-  canceled: "Annulé",
+  suspended: "Suspendu",
 };
+
 
 function calcBmi(weight: number | null, height: number | null): number | null {
   if (!weight || !height || weight <= 0 || height <= 0) return null;
@@ -107,11 +119,13 @@ function calcBmi(weight: number | null, height: number | null): number | null {
   return Math.round((weight / (m * m)) * 10) / 10;
 }
 
+
 function isRowComplete(row: ProfileRow | null): boolean {
   if (!row || row.age == null || !row.goal) return false;
   if (isMinor(row.age)) return true;
   return !!row.gender && !!row.activity_level && !!row.weight_kg && !!row.height_cm;
 }
+
 
 function SubscriberProfilePage() {
   return (
@@ -123,17 +137,25 @@ function SubscriberProfilePage() {
   );
 }
 
+
 function SubscriberProfileContent() {
   const { user, profile } = useAuth();
+  const { state: accessState } = useAccessState();
   const navigate = useNavigate();
+
+  // Abonnement suspendu : seules les informations de profil restent visibles.
+  const isSuspended = accessState === "suspended";
+
 
   const [row, setRow] = useState<ProfileRow | null | undefined>(undefined);
   const [measurements, setMeasurements] = useState<Measurement[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
 
   const [age, setAge] = useState("");
   const [gender, setGender] = useState<Gender | "">("");
@@ -144,8 +166,10 @@ function SubscriberProfileContent() {
   const [goal, setGoal] = useState<NutritionGoal | "">("");
   const [pregnant, setPregnant] = useState(false);
 
+
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
 
   const loadMeasurements = useCallback(async () => {
     if (!user) return;
@@ -157,6 +181,7 @@ function SubscriberProfileContent() {
       .limit(60);
     setMeasurements((data ?? []) as Measurement[]);
   }, [user]);
+
 
   const fillForm = (r: ProfileRow | null) => {
     setAge(r?.age != null ? String(r.age) : "");
@@ -174,9 +199,11 @@ function SubscriberProfileContent() {
     setPregnant(r?.is_pregnant_or_breastfeeding ?? false);
   };
 
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+
 
     void (async () => {
       const { data, error } = await supabase
@@ -187,9 +214,12 @@ function SubscriberProfileContent() {
         .eq("id", user.id)
         .maybeSingle();
 
+
       if (cancelled) return;
 
+
       if (error) setLoadError(error.message);
+
 
       const r = (data as ProfileRow | null) ?? null;
       setRow(r);
@@ -197,13 +227,16 @@ function SubscriberProfileContent() {
       // Profil incomplet : on ouvre directement le formulaire.
       if (!isRowComplete(r)) setEditing(true);
 
+
       await loadMeasurements();
     })();
+
 
     return () => {
       cancelled = true;
     };
   }, [user, loadMeasurements]);
+
 
   const chartData = useMemo(
     () =>
@@ -216,12 +249,15 @@ function SubscriberProfileContent() {
     [measurements],
   );
 
+
   const numericAge = age ? Number(age) : null;
   const minorPreview = numericAge !== null && Number.isFinite(numericAge) && isMinor(numericAge);
+
 
   const handleSave = async () => {
     if (!user) return;
     setFormError(null);
+
 
     const a = Number(age);
     if (!age || !Number.isFinite(a) || a < 10 || a > 120) {
@@ -233,10 +269,12 @@ function SubscriberProfileContent() {
       return;
     }
 
+
     const minor = isMinor(a);
     const w = weight ? Number(weight) : null;
     const h = height ? Number(height) : null;
     const tw = targetWeight ? Number(targetWeight) : null;
+
 
     if (w !== null && (!Number.isFinite(w) || w < 30 || w > 300)) {
       setFormError("Le poids doit être compris entre 30 et 300 kg.");
@@ -250,6 +288,7 @@ function SubscriberProfileContent() {
       setFormError("Le poids objectif doit être compris entre 30 et 300 kg.");
       return;
     }
+
 
     if (!minor) {
       if (!gender) {
@@ -266,10 +305,13 @@ function SubscriberProfileContent() {
       }
     }
 
+
     setSaving(true);
+
 
     const programStartDate = row?.program_start_date ?? new Date().toISOString().slice(0, 10);
     const isPregnant = !minor && gender === "femme" ? pregnant : false;
+
 
     const nutrition = minor
       ? null
@@ -283,6 +325,7 @@ function SubscriberProfileContent() {
           programStartDate,
           isPregnantOrBreastfeeding: isPregnant,
         });
+
 
     // Uniquement des champs autorisés : jamais role, plan, pro_id, abonnement, stripe.
     const payload = {
@@ -306,13 +349,16 @@ function SubscriberProfileContent() {
       profile_complete: !minor,
     };
 
+
     const { error } = await supabase.from("profiles").update(payload).eq("id", user.id);
+
 
     if (error) {
       setSaving(false);
       setFormError("Enregistrement impossible : " + error.message);
       return;
     }
+
 
     // Nouveau poids : on l'ajoute à l'historique (sans bloquer si ça échoue).
     if (w !== null && w !== row?.weight_kg) {
@@ -324,6 +370,7 @@ function SubscriberProfileContent() {
       });
       if (measureError) console.error("Mesure de poids non enregistrée :", measureError);
     }
+
 
     const updated: ProfileRow = {
       age: a,
@@ -337,6 +384,7 @@ function SubscriberProfileContent() {
       program_start_date: programStartDate,
     };
 
+
     setRow(updated);
     setSaving(false);
     setEditing(false);
@@ -344,20 +392,26 @@ function SubscriberProfileContent() {
     await loadMeasurements();
   };
 
+
   const handleDeleteAccount = async () => {
     if (!user) return;
 
+
     setDeleting(true);
+
 
     try {
       // Supprimer les mesures
       await supabase.from("body_measurements").delete().eq("user_id", user.id);
 
+
       // Supprimer le profil
       await supabase.from("profiles").delete().eq("id", user.id);
 
+
       // Déconnexion
       await supabase.auth.signOut();
+
 
       navigate({ to: "/" });
     } catch (err) {
@@ -365,6 +419,7 @@ function SubscriberProfileContent() {
       setDeleting(false);
     }
   };
+
 
   if (row === undefined) {
     return (
@@ -376,11 +431,11 @@ function SubscriberProfileContent() {
     );
   }
 
+
   const planLabel =
     profile?.plan === "premium" ? "Premium" : profile?.plan === "basic" ? "Basic" : (profile?.plan ?? "—");
-  const statusLabel = profile?.subscription_status
-    ? (STATUS_LABELS[profile.subscription_status] ?? profile.subscription_status)
-    : "—";
+  const statusLabel = ACCESS_STATE_LABELS[accessState] ?? "—";
+
 
   return (
     <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
@@ -401,7 +456,8 @@ function SubscriberProfileContent() {
                 </div>
               </div>
 
-              {!editing ? (
+
+              {!editing && !isSuspended ? (
                 <Button
                   variant="outline"
                   className="rounded-2xl"
@@ -419,13 +475,15 @@ function SubscriberProfileContent() {
           </CardHeader>
         </Card>
 
+
         {loadError ? (
           <div className="rounded-2xl border border-destructive/40 px-4 py-3 text-sm text-destructive">
             {loadError}
           </div>
         ) : null}
 
-        {editing ? (
+
+        {editing && !isSuspended ? (
           <Card className="rounded-3xl border shadow-sm">
             <CardHeader>
               <CardTitle>Vos informations</CardTitle>
@@ -439,6 +497,7 @@ function SubscriberProfileContent() {
                   Complétez ces informations pour obtenir vos objectifs nutritionnels.
                 </div>
               ) : null}
+
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -494,6 +553,7 @@ function SubscriberProfileContent() {
                 </div>
               </div>
 
+
               {minorPreview ? (
                 <div className="rounded-2xl border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
                   Les moins de 18 ans nécessitent un accompagnement personnalisé : votre
@@ -523,6 +583,7 @@ function SubscriberProfileContent() {
                     </div>
                   </div>
 
+
                   {gender === "femme" ? (
                     <label className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-3 text-sm">
                       <input
@@ -535,6 +596,7 @@ function SubscriberProfileContent() {
                       Je suis enceinte ou j'allaite (facultatif)
                     </label>
                   ) : null}
+
 
                   <div className="space-y-2">
                     <Label>Niveau d'activité physique</Label>
@@ -561,6 +623,7 @@ function SubscriberProfileContent() {
                 </>
               )}
 
+
               <div className="space-y-2">
                 <Label>Votre objectif principal</Label>
                 <div className="grid grid-cols-2 gap-2">
@@ -583,11 +646,13 @@ function SubscriberProfileContent() {
                 </div>
               </div>
 
+
               {formError ? (
                 <div className="rounded-2xl border border-destructive/40 px-4 py-3 text-sm text-destructive">
                   {formError}
                 </div>
               ) : null}
+
 
               <div className="flex justify-end gap-2">
                 {isRowComplete(row) ? (
@@ -616,6 +681,7 @@ function SubscriberProfileContent() {
           </Card>
         ) : null}
 
+
         <div className="grid gap-4 md:grid-cols-2">
           <InfoCard
             icon={<BadgeCheck className="h-5 w-5" />}
@@ -632,38 +698,43 @@ function SubscriberProfileContent() {
             label="Nom complet"
             value={profile?.full_name ?? "—"}
           />
-          <InfoCard
-            icon={<Shield className="h-5 w-5" />}
-            label="Objectif principal"
-            value={row?.goal ? (GOAL_LABELS[row.goal] ?? "—") : "—"}
-          />
-          <InfoCard
-            icon={<Ruler className="h-5 w-5" />}
-            label="Taille"
-            value={row?.height_cm ? `${row.height_cm} cm` : "—"}
-          />
-          <InfoCard
-            icon={<Weight className="h-5 w-5" />}
-            label="Poids actuel"
-            value={row?.weight_kg ? `${row.weight_kg} kg` : "—"}
-          />
-          <InfoCard
-            icon={<Target className="h-5 w-5" />}
-            label="Poids objectif"
-            value={row?.target_weight_kg ? `${row.target_weight_kg} kg` : "—"}
-          />
-          <InfoCard
-            icon={<User className="h-5 w-5" />}
-            label="Sexe · activité"
-            value={
-              row?.gender || row?.activity_level
-                ? `${row?.gender === "homme" ? "Homme" : row?.gender === "femme" ? "Femme" : "—"} · ${
-                    row?.activity_level ? (ACTIVITY_LABELS[row.activity_level] ?? "—") : "—"
-                  }`
-                : "—"
-            }
-          />
+          {!isSuspended ? (
+            <>
+              <InfoCard
+                icon={<Shield className="h-5 w-5" />}
+                label="Objectif principal"
+                value={row?.goal ? (GOAL_LABELS[row.goal] ?? "—") : "—"}
+              />
+              <InfoCard
+                icon={<Ruler className="h-5 w-5" />}
+                label="Taille"
+                value={row?.height_cm ? `${row.height_cm} cm` : "—"}
+              />
+              <InfoCard
+                icon={<Weight className="h-5 w-5" />}
+                label="Poids actuel"
+                value={row?.weight_kg ? `${row.weight_kg} kg` : "—"}
+              />
+              <InfoCard
+                icon={<Target className="h-5 w-5" />}
+                label="Poids objectif"
+                value={row?.target_weight_kg ? `${row.target_weight_kg} kg` : "—"}
+              />
+              <InfoCard
+                icon={<User className="h-5 w-5" />}
+                label="Sexe · activité"
+                value={
+                  row?.gender || row?.activity_level
+                    ? `${row?.gender === "homme" ? "Homme" : row?.gender === "femme" ? "Femme" : "—"} · ${
+                        row?.activity_level ? (ACTIVITY_LABELS[row.activity_level] ?? "—") : "—"
+                      }`
+                    : "—"
+                }
+              />
+            </>
+          ) : null}
         </div>
+
 
         <Card className="rounded-3xl border shadow-sm">
           <CardHeader>
@@ -690,56 +761,64 @@ function SubscriberProfileContent() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border shadow-sm">
-          <CardHeader>
-            <CardTitle>Évolution du poids</CardTitle>
-            <CardDescription>
-              Historique simple pour garder une expérience cohérente avec l'espace patient.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {measurements === null ? (
-              <Skeleton className="h-48 w-full rounded-2xl" />
-            ) : chartData.length === 0 ? (
-              <div className="rounded-2xl bg-muted/30 p-4 text-sm text-muted-foreground">
-                Aucune mesure enregistrée pour le moment.
-              </div>
-            ) : (
-              <>
-                <div className="h-56 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="date" fontSize={11} />
-                      <YAxis domain={["auto", "auto"]} fontSize={11} />
-                      <Tooltip />
-                      <Line
-                        type="monotone"
-                        dataKey="weight"
-                        stroke="#6DB33F"
-                        strokeWidth={2}
-                        dot={{ r: 3 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
 
-                <div className="mt-4 rounded-2xl border">
-                  <ul className="divide-y text-sm">
-                    {[...(measurements ?? [])].reverse().map((m) => (
-                      <li key={m.id} className="flex items-center justify-between px-4 py-3">
-                        <span>{format(new Date(m.measured_at), "dd/MM/yyyy")}</span>
-                        <span className="font-medium">
-                          {m.weight_kg != null ? `${m.weight_kg} kg` : "—"}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+        <SubscriptionOfferCard />
+
+
+        {!isSuspended ? (
+          <Card className="rounded-3xl border shadow-sm">
+            <CardHeader>
+              <CardTitle>Évolution du poids</CardTitle>
+              <CardDescription>
+                Historique simple pour garder une expérience cohérente avec l'espace patient.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {measurements === null ? (
+                <Skeleton className="h-48 w-full rounded-2xl" />
+              ) : chartData.length === 0 ? (
+                <div className="rounded-2xl bg-muted/30 p-4 text-sm text-muted-foreground">
+                  Aucune mesure enregistrée pour le moment.
                 </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              ) : (
+                <>
+                  <div className="h-56 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis dataKey="date" fontSize={11} />
+                        <YAxis domain={["auto", "auto"]} fontSize={11} />
+                        <Tooltip />
+                        <Line
+                          type="monotone"
+                          dataKey="weight"
+                          stroke="#6DB33F"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+
+                  <div className="mt-4 rounded-2xl border">
+                    <ul className="divide-y text-sm">
+                      {[...(measurements ?? [])].reverse().map((m) => (
+                        <li key={m.id} className="flex items-center justify-between px-4 py-3">
+                          <span>{format(new Date(m.measured_at), "dd/MM/yyyy")}</span>
+                          <span className="font-medium">
+                            {m.weight_kg != null ? `${m.weight_kg} kg` : "—"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
+
 
         <Card className="rounded-3xl border shadow-sm">
           <CardHeader>
@@ -752,6 +831,7 @@ function SubscriberProfileContent() {
             <Button variant="outline" className="rounded-2xl">
               Gérer mes informations de compte
             </Button>
+
 
             <div className="border-t pt-4">
               <Button
@@ -769,6 +849,7 @@ function SubscriberProfileContent() {
           </CardContent>
         </Card>
       </div>
+
 
       {/* Dialog de confirmation */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
@@ -796,6 +877,7 @@ function SubscriberProfileContent() {
     </div>
   );
 }
+
 
 function InfoCard({
   icon,

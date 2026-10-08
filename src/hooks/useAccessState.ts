@@ -80,3 +80,45 @@ export function useBillingEnabled() {
 
   return { billingEnabled: query.data ?? false, loading: query.isLoading };
 }
+
+
+export interface MyBillingRow {
+  status: string;
+  billing_plan: string | null;
+  trial_end: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  managed_by_pro: boolean;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+}
+
+
+/** Ligne d'abonnement de l'utilisateur connecté (vide tant qu'il n'a jamais payé). */
+export function useMyBilling() {
+  const { user, role } = useAuth();
+
+
+  const query = useQuery({
+    queryKey: ["my-billing", user?.id ?? null],
+    enabled: Boolean(user) && role === "subscriber",
+    staleTime: 60_000,
+    queryFn: async (): Promise<MyBillingRow | null> => {
+      const { data, error } = await supabase
+        .from("subscriber_billing")
+        .select(
+          "status, billing_plan, trial_end, current_period_end, cancel_at_period_end, managed_by_pro, stripe_customer_id, stripe_subscription_id",
+        )
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error) {
+        console.error("[useMyBilling]", error);
+        return null;
+      }
+      return (data as MyBillingRow | null) ?? null;
+    },
+  });
+
+
+  return { billing: query.data ?? null, loading: query.isLoading };
+}
