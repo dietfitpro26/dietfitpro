@@ -198,7 +198,9 @@ function PatientDetailContent() {
         .order("created_at", { ascending: false }),
       supabase.from("body_measurements")
         .select("id, measured_at, weight_kg, body_fat_pct, muscle_mass_kg, metabolic_age, visceral_fat, waist_cm, hip_cm, arm_cm, thigh_cm, chest_cm, notes")
-        .eq("patient_id", patientRow.id).order("measured_at", { ascending: true }),
+        .eq("patient_id", patientRow.id)
+        .order("measured_at", { ascending: true })
+        .order("created_at", { ascending: true }),
       userId
         ? supabase.from("appointments")
             .select("id, starts_at, ends_at, status, is_visio")
@@ -222,22 +224,20 @@ function PatientDetailContent() {
     const { data } = await supabase
       .from("subscriber_overrides")
       .select("*")
-      .eq("user_id", patientRow.user_id)
-      .maybeSingle();
+      .eq("user_id", patientRow.user_id);
     setAccessLoading(false);
-    if (data) {
-      setAccess({
-        access_recipes:            data.access_recipes            ?? true,
-        access_sport_programs:     data.access_sport_programs     ?? true,
-        access_nutrition_programs: data.access_nutrition_programs ?? true,
-        access_messaging:          data.access_messaging          ?? true,
-        access_visio:              data.access_visio              ?? false,
-        access_premium_content:    data.access_premium_content    ?? false,
-        access_ai_coach:           data.access_ai_coach           ?? false,
-      });
-    } else {
+    const rows = (data ?? []) as Array<Record<string, unknown>>;
+    if (rows.length === 0) {
       setAccess(DEFAULT_ACCESS);
+      return;
     }
+    const next: PatientAccess = { ...DEFAULT_ACCESS };
+    (Object.keys(DEFAULT_ACCESS) as (keyof PatientAccess)[]).forEach((key) => {
+      const row = rows.find((r) => r.feature_key === key);
+      if (row) next[key] = Boolean(row.enabled);
+      else if (typeof rows[0][key] === "boolean") next[key] = rows[0][key] as boolean;
+    });
+    setAccess(next);
   };
 
   const saveAccess = async () => {
@@ -246,12 +246,16 @@ function PatientDetailContent() {
       return;
     }
     setSavingAccess(true);
+    const keys = Object.keys(access) as (keyof PatientAccess)[];
+    const rows = keys.map((key) => ({
+      user_id: patient.user_id,
+      feature_key: key,
+      enabled: access[key],
+      ...access,
+    }));
     const { error } = await supabase
       .from("subscriber_overrides")
-      .upsert(
-        { user_id: patient.user_id, pro_id: user?.id, ...access, updated_at: new Date().toISOString() },
-        { onConflict: "user_id" }
-      );
+      .upsert(rows, { onConflict: "user_id,feature_key" });
     setSavingAccess(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Droits d'accès mis à jour ✅");
@@ -326,7 +330,11 @@ function PatientDetailContent() {
 
   const initials = `${patient.first_name[0] ?? ""}${patient.last_name[0] ?? ""}`.toUpperCase();
   const goal = patient.goal ? (GOAL_LABEL[patient.goal] ?? "—") : "—";
-  const bmi = calcBmi(patient.weight_kg, patient.height_cm);
+  // Poids actuel = dernière mesure enregistrée (sinon poids de la fiche)
+  const latestMeasuredWeight =
+    [...measurements].reverse().find((m) => m.weight_kg != null)?.weight_kg ?? null;
+  const currentWeight = latestMeasuredWeight ?? patient.weight_kg;
+  const bmi = calcBmi(currentWeight, patient.height_cm);
 
   // Données formatées pour BodyMetricsChart : on injecte height_cm sur chaque
   // point pour permettre le calcul auto de l'IMC dans le composant.
@@ -406,13 +414,13 @@ function PatientDetailContent() {
           {/* ── ÉVOLUTION ── */}
           <TabsContent value="evolution" className="mt-2 space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <KpiCard label="Poids actuel" value={patient.weight_kg ? `${patient.weight_kg} kg` : "—"} />
+              <KpiCard label="Poids actuel" value={currentWeight ? `${currentWeight} kg` : "—"} />
               <KpiCard label="Poids cible" value={patient.target_weight_kg ? `${patient.target_weight_kg} kg` : "—"} color="green" />
               <KpiCard label="IMC" value={bmi} />
               <KpiCard
                 label={patient.goal === "prise_de_masse" ? "À gagner" : "À perdre"}
-                value={patient.weight_kg && patient.target_weight_kg
-                  ? `${Math.abs(patient.weight_kg - patient.target_weight_kg).toFixed(1)} kg` : "—"}
+                value={currentWeight && patient.target_weight_kg
+                  ? `${Math.abs(currentWeight - patient.target_weight_kg).toFixed(1)} kg` : "—"}
                 color="orange"
               />
             </div>
@@ -478,7 +486,7 @@ function PatientDetailContent() {
                 <InfoRow label="Date de naissance" value={patient.birth_date ? new Date(patient.birth_date).toLocaleDateString("fr-FR") : "—"} />
                 <InfoRow label="Genre" value={patient.gender ?? "—"} />
                 <InfoRow label="Taille" value={patient.height_cm ? `${patient.height_cm} cm` : "—"} />
-                <InfoRow label="Poids actuel" value={patient.weight_kg ? `${patient.weight_kg} kg` : "—"} />
+                <InfoRow label="Poids actuel" value={currentWeight ? `${currentWeight} kg` : "—"} />
                 <InfoRow label="Poids cible" value={patient.target_weight_kg ? `${patient.target_weight_kg} kg` : "—"} />
                 <InfoRow label="IMC" value={bmi} />
                 <InfoRow label="Objectif" value={goal} />
@@ -533,7 +541,7 @@ function PatientDetailContent() {
 
     {/* Calculateur de macros */}
     <MacroCalculator
-      weight_kg={patient.weight_kg}
+      weight_kg={currentWeight}
       height_cm={patient.height_cm}
       age={patient.birth_date
         ? Math.floor((Date.now() - new Date(patient.birth_date).getTime()) / 31557600000)

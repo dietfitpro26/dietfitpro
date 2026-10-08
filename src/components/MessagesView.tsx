@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Paperclip, Send, FileText, Check, CheckCheck, Search } from "lucide-react";
+import { Paperclip, Send, FileText, Check, CheckCheck, Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useConversations, useConversation, type Conversation } from "@/hooks/useMessages";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -8,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
+
 function initials(name: string | null, email: string) {
-  const src = name?.trim() || email;
+  const src = name?.trim() || email || "?";
   return src
     .split(/\s+/)
     .map((w) => w[0])
@@ -19,7 +21,14 @@ function initials(name: string | null, email: string) {
     .toUpperCase();
 }
 
+
+function displayName(partner: Conversation["partner"]) {
+  return partner.full_name || partner.email || "Contact";
+}
+
+
 function formatTime(iso: string) {
+  if (!iso) return "";
   const d = new Date(iso);
   const today = new Date();
   const sameDay =
@@ -30,6 +39,7 @@ function formatTime(iso: string) {
     ? d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
     : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
+
 
 function ConversationList({
   conversations,
@@ -44,10 +54,9 @@ function ConversationList({
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return conversations;
-    return conversations.filter((c) =>
-      (c.partner.full_name ?? c.partner.email).toLowerCase().includes(t),
-    );
+    return conversations.filter((c) => displayName(c.partner).toLowerCase().includes(t));
   }, [q, conversations]);
+
 
   return (
     <div className="flex h-full flex-col border-r bg-background">
@@ -70,7 +79,7 @@ function ConversationList({
         )}
         {filtered.map((c) => {
           const active = c.partner.id === activeId;
-          const name = c.partner.full_name ?? c.partner.email;
+          const name = displayName(c.partner);
           return (
             <button
               key={c.partner.id}
@@ -87,9 +96,11 @@ function ConversationList({
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-baseline gap-2">
                   <p className="text-sm font-medium truncate">{name}</p>
-                  <span className="text-[10px] text-muted-foreground shrink-0">
-                    {formatTime(c.lastMessage.created_at)}
-                  </span>
+                  {!c.isPlaceholder && (
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {formatTime(c.lastMessage.created_at)}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <p
@@ -98,9 +109,11 @@ function ConversationList({
                       c.unreadCount > 0 ? "text-foreground font-semibold" : "text-muted-foreground",
                     )}
                   >
-                    {c.lastMessage.attachment_url && !c.lastMessage.content
-                      ? "📎 Pièce jointe"
-                      : c.lastMessage.content}
+                    {c.isPlaceholder
+                      ? "Écrire le premier message"
+                      : c.lastMessage.attachment_url && !c.lastMessage.content
+                        ? "📎 Pièce jointe"
+                        : c.lastMessage.content}
                   </p>
                   {c.unreadCount > 0 && (
                     <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#6DB33F] text-white text-[10px] font-semibold flex items-center justify-center">
@@ -117,18 +130,29 @@ function ConversationList({
   );
 }
 
-function ChatPane({ partner }: { partner: Conversation["partner"] | null }) {
+
+function ChatPane({
+  partner,
+  onDeleteConversation,
+}: {
+  partner: Conversation["partner"] | null;
+  /** Fourni uniquement au professionnel : affiche le bouton « Supprimer la conversation ». */
+  onDeleteConversation?: (partner: Conversation["partner"]) => Promise<void>;
+}) {
   const { user } = useAuth();
   const { messages, sendMessage } = useConversation(partner?.id ?? null);
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
 
   if (!partner) {
     return (
@@ -137,6 +161,7 @@ function ChatPane({ partner }: { partner: Conversation["partner"] | null }) {
       </div>
     );
   }
+
 
   const handleSend = async () => {
     if (sending) return;
@@ -147,12 +172,28 @@ function ChatPane({ partner }: { partner: Conversation["partner"] | null }) {
       setText("");
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur inconnue";
+      toast.error("Message non envoyé : " + message);
     } finally {
       setSending(false);
     }
   };
 
-  const name = partner.full_name ?? partner.email;
+
+  const handleDeleteClick = async () => {
+    if (!onDeleteConversation || deleting) return;
+    setDeleting(true);
+    try {
+      await onDeleteConversation(partner);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+
+  const name = displayName(partner);
+
 
   return (
     <div className="flex flex-1 flex-col bg-muted/20">
@@ -161,13 +202,32 @@ function ChatPane({ partner }: { partner: Conversation["partner"] | null }) {
           {partner.avatar_url && <AvatarImage src={partner.avatar_url} alt={name} />}
           <AvatarFallback>{initials(partner.full_name, partner.email)}</AvatarFallback>
         </Avatar>
-        <div>
-          <p className="text-sm font-medium">{name}</p>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{name}</p>
           <p className="text-xs text-muted-foreground capitalize">{partner.role}</p>
         </div>
+        {onDeleteConversation && messages.length > 0 ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+            onClick={() => void handleDeleteClick()}
+            disabled={deleting}
+          >
+            <Trash2 className="mr-1 h-4 w-4" />
+            {deleting ? "Suppression…" : "Supprimer la conversation"}
+          </Button>
+        ) : null}
       </header>
 
+
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
+        {messages.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground">
+            Aucun message pour l'instant. Écrivez le premier message ci-dessous.
+          </p>
+        )}
         {messages.map((m, i) => {
           const mine = m.sender_id === user?.id;
           const prev = messages[i - 1];
@@ -226,6 +286,7 @@ function ChatPane({ partner }: { partner: Conversation["partner"] | null }) {
         <div ref={bottomRef} />
       </div>
 
+
       <div className="p-3 border-t bg-background">
         {file && (
           <div className="mb-2 flex items-center gap-2 text-xs bg-muted px-2 py-1 rounded">
@@ -281,9 +342,14 @@ function ChatPane({ partner }: { partner: Conversation["partner"] | null }) {
   );
 }
 
+
 export function MessagesView() {
-  const { conversations } = useConversations();
+  const { profile } = useAuth();
+  const { conversations, deleteConversation } = useConversations();
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [threadVersion, setThreadVersion] = useState(0);
+  const isPro = profile?.role === "pro";
+
 
   useEffect(() => {
     if (!activeId && conversations.length > 0) {
@@ -291,7 +357,38 @@ export function MessagesView() {
     }
   }, [conversations, activeId]);
 
+
   const active = conversations.find((c) => c.partner.id === activeId)?.partner ?? null;
+
+
+  const handleDeleteConversation = async (partner: Conversation["partner"]) => {
+    const name = displayName(partner);
+    const confirmed = window.confirm(
+      `Supprimer définitivement toute la conversation avec ${name} ?\n\n` +
+        "Les messages et les pièces jointes seront aussi supprimés chez votre interlocuteur. " +
+        "Cette action est irréversible.",
+    );
+    if (!confirmed) return;
+    try {
+      const result = await deleteConversation(partner.id);
+      toast.success(
+        `Conversation supprimée (${result.deletedMessages} message${result.deletedMessages > 1 ? "s" : ""}).`,
+      );
+      if (result.filesTotal > result.filesRemoved) {
+        toast.warning(
+          `${result.filesTotal - result.filesRemoved} fichier(s) joint(s) n'ont pas pu être supprimé(s) du stockage.`,
+        );
+      }
+      setThreadVersion((v) => v + 1);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur inconnue";
+      toast.error("Suppression impossible : " + message);
+    }
+  };
+
+
+  const onDelete = isPro ? handleDeleteConversation : undefined;
+
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
@@ -312,7 +409,11 @@ export function MessagesView() {
             >
               ← Conversations
             </button>
-            <ChatPane partner={active} />
+            <ChatPane
+              key={`${active.id}-${threadVersion}`}
+              partner={active}
+              onDeleteConversation={onDelete}
+            />
           </div>
         ) : (
           <ConversationList
@@ -323,7 +424,11 @@ export function MessagesView() {
         )}
       </div>
       <div className="hidden md:flex flex-1">
-        <ChatPane partner={active} />
+        <ChatPane
+          key={`${active?.id ?? "none"}-${threadVersion}`}
+          partner={active}
+          onDeleteConversation={onDelete}
+        />
       </div>
     </div>
   );
