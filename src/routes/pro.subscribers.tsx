@@ -20,11 +20,13 @@ import {
   Star,
   Loader2,
   Trash2,
+  CreditCard,
 } from "lucide-react";
 
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useBillingEnabled } from "@/hooks/useAccessState";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -56,6 +58,18 @@ type Subscriber = {
   bmi: number | null;
   goal: string | null;
   created_at: string;
+};
+
+
+type BillingRow = {
+  user_id: string;
+  status: string;
+  billing_plan: string | null;
+  trial_end: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  managed_by_pro: boolean;
+  stripe_subscription_id: string | null;
 };
 
 
@@ -217,6 +231,59 @@ function getPlanBadge(plan: SubscriberPlan) {
 }
 
 
+function getBillingBadge(billing: BillingRow | undefined, billingEnabled: boolean) {
+  if (billing?.managed_by_pro) {
+    return (
+      <Badge className="border-0 bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
+        Géré par vous
+      </Badge>
+    );
+  }
+
+
+  const status = billing?.status ?? "none";
+
+
+  if (status === "trialing") {
+    return (
+      <Badge className="border-0 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+        Essai gratuit
+      </Badge>
+    );
+  }
+
+
+  if (status === "active") {
+    return (
+      <Badge className="border-0 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+        {billing?.cancel_at_period_end ? "Actif · fin prévue" : "Abonnement actif"}
+      </Badge>
+    );
+  }
+
+
+  if (status === "past_due") {
+    return (
+      <Badge className="border-0 bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+        Paiement en retard
+      </Badge>
+    );
+  }
+
+
+  if (status === "canceled" || status === "unpaid" || status === "incomplete_expired") {
+    return (
+      <Badge className="border-0 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+        Suspendu
+      </Badge>
+    );
+  }
+
+
+  return <Badge variant="outline">{billingEnabled ? "Sans abonnement" : "Paiement désactivé"}</Badge>;
+}
+
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("fr-FR", {
     day: "2-digit",
@@ -291,6 +358,133 @@ function Toggle({
         }`}
       />
     </button>
+  );
+}
+
+
+function BillingPanel({
+  subscriberId,
+  displayName,
+  billing,
+  billingEnabled,
+  onModeChanged,
+}: {
+  subscriberId: string;
+  displayName: string;
+  billing: BillingRow | undefined;
+  billingEnabled: boolean;
+  onModeChanged: (subscriberId: string, managed: boolean) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const managed = billing?.managed_by_pro ?? false;
+  const hasStripeSubscription = Boolean(billing?.stripe_subscription_id);
+
+
+  const changeMode = async (nextManaged: boolean) => {
+    let message: string;
+
+
+    if (nextManaged) {
+      message = hasStripeSubscription
+        ? `Gérer manuellement ${displayName} ?\n\nSon abonnement Stripe reste actif : pensez à le résilier dans Stripe pour éviter un double paiement.`
+        : `Gérer manuellement ${displayName} ?\n\nIl gardera son accès sans paiement en ligne.`;
+    } else {
+      message = billingEnabled
+        ? `Rendre la main à Stripe pour ${displayName} ?\n\nSon accès dépendra désormais de son abonnement en ligne : s'il n'en a pas, il devra souscrire pour continuer.`
+        : `Rendre la main à Stripe pour ${displayName} ?\n\nLe paiement en ligne est encore désactivé : son accès ne change pas pour le moment.`;
+    }
+
+
+    if (!window.confirm(message)) return;
+
+
+    setSaving(true);
+
+
+    const { error } = await supabase.rpc("pro_set_billing_mode", {
+      p_subscriber_id: subscriberId,
+      p_managed: nextManaged,
+    });
+
+
+    setSaving(false);
+
+
+    if (error) {
+      console.error("[BillingPanel] Erreur :", error);
+      window.alert(`Impossible de modifier le mode de paiement : ${error.message}`);
+      return;
+    }
+
+
+    onModeChanged(subscriberId, nextManaged);
+  };
+
+
+  return (
+    <div className="border-t px-4 pb-4 pt-3">
+      <p className="mb-3 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <CreditCard className="h-3.5 w-3.5" />
+        Abonnement et paiement
+      </p>
+
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background px-3 py-3">
+        <div className="space-y-1 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            {getBillingBadge(billing, billingEnabled)}
+            {billing?.billing_plan ? (
+              <span className="text-xs text-muted-foreground">
+                Formule en ligne : {billing.billing_plan}
+              </span>
+            ) : null}
+          </div>
+
+
+          {billing?.status === "trialing" && billing.trial_end ? (
+            <p className="text-xs text-muted-foreground">
+              Essai jusqu'au {formatDate(billing.trial_end)}
+            </p>
+          ) : null}
+
+
+          {billing?.status === "active" && billing.current_period_end ? (
+            <p className="text-xs text-muted-foreground">
+              {billing.cancel_at_period_end ? "Se termine le" : "Prochain renouvellement le"}{" "}
+              {formatDate(billing.current_period_end)}
+            </p>
+          ) : null}
+
+
+          <p className="text-xs text-muted-foreground">
+            {managed
+              ? "Vous gérez son accès à la main : Stripe n'a aucun effet sur son compte."
+              : "Son accès dépend de son abonnement en ligne (Stripe)."}
+          </p>
+        </div>
+
+
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="rounded-xl"
+          disabled={saving}
+          onClick={() => void changeMode(!managed)}
+        >
+          {saving ? (
+            <>
+              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              Mise à jour…
+            </>
+          ) : managed ? (
+            "Rendre la main à Stripe"
+          ) : (
+            "Gérer manuellement"
+          )}
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -550,9 +744,11 @@ function Page() {
 
 function Content() {
   const { user } = useAuth();
+  const { billingEnabled } = useBillingEnabled();
 
 
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [billingMap, setBillingMap] = useState<Record<string, BillingRow>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterGoal, setFilterGoal] = useState("all");
@@ -595,8 +791,40 @@ function Content() {
           error,
         );
         setSubscribers([]);
+        setBillingMap({});
       } else {
-        setSubscribers((data ?? []) as Subscriber[]);
+        const list = (data ?? []) as Subscriber[];
+        setSubscribers(list);
+
+
+        if (list.length > 0) {
+          const { data: billingData, error: billingError } = await supabase
+            .from("subscriber_billing")
+            .select(
+              "user_id, status, billing_plan, trial_end, current_period_end, cancel_at_period_end, managed_by_pro, stripe_subscription_id",
+            )
+            .in(
+              "user_id",
+              list.map((item) => item.id),
+            );
+
+
+          if (!mounted) return;
+
+
+          if (billingError) {
+            console.error("[pro.subscribers] Erreur chargement paiements :", billingError);
+            setBillingMap({});
+          } else {
+            const map: Record<string, BillingRow> = {};
+            for (const row of (billingData ?? []) as BillingRow[]) {
+              map[row.user_id] = row;
+            }
+            setBillingMap(map);
+          }
+        } else {
+          setBillingMap({});
+        }
       }
 
 
@@ -611,6 +839,23 @@ function Content() {
       mounted = false;
     };
   }, [user]);
+
+
+  const handleBillingModeChanged = useCallback((subscriberId: string, managed: boolean) => {
+    setBillingMap((previous) => ({
+      ...previous,
+      [subscriberId]: {
+        user_id: subscriberId,
+        status: previous[subscriberId]?.status ?? "none",
+        billing_plan: previous[subscriberId]?.billing_plan ?? null,
+        trial_end: previous[subscriberId]?.trial_end ?? null,
+        current_period_end: previous[subscriberId]?.current_period_end ?? null,
+        cancel_at_period_end: previous[subscriberId]?.cancel_at_period_end ?? false,
+        stripe_subscription_id: previous[subscriberId]?.stripe_subscription_id ?? null,
+        managed_by_pro: managed,
+      },
+    }));
+  }, []);
 
 
   const handleTogglePremium = useCallback(
@@ -804,6 +1049,11 @@ function Content() {
       : null;
 
 
+  const pastDueCount = subscribers.filter(
+    (subscriber) => billingMap[subscriber.id]?.status === "past_due",
+  ).length;
+
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center gap-3">
@@ -819,7 +1069,7 @@ function Content() {
       </div>
 
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
         <div className="rounded-lg border bg-card p-4 text-center">
           <p className="text-2xl font-bold text-primary">
             {subscribers.length}
@@ -840,6 +1090,22 @@ function Content() {
 
           <p className="mt-1 text-xs text-muted-foreground">
             IMC moyen
+          </p>
+        </div>
+
+
+        <div className="rounded-lg border bg-card p-4 text-center">
+          <p
+            className={`text-2xl font-bold ${
+              pastDueCount > 0 ? "text-orange-500" : "text-primary"
+            }`}
+          >
+            {pastDueCount}
+          </p>
+
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            Paiements en retard
           </p>
         </div>
       </div>
@@ -958,6 +1224,9 @@ function Content() {
 
 
                       {getPlanBadge(subscriber.plan)}
+
+
+                      {getBillingBadge(billingMap[subscriber.id], billingEnabled)}
                     </div>
 
 
@@ -1059,6 +1328,15 @@ function Content() {
 
                 {isOpen ? (
                   <>
+                    <BillingPanel
+                      subscriberId={subscriber.id}
+                      displayName={subscriber.full_name ?? subscriber.email}
+                      billing={billingMap[subscriber.id]}
+                      billingEnabled={billingEnabled}
+                      onModeChanged={handleBillingModeChanged}
+                    />
+
+
                     <OverridesPanel userId={subscriber.id} />
 
 

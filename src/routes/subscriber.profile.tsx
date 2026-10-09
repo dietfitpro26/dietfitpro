@@ -401,22 +401,27 @@ function SubscriberProfileContent() {
 
 
     try {
-      // Supprimer les mesures
-      await supabase.from("body_measurements").delete().eq("user_id", user.id);
+      // La fonction serveur annule l'abonnement en ligne, supprime les données et le compte de connexion.
+      const { data, error } = await supabase.functions.invoke("delete-account", { body: {} });
 
 
-      // Supprimer le profil
-      await supabase.from("profiles").delete().eq("id", user.id);
+      if (error || !(data as { success?: boolean } | null)?.success) {
+        let message = "Suppression impossible pour le moment. Réessayez ou contactez votre professionnel.";
+        const serverError = (data as { error?: string } | null)?.error;
+        if (serverError) message = serverError;
+        throw new Error(message);
+      }
 
 
-      // Déconnexion
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" });
 
 
       navigate({ to: "/" });
     } catch (err) {
       console.error(err);
+      toast.error(err instanceof Error ? err.message : "Suppression impossible.");
       setDeleting(false);
+      setDeleteOpen(false);
     }
   };
 
@@ -843,7 +848,8 @@ function SubscriberProfileContent() {
                 Supprimer mon compte
               </Button>
               <p className="mt-2 text-xs text-muted-foreground">
-                Cette action est irréversible. Toutes vos données seront supprimées.
+                Cette action est irréversible. Toutes vos données seront supprimées, et votre
+                abonnement en ligne éventuel sera annulé.
               </p>
             </div>
           </CardContent>
@@ -860,8 +866,8 @@ function SubscriberProfileContent() {
               Supprimer votre compte ?
             </DialogTitle>
             <DialogDescription>
-              Vous allez supprimer définitivement votre compte abonné et toutes vos données. Cette
-              action est irréversible.
+              Vous allez supprimer définitivement votre compte abonné et toutes vos données. Votre
+              abonnement en ligne éventuel sera annulé. Cette action est irréversible.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
