@@ -65,6 +65,44 @@ function toIso(seconds: number | null | undefined): string | null {
   return typeof seconds === "number" ? new Date(seconds * 1000).toISOString() : null;
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// Envoi d'e-mail via Resend. Ne fait jamais échouer le webhook : en cas de problème, on note l'erreur dans les journaux.
+async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+  const apiKey = Deno.env.get("RESEND_API_KEY");
+
+  if (!apiKey) {
+    console.error("[stripe-webhook] RESEND_API_KEY manquante : e-mail non envoyé.");
+    return;
+  }
+
+  const from = Deno.env.get("RESEND_FROM") ?? "DietFitPro <onboarding@resend.dev>";
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from, to: [to], subject, html }),
+    });
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      console.error("[stripe-webhook] Resend a refusé l'envoi :", response.status, detail);
+    }
+  } catch (error) {
+    console.error("[stripe-webhook] Resend injoignable :", error instanceof Error ? error.message : error);
+  }
+}
+
 // deno-lint-ignore no-explicit-any
 type Admin = any;
 
@@ -143,6 +181,70 @@ async function onSubscription(admin: Admin, eventSubscription: any, deleted: boo
   if (error) throw new Error(`apply_stripe_subscription : ${error.message}`);
 }
 
+// Paiement d'abonnement refusé : on prévient l'abonné par e-mail pour qu'il mette à jour sa carte.
+async function onPaymentFailed(admin: Admin, invoice: any) {
+  const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+  if (!customerId) return;
+
+  const { data: billing } = await admin
+    .from("subscriber_billing")
+    .select("user_id, managed_by_pro")
+    .eq("stripe_customer_id", customerId)
+    .maybeSingle();
+
+  if (!billing?.user_id) return;
+
+  // Formule gérée à la main par le professionnel : pas d'e-mail automatique.
+  if (billing.managed_by_pro) return;
+
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("email, full_name")
+    .eq("id", billing.user_id)
+    .maybeSingle();
+
+  const to: string | null = profile?.email ?? invoice.customer_email ?? null;
+  if (!to) return;
+
+  const siteUrl = (Deno.env.get("SITE_URL") ?? "http://localhost:8080").replace(/\/$/, "");
+  const profileUrl = `${siteUrl}/subscriber/profile`;
+
+  const firstName = escapeHtml(((profile?.full_name as string | null) ?? "").trim().split(" ")[0] ?? "");
+  const greeting = firstName ? `Bonjour ${firstName},` : "Bonjour,";
+
+  const amount = (((invoice.amount_due as number | undefined) ?? 0) / 100).toFixed(2).replace(".", ",");
+
+  const nextAttempt = typeof invoice.next_payment_attempt === "number"
+    ? new Date(invoice.next_payment_attempt * 1000).toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
+    : null;
+
+  const retryLine = nextAttempt
+    ? `<p>Une nouvelle tentative de prélèvement aura lieu le ${nextAttempt}.</p>`
+    : "<p>Sans mise à jour de votre moyen de paiement, votre accès pourra être suspendu.</p>";
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; color: #1f2937; line-height: 1.5;">
+      <h2 style="color: #2D7A1F;">Votre paiement n'a pas abouti</h2>
+      <p>${greeting}</p>
+      <p>Nous n'avons pas pu prélever ${amount} € pour votre abonnement DietFitPro.</p>
+      ${retryLine}
+      <p>Pour éviter toute interruption, mettez à jour votre moyen de paiement depuis votre espace :</p>
+      <p style="margin: 24px 0;">
+        <a href="${profileUrl}" style="background: #6DB33F; color: #ffffff; padding: 12px 20px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+          Mettre à jour mon moyen de paiement
+        </a>
+      </p>
+      <p style="font-size: 12px; color: #6b7280;">Dans votre profil, utilisez « Gérer mon abonnement et mes factures ». Vos données sont conservées. Si vous avez déjà régularisé, ignorez ce message.</p>
+    </div>
+  `;
+
+  await sendEmail(to, "Votre paiement DietFitPro n'a pas abouti", html);
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return new Response("Méthode non autorisée", { status: 405 });
 
@@ -192,6 +294,9 @@ Deno.serve(async (request: Request) => {
         break;
       case "customer.subscription.deleted":
         await onSubscription(admin, event.data.object, true);
+        break;
+      case "invoice.payment_failed":
+        await onPaymentFailed(admin, event.data.object);
         break;
       default:
         break;
