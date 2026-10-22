@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -179,8 +180,8 @@ Deno.serve(async (request: Request) => {
         "subscription_data[metadata][user_id]": user.id,
         "subscription_data[metadata][plan]": plan,
         "subscription_data[trial_period_days]": trialDays,
-        success_url: `${origin}/subscriber/profile?checkout=success`,
-        cancel_url: `${origin}/subscriber/profile?checkout=cancel`,
+        success_url: `${origin}/home?checkout=success`,
+        cancel_url: `${origin}/home?checkout=cancel`,
       });
 
       return json({ url: session.url });
@@ -202,8 +203,8 @@ Deno.serve(async (request: Request) => {
         "metadata[kind]": "custom_program",
         "payment_intent_data[metadata][user_id]": user.id,
         "payment_intent_data[metadata][kind]": "custom_program",
-        success_url: `${origin}/subscriber/profile?checkout=success`,
-        cancel_url: `${origin}/subscriber/profile?checkout=cancel`,
+        success_url: `${origin}/home?checkout=success`,
+        cancel_url: `${origin}/subscriber/nutrition`,
       });
 
       await admin.from("purchases").insert({

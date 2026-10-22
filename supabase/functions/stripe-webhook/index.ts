@@ -1,4 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// @ts-nocheck 
+// import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // IMPORTANT : cette fonction doit être déployée avec "Verify JWT" désactivé,
 // car c'est Stripe (et non un utilisateur connecté) qui l'appelle.
