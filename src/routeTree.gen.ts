@@ -11,11 +11,15 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ProgressRouteImport } from './routes/progress'
+import { Route as MentionsLegalesRouteImport } from './routes/mentions-legales'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as FeedRouteImport } from './routes/feed'
+import { Route as ConfidentialiteRouteImport } from './routes/confidentialite'
+import { Route as CgvRouteImport } from './routes/cgv'
 import { Route as BienvenueRouteImport } from './routes/bienvenue'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as GroupsIndexRouteImport } from './routes/groups.index'
 import { Route as SubscriberSportRouteImport } from './routes/subscriber.sport'
 import { Route as SubscriberProfileRouteImport } from './routes/subscriber.profile'
 import { Route as SubscriberNutritionRouteImport } from './routes/subscriber.nutrition'
@@ -43,12 +47,13 @@ import { Route as PatientDashboardRouteImport } from './routes/patient.dashboard
 import { Route as PatientConsultationsRouteImport } from './routes/patient.consultations'
 import { Route as PatientAnamneseRouteImport } from './routes/patient.anamnese'
 import { Route as PatientAgendaRouteImport } from './routes/patient.agenda'
+import { Route as GroupsJoinRouteImport } from './routes/groups.join'
+import { Route as GroupsGroupIdRouteImport } from './routes/groups.$groupId'
 import { Route as ProSportProgramIdRouteImport } from './routes/pro.sport.$programId'
 import { Route as ProRecipesNewRouteImport } from './routes/pro.recipes.new'
 import { Route as ProPatientsPatientIdRouteImport } from './routes/pro.patients.$patientId'
 import { Route as ProNutritionProgramIdRouteImport } from './routes/pro.nutrition.$programId'
 import { Route as ProConsultationsIdRouteImport } from './routes/pro.consultations.$id'
-import { Route as PatientPayConsultationIdRouteImport } from './routes/patient.pay.$consultationId'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -58,6 +63,11 @@ const RegisterRoute = RegisterRouteImport.update({
 const ProgressRoute = ProgressRouteImport.update({
   id: '/progress',
   path: '/progress',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MentionsLegalesRoute = MentionsLegalesRouteImport.update({
+  id: '/mentions-legales',
+  path: '/mentions-legales',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -75,6 +85,16 @@ const FeedRoute = FeedRouteImport.update({
   path: '/feed',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConfidentialiteRoute = ConfidentialiteRouteImport.update({
+  id: '/confidentialite',
+  path: '/confidentialite',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CgvRoute = CgvRouteImport.update({
+  id: '/cgv',
+  path: '/cgv',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BienvenueRoute = BienvenueRouteImport.update({
   id: '/bienvenue',
   path: '/bienvenue',
@@ -83,6 +103,11 @@ const BienvenueRoute = BienvenueRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GroupsIndexRoute = GroupsIndexRouteImport.update({
+  id: '/groups/',
+  path: '/groups/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SubscriberSportRoute = SubscriberSportRouteImport.update({
@@ -220,6 +245,16 @@ const PatientAgendaRoute = PatientAgendaRouteImport.update({
   path: '/patient/agenda',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GroupsJoinRoute = GroupsJoinRouteImport.update({
+  id: '/groups/join',
+  path: '/groups/join',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GroupsGroupIdRoute = GroupsGroupIdRouteImport.update({
+  id: '/groups/$groupId',
+  path: '/groups/$groupId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProSportProgramIdRoute = ProSportProgramIdRouteImport.update({
   id: '/$programId',
   path: '/$programId',
@@ -245,21 +280,20 @@ const ProConsultationsIdRoute = ProConsultationsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => ProConsultationsRoute,
 } as any)
-const PatientPayConsultationIdRoute =
-  PatientPayConsultationIdRouteImport.update({
-    id: '/patient/pay/$consultationId',
-    path: '/patient/pay/$consultationId',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/bienvenue': typeof BienvenueRoute
+  '/cgv': typeof CgvRoute
+  '/confidentialite': typeof ConfidentialiteRoute
   '/feed': typeof FeedRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/mentions-legales': typeof MentionsLegalesRoute
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
+  '/groups/$groupId': typeof GroupsGroupIdRoute
+  '/groups/join': typeof GroupsJoinRoute
   '/patient/agenda': typeof PatientAgendaRoute
   '/patient/anamnese': typeof PatientAnamneseRoute
   '/patient/consultations': typeof PatientConsultationsRoute
@@ -287,7 +321,7 @@ export interface FileRoutesByFullPath {
   '/subscriber/nutrition': typeof SubscriberNutritionRoute
   '/subscriber/profile': typeof SubscriberProfileRoute
   '/subscriber/sport': typeof SubscriberSportRoute
-  '/patient/pay/$consultationId': typeof PatientPayConsultationIdRoute
+  '/groups/': typeof GroupsIndexRoute
   '/pro/consultations/$id': typeof ProConsultationsIdRoute
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
   '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
@@ -297,11 +331,16 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bienvenue': typeof BienvenueRoute
+  '/cgv': typeof CgvRoute
+  '/confidentialite': typeof ConfidentialiteRoute
   '/feed': typeof FeedRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/mentions-legales': typeof MentionsLegalesRoute
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
+  '/groups/$groupId': typeof GroupsGroupIdRoute
+  '/groups/join': typeof GroupsJoinRoute
   '/patient/agenda': typeof PatientAgendaRoute
   '/patient/anamnese': typeof PatientAnamneseRoute
   '/patient/consultations': typeof PatientConsultationsRoute
@@ -329,7 +368,7 @@ export interface FileRoutesByTo {
   '/subscriber/nutrition': typeof SubscriberNutritionRoute
   '/subscriber/profile': typeof SubscriberProfileRoute
   '/subscriber/sport': typeof SubscriberSportRoute
-  '/patient/pay/$consultationId': typeof PatientPayConsultationIdRoute
+  '/groups': typeof GroupsIndexRoute
   '/pro/consultations/$id': typeof ProConsultationsIdRoute
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
   '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
@@ -340,11 +379,16 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/bienvenue': typeof BienvenueRoute
+  '/cgv': typeof CgvRoute
+  '/confidentialite': typeof ConfidentialiteRoute
   '/feed': typeof FeedRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/mentions-legales': typeof MentionsLegalesRoute
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
+  '/groups/$groupId': typeof GroupsGroupIdRoute
+  '/groups/join': typeof GroupsJoinRoute
   '/patient/agenda': typeof PatientAgendaRoute
   '/patient/anamnese': typeof PatientAnamneseRoute
   '/patient/consultations': typeof PatientConsultationsRoute
@@ -372,7 +416,7 @@ export interface FileRoutesById {
   '/subscriber/nutrition': typeof SubscriberNutritionRoute
   '/subscriber/profile': typeof SubscriberProfileRoute
   '/subscriber/sport': typeof SubscriberSportRoute
-  '/patient/pay/$consultationId': typeof PatientPayConsultationIdRoute
+  '/groups/': typeof GroupsIndexRoute
   '/pro/consultations/$id': typeof ProConsultationsIdRoute
   '/pro/nutrition/$programId': typeof ProNutritionProgramIdRoute
   '/pro/patients/$patientId': typeof ProPatientsPatientIdRoute
@@ -384,11 +428,16 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/bienvenue'
+    | '/cgv'
+    | '/confidentialite'
     | '/feed'
     | '/home'
     | '/login'
+    | '/mentions-legales'
     | '/progress'
     | '/register'
+    | '/groups/$groupId'
+    | '/groups/join'
     | '/patient/agenda'
     | '/patient/anamnese'
     | '/patient/consultations'
@@ -416,7 +465,7 @@ export interface FileRouteTypes {
     | '/subscriber/nutrition'
     | '/subscriber/profile'
     | '/subscriber/sport'
-    | '/patient/pay/$consultationId'
+    | '/groups/'
     | '/pro/consultations/$id'
     | '/pro/nutrition/$programId'
     | '/pro/patients/$patientId'
@@ -426,11 +475,16 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/bienvenue'
+    | '/cgv'
+    | '/confidentialite'
     | '/feed'
     | '/home'
     | '/login'
+    | '/mentions-legales'
     | '/progress'
     | '/register'
+    | '/groups/$groupId'
+    | '/groups/join'
     | '/patient/agenda'
     | '/patient/anamnese'
     | '/patient/consultations'
@@ -458,7 +512,7 @@ export interface FileRouteTypes {
     | '/subscriber/nutrition'
     | '/subscriber/profile'
     | '/subscriber/sport'
-    | '/patient/pay/$consultationId'
+    | '/groups'
     | '/pro/consultations/$id'
     | '/pro/nutrition/$programId'
     | '/pro/patients/$patientId'
@@ -468,11 +522,16 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/bienvenue'
+    | '/cgv'
+    | '/confidentialite'
     | '/feed'
     | '/home'
     | '/login'
+    | '/mentions-legales'
     | '/progress'
     | '/register'
+    | '/groups/$groupId'
+    | '/groups/join'
     | '/patient/agenda'
     | '/patient/anamnese'
     | '/patient/consultations'
@@ -500,7 +559,7 @@ export interface FileRouteTypes {
     | '/subscriber/nutrition'
     | '/subscriber/profile'
     | '/subscriber/sport'
-    | '/patient/pay/$consultationId'
+    | '/groups/'
     | '/pro/consultations/$id'
     | '/pro/nutrition/$programId'
     | '/pro/patients/$patientId'
@@ -511,11 +570,16 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BienvenueRoute: typeof BienvenueRoute
+  CgvRoute: typeof CgvRoute
+  ConfidentialiteRoute: typeof ConfidentialiteRoute
   FeedRoute: typeof FeedRoute
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
+  MentionsLegalesRoute: typeof MentionsLegalesRoute
   ProgressRoute: typeof ProgressRoute
   RegisterRoute: typeof RegisterRoute
+  GroupsGroupIdRoute: typeof GroupsGroupIdRoute
+  GroupsJoinRoute: typeof GroupsJoinRoute
   PatientAgendaRoute: typeof PatientAgendaRoute
   PatientAnamneseRoute: typeof PatientAnamneseRoute
   PatientConsultationsRoute: typeof PatientConsultationsRoute
@@ -543,7 +607,7 @@ export interface RootRouteChildren {
   SubscriberNutritionRoute: typeof SubscriberNutritionRoute
   SubscriberProfileRoute: typeof SubscriberProfileRoute
   SubscriberSportRoute: typeof SubscriberSportRoute
-  PatientPayConsultationIdRoute: typeof PatientPayConsultationIdRoute
+  GroupsIndexRoute: typeof GroupsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -560,6 +624,13 @@ declare module '@tanstack/react-router' {
       path: '/progress'
       fullPath: '/progress'
       preLoaderRoute: typeof ProgressRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mentions-legales': {
+      id: '/mentions-legales'
+      path: '/mentions-legales'
+      fullPath: '/mentions-legales'
+      preLoaderRoute: typeof MentionsLegalesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -583,6 +654,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FeedRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/confidentialite': {
+      id: '/confidentialite'
+      path: '/confidentialite'
+      fullPath: '/confidentialite'
+      preLoaderRoute: typeof ConfidentialiteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cgv': {
+      id: '/cgv'
+      path: '/cgv'
+      fullPath: '/cgv'
+      preLoaderRoute: typeof CgvRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/bienvenue': {
       id: '/bienvenue'
       path: '/bienvenue'
@@ -595,6 +680,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/groups/': {
+      id: '/groups/'
+      path: '/groups'
+      fullPath: '/groups/'
+      preLoaderRoute: typeof GroupsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/subscriber/sport': {
@@ -786,6 +878,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PatientAgendaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/groups/join': {
+      id: '/groups/join'
+      path: '/groups/join'
+      fullPath: '/groups/join'
+      preLoaderRoute: typeof GroupsJoinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/groups/$groupId': {
+      id: '/groups/$groupId'
+      path: '/groups/$groupId'
+      fullPath: '/groups/$groupId'
+      preLoaderRoute: typeof GroupsGroupIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pro/sport/$programId': {
       id: '/pro/sport/$programId'
       path: '/$programId'
@@ -820,13 +926,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/pro/consultations/$id'
       preLoaderRoute: typeof ProConsultationsIdRouteImport
       parentRoute: typeof ProConsultationsRoute
-    }
-    '/patient/pay/$consultationId': {
-      id: '/patient/pay/$consultationId'
-      path: '/patient/pay/$consultationId'
-      fullPath: '/patient/pay/$consultationId'
-      preLoaderRoute: typeof PatientPayConsultationIdRouteImport
-      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -893,11 +992,16 @@ const ProSportRouteWithChildren = ProSportRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BienvenueRoute: BienvenueRoute,
+  CgvRoute: CgvRoute,
+  ConfidentialiteRoute: ConfidentialiteRoute,
   FeedRoute: FeedRoute,
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
+  MentionsLegalesRoute: MentionsLegalesRoute,
   ProgressRoute: ProgressRoute,
   RegisterRoute: RegisterRoute,
+  GroupsGroupIdRoute: GroupsGroupIdRoute,
+  GroupsJoinRoute: GroupsJoinRoute,
   PatientAgendaRoute: PatientAgendaRoute,
   PatientAnamneseRoute: PatientAnamneseRoute,
   PatientConsultationsRoute: PatientConsultationsRoute,
@@ -925,7 +1029,7 @@ const rootRouteChildren: RootRouteChildren = {
   SubscriberNutritionRoute: SubscriberNutritionRoute,
   SubscriberProfileRoute: SubscriberProfileRoute,
   SubscriberSportRoute: SubscriberSportRoute,
-  PatientPayConsultationIdRoute: PatientPayConsultationIdRoute,
+  GroupsIndexRoute: GroupsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

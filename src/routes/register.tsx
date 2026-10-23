@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { Activity, Eye, EyeOff } from "lucide-react";
+import { Activity, Eye, EyeOff, Mail } from "lucide-react";
+
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { startCheckout } from "@/lib/billing";
 import {
   calculateNutritionProfile,
   isMinor,
@@ -22,6 +24,7 @@ import {
   type Gender,
   type NutritionGoal,
 } from "@/lib/nutritionCalc";
+
 
 export const Route = createFileRoute("/register")({
   head: () => ({
@@ -36,6 +39,12 @@ export const Route = createFileRoute("/register")({
   component: RegisterPage,
 });
 
+
+// Version des textes légaux acceptés à l'inscription (CGV + confidentialité).
+// À changer à chaque mise à jour importante de ces textes.
+const LEGAL_DOCUMENTS_VERSION = "2026-10-14";
+
+
 const GOALS: { value: NutritionGoal; label: string }[] = [
   { value: "perte_de_poids", label: "🥗 Perte de poids" },
   { value: "prise_de_masse", label: "💪 Prise de masse" },
@@ -43,27 +52,33 @@ const GOALS: { value: NutritionGoal; label: string }[] = [
   { value: "equilibre", label: "❤️ Santé générale" },
 ];
 
+
 const ACTIVITY_LEVELS: { value: ActivityLevel; label: string; hint: string }[] = [
   { value: "sedentaire", label: "🪑 Sédentaire", hint: "Bureau, peu ou pas de sport" },
   { value: "actif", label: "🏃 Actif", hint: "Sport 2-3x / semaine" },
   { value: "tres_actif", label: "🔥 Très actif", hint: "Sport 4-6x / semaine ou métier physique" },
 ];
 
+
 function calcBMI(weight: number, height: number): number | null {
   if (!Number.isFinite(weight) || !Number.isFinite(height)) {
     return null;
   }
 
+
   if (weight <= 0 || height <= 0) {
     return null;
   }
 
+
   const heightInMeters = height / 100;
+
 
   return Math.round(
     (weight / (heightInMeters * heightInMeters)) * 10,
   ) / 10;
 }
+
 
 function getBMILabel(bmi: number): {
   label: string;
@@ -76,12 +91,14 @@ function getBMILabel(bmi: number): {
     };
   }
 
+
   if (bmi < 25) {
     return {
       label: "Poids normal ✅",
       color: "text-green-500",
     };
   }
+
 
   if (bmi < 30) {
     return {
@@ -90,16 +107,19 @@ function getBMILabel(bmi: number): {
     };
   }
 
+
   return {
     label: "Obésité",
     color: "text-red-500",
   };
 }
 
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
     return error.message;
   }
+
 
   if (typeof error === "object" && error !== null) {
     const possibleError = error as {
@@ -108,6 +128,7 @@ function getErrorMessage(error: unknown): string {
       hint?: unknown;
       code?: unknown;
     };
+
 
     const parts = [
       possibleError.message,
@@ -121,17 +142,25 @@ function getErrorMessage(error: unknown): string {
       )
       .map((value) => value.trim());
 
+
     if (parts.length > 0) {
       return parts.join(" — ");
     }
   }
 
+
   return "Erreur inconnue pendant la création du compte.";
 }
+
 
 // Clé de stockage local temporaire : si l'email doit être confirmé avant la première
 // connexion, on garde le profil physique en attente pour le réinjecter au premier login.
 export const PENDING_PROFILE_KEY = "dietfitpro_pending_profile";
+
+// Même principe pour la formule choisie : après confirmation de l'email et première
+// connexion, l'abonné est envoyé directement sur la page de paiement.
+export const PENDING_PLAN_KEY = "dietfitpro_pending_plan";
+
 
 // IMPORTANT : ces champs correspondent exactement aux colonnes existantes de la
 // table public.profiles ET sont autorisés par le trigger de sécurité
@@ -160,22 +189,33 @@ export interface PendingProfileData {
   profile_complete: boolean;
 }
 
+
 function savePendingProfile(data: PendingProfileData) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(PENDING_PROFILE_KEY, JSON.stringify(data));
 }
 
+
+function savePendingPlan(plan: "basic" | "premium") {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(PENDING_PLAN_KEY, plan);
+}
+
+
 function RegisterPage() {
   const { signUp } = useAuth();
   const navigate = useNavigate();
+
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+
 
   const [age, setAge] = useState("");
   const [gender, setGender] = useState<Gender | "">("");
@@ -187,13 +227,20 @@ function RegisterPage() {
   const [isPregnantOrBreastfeeding, setIsPregnantOrBreastfeeding] = useState(false);
   const [plan, setPlan] = useState<"basic" | "premium">("basic");
 
+
+  const [acceptCgv, setAcceptCgv] = useState(false);
+  const [acceptHealthData, setAcceptHealthData] = useState(false);
+
+
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [needsEmailConfirm, setNeedsEmailConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+
   const bmi = calcBMI(Number(weightKg), Number(heightCm));
   const bmiInfo = bmi !== null ? getBMILabel(bmi) : null;
+
 
   const targetBmi = calcBMI(
     Number(targetWeightKg),
@@ -202,11 +249,13 @@ function RegisterPage() {
   const targetBmiInfo =
     targetBmi !== null ? getBMILabel(targetBmi) : null;
 
+
   const numericAgeForPreview = age ? Number(age) : null;
   const isMinorProfile =
     numericAgeForPreview !== null && Number.isFinite(numericAgeForPreview)
       ? isMinor(numericAgeForPreview)
       : false;
+
 
   // Aperçu du calcul nutrition en direct, dès que tous les champs nécessaires sont remplis.
   const nutritionPreview =
@@ -229,50 +278,62 @@ function RegisterPage() {
         })
       : null;
 
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
 
     if (submitting || success) {
       return;
     }
 
+
     setError(null);
     setNeedsEmailConfirm(false);
 
+
     const cleanName = fullName.trim();
     const cleanEmail = email.trim().toLowerCase();
+
 
     if (!cleanName) {
       setError("Veuillez renseigner votre nom complet.");
       return;
     }
 
+
     if (!cleanEmail) {
       setError("Veuillez renseigner votre adresse email.");
       return;
     }
+
 
     if (password.length < 6) {
       setError("Le mot de passe doit contenir au moins 6 caractères.");
       return;
     }
 
+
     if (password !== confirmPassword) {
       setError("Les deux mots de passe ne correspondent pas.");
       return;
     }
+
 
     if (!goal) {
       setError("Veuillez sélectionner votre objectif.");
       return;
     }
 
+
     const numericAge = age ? Number(age) : null;
+
 
     if (numericAge === null) {
       setError("Veuillez renseigner votre âge.");
       return;
     }
+
 
     if (!isMinor(numericAge)) {
       if (!gender) {
@@ -280,13 +341,30 @@ function RegisterPage() {
         return;
       }
 
+
       if (!activityLevel) {
         setError("Veuillez sélectionner votre niveau d'activité physique.");
         return;
       }
     }
 
+
+    if (!acceptCgv) {
+      setError("Veuillez accepter les conditions générales de vente pour créer votre compte.");
+      return;
+    }
+
+
+    if (!acceptHealthData) {
+      setError(
+        "Votre consentement au traitement de vos données de santé est nécessaire pour personnaliser vos programmes.",
+      );
+      return;
+    }
+
+
     setSubmitting(true);
+
 
     try {
       const weight = weightKg ? Number(weightKg) : null;
@@ -295,16 +373,20 @@ function RegisterPage() {
         ? Number(targetWeightKg)
         : null;
 
+
       const currentBmi =
         weight !== null && height !== null
           ? calcBMI(weight, height)
           : null;
 
+
       const programStartDate = new Date().toISOString().slice(0, 10);
+
 
       // Cas mineur : pas de calcul Black et al., profil marqué incomplet
       // pour déclencher un suivi manuel côté Pro.
       const minor = isMinor(numericAge);
+
 
       const nutrition = minor
         ? null
@@ -319,10 +401,11 @@ function RegisterPage() {
             isPregnantOrBreastfeeding,
           });
 
+
       // NOTE IMPORTANTE : "plan" n'est jamais envoyé ici. Le compte est
       // toujours créé en "basic" par handle_new_user() (sécurité anti-triche
-      // côté base). Le passage en Premium se fera après paiement confirmé,
-      // via le flux de paiement existant (Stripe / set_patient_plan).
+      // côté base). Le passage en Premium se fait après paiement confirmé,
+      // via le flux de paiement Stripe.
       const profileUpdate: PendingProfileData = {
         age: numericAge,
         gender: minor ? null : (gender as Gender),
@@ -344,15 +427,26 @@ function RegisterPage() {
         profile_complete: !minor,
       };
 
+
+      // Preuve du consentement : date et version des textes acceptés,
+      // conservées par Supabase avec le compte.
+      const consentAt = new Date().toISOString();
+
+
       const result = await signUp(cleanEmail, password, {
         full_name: cleanName,
+        cgv_accepted_at: consentAt,
+        health_consent_at: consentAt,
+        legal_documents_version: LEGAL_DOCUMENTS_VERSION,
       });
+
 
       if (result.data.session) {
         const { error: updateError } = await supabase
           .from("profiles")
           .update(profileUpdate)
           .eq("id", result.data.session.user.id);
+
 
         if (updateError) {
           console.error("[register] Erreur mise à jour profil :", updateError);
@@ -361,24 +455,32 @@ function RegisterPage() {
           return;
         }
 
+
         setSuccess(true);
 
-        // Si l'utilisateur a choisi Premium, on le redirige vers le paiement
-        // au lieu de /home directement. Le plan ne sera activé qu'après
-        // confirmation du paiement (voir patient.pay.$consultationId.tsx ou
-        // équivalent abonné).
-        window.setTimeout(() => {
-          if (plan === "premium") {
-            void navigate({ to: "/home" }); // TODO: rediriger vers la page de paiement Premium quand elle existe
-          } else {
-            void navigate({ to: "/home" });
-          }
-        }, 1000);
 
-        return;
+        // Compte actif tout de suite : on envoie l'abonné directement sur la
+        // page de paiement sécurisée Stripe, avec la formule qu'il a choisie.
+        try {
+          await startCheckout({ kind: "subscription", plan });
+          return;
+        } catch (checkoutError) {
+          console.error("[register] Ouverture du paiement impossible :", checkoutError);
+          setError(
+            "Votre compte est créé, mais la page de paiement n'a pas pu s'ouvrir. Vous pourrez choisir votre formule depuis votre profil.",
+          );
+          window.setTimeout(() => {
+            void navigate({ to: "/home" });
+          }, 3000);
+          return;
+        }
       }
 
+
+      // Confirmation d'email requise : on garde le profil et la formule choisie
+      // pour les appliquer à la première connexion.
       savePendingProfile(profileUpdate);
+      savePendingPlan(plan);
       setSuccess(true);
       setNeedsEmailConfirm(true);
     } catch (err) {
@@ -388,6 +490,56 @@ function RegisterPage() {
       setSubmitting(false);
     }
   };
+
+
+  // Écran dédié : vérification de l'adresse email.
+  if (success && needsEmailConfirm) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
+        <div className="w-full max-w-md">
+          <div className="mb-8 flex items-center justify-center gap-2">
+            <Activity className="h-7 w-7 text-primary" />
+            <span className="text-2xl font-bold text-foreground">
+              DietFitPro
+            </span>
+          </div>
+
+
+          <Card>
+            <CardHeader className="items-center text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Mail className="h-7 w-7" />
+              </div>
+              <CardTitle className="mt-3">Vérifiez votre adresse e-mail</CardTitle>
+              <CardDescription>
+                Nous venons d'envoyer un message de confirmation à{" "}
+                <span className="font-medium text-foreground">{email.trim().toLowerCase()}</span>.
+              </CardDescription>
+            </CardHeader>
+
+
+            <CardContent className="space-y-4">
+              <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+                <li>Ouvrez votre boîte mail (pensez à regarder vos spams).</li>
+                <li>Cliquez sur le lien de confirmation.</li>
+                <li>
+                  Connectez-vous : vous serez envoyé directement sur la page de paiement
+                  sécurisée de votre formule {plan === "premium" ? "Premium" : "Basic"}
+                  {plan === "basic" ? " (7 jours d'essai gratuits)" : ""}.
+                </li>
+              </ol>
+
+
+              <Button asChild className="w-full">
+                <Link to="/login">Aller à la connexion</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
@@ -399,6 +551,7 @@ function RegisterPage() {
           </span>
         </div>
 
+
         <Card>
           <CardHeader>
             <CardTitle>Créer un compte</CardTitle>
@@ -406,6 +559,7 @@ function RegisterPage() {
               Rejoignez la communauté DietFitPro
             </CardDescription>
           </CardHeader>
+
 
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -422,6 +576,7 @@ function RegisterPage() {
                 />
               </div>
 
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -435,8 +590,10 @@ function RegisterPage() {
                 />
               </div>
 
+
               <div className="space-y-2">
                 <Label htmlFor="password">Mot de passe</Label>
+
 
                 <div className="relative">
                   <Input
@@ -451,6 +608,7 @@ function RegisterPage() {
                     autoComplete="new-password"
                     disabled={submitting || success}
                   />
+
 
                   <button
                     type="button"
@@ -471,15 +629,18 @@ function RegisterPage() {
                   </button>
                 </div>
 
+
                 <p className="text-xs text-muted-foreground">
                   6 caractères minimum.
                 </p>
               </div>
 
+
               <div className="space-y-2">
                 <Label htmlFor="confirm_password">
                   Confirmer le mot de passe
                 </Label>
+
 
                 <div className="relative">
                   <Input
@@ -494,6 +655,7 @@ function RegisterPage() {
                     autoComplete="new-password"
                     disabled={submitting || success}
                   />
+
 
                   <button
                     type="button"
@@ -515,10 +677,12 @@ function RegisterPage() {
                 </div>
               </div>
 
+
               <div className="border-t pt-4">
                 <p className="mb-3 text-sm font-medium text-foreground">
                   Choisissez votre offre
                 </p>
+
 
                 <div className="grid grid-cols-2 gap-3">
                   <button
@@ -546,6 +710,7 @@ function RegisterPage() {
                     </p>
                   </button>
 
+
                   <button
                     type="button"
                     onClick={() => setPlan("premium")}
@@ -569,20 +734,23 @@ function RegisterPage() {
                   </button>
                 </div>
 
+
                 <p className="mt-2 text-center text-xs text-muted-foreground">
                   Sans engagement — Annulable à tout moment
                 </p>
                 <p className="mt-1 text-center text-xs text-muted-foreground">
-                  Votre compte démarre en formule Basic. Le passage en Premium
-                  sera confirmé après votre paiement.
+                  Après votre inscription, vous serez dirigé vers la page de
+                  paiement sécurisée de la formule choisie.
                 </p>
               </div>
+
 
               <div className="border-t pt-4">
                 <p className="mb-3 text-sm font-medium text-foreground">
                   Votre profil physique
                 </p>
               </div>
+
 
               <div className="space-y-2">
                 <Label htmlFor="age">Âge</Label>
@@ -597,6 +765,7 @@ function RegisterPage() {
                   disabled={submitting || success}
                 />
               </div>
+
 
               {isMinorProfile ? (
                 <Alert>
@@ -638,6 +807,7 @@ function RegisterPage() {
                     </div>
                   </div>
 
+
                   {gender === "femme" ? (
                     <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-3">
                       <input
@@ -659,6 +829,7 @@ function RegisterPage() {
                 </>
               )}
 
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="weight">Poids actuel (kg)</Label>
@@ -676,6 +847,7 @@ function RegisterPage() {
                     disabled={submitting || success}
                   />
                 </div>
+
 
                 <div className="space-y-2">
                   <Label htmlFor="height">Taille (cm)</Label>
@@ -695,11 +867,13 @@ function RegisterPage() {
                 </div>
               </div>
 
+
               {bmi !== null && bmiInfo ? (
                 <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-3">
                   <span className="text-sm text-muted-foreground">
                     Votre IMC actuel
                   </span>
+
 
                   <div className="text-right">
                     <span className="text-lg font-bold text-foreground">
@@ -711,6 +885,7 @@ function RegisterPage() {
                   </div>
                 </div>
               ) : null}
+
 
               <div className="space-y-2">
                 <Label htmlFor="targetWeight">Poids cible (kg)</Label>
@@ -729,11 +904,13 @@ function RegisterPage() {
                 />
               </div>
 
+
               {targetBmi !== null && targetBmiInfo ? (
                 <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-3">
                   <span className="text-sm text-muted-foreground">
                     IMC cible
                   </span>
+
 
                   <div className="text-right">
                     <span className="text-lg font-bold text-foreground">
@@ -747,6 +924,7 @@ function RegisterPage() {
                   </div>
                 </div>
               ) : null}
+
 
               {!isMinorProfile ? (
                 <div className="space-y-2">
@@ -774,8 +952,10 @@ function RegisterPage() {
                 </div>
               ) : null}
 
+
               <div className="space-y-2">
                 <Label>Votre objectif principal</Label>
+
 
                 <div className="grid grid-cols-2 gap-2">
                   {GOALS.map((item) => (
@@ -795,6 +975,7 @@ function RegisterPage() {
                   ))}
                 </div>
 
+
                 {nutritionPreview && nutritionPreview.warnings.length === 0 ? (
                   <div className="space-y-1 rounded-lg border bg-muted/40 px-4 py-3">
                     <p className="text-xs text-muted-foreground">
@@ -811,12 +992,66 @@ function RegisterPage() {
                   </div>
                 ) : null}
 
+
                 {nutritionPreview?.warnings.map((warning) => (
                   <Alert key={warning}>
                     <AlertDescription>{warning}</AlertDescription>
                   </Alert>
                 ))}
               </div>
+
+
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-start gap-2 rounded-lg border bg-muted/40 px-4 py-3">
+                  <input
+                    id="accept_cgv"
+                    type="checkbox"
+                    checked={acceptCgv}
+                    onChange={(event) => setAcceptCgv(event.target.checked)}
+                    disabled={submitting || success}
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                  />
+                  <Label htmlFor="accept_cgv" className="text-sm font-normal leading-snug">
+                    J'ai lu et j'accepte les{" "}
+                    <a
+                      href="/cgv"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-primary hover:underline"
+                    >
+                      conditions générales de vente
+                    </a>
+                    .
+                  </Label>
+                </div>
+
+
+                <div className="flex items-start gap-2 rounded-lg border bg-muted/40 px-4 py-3">
+                  <input
+                    id="accept_health"
+                    type="checkbox"
+                    checked={acceptHealthData}
+                    onChange={(event) => setAcceptHealthData(event.target.checked)}
+                    disabled={submitting || success}
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                  />
+                  <Label htmlFor="accept_health" className="text-sm font-normal leading-snug">
+                    Je consens expressément (ou mon représentant légal si je suis mineur) à ce
+                    que DietFitPro traite mes données de santé (âge, poids, taille, objectifs,
+                    suivi alimentaire) pour personnaliser mes programmes, comme décrit dans la{" "}
+                    <a
+                      href="/confidentialite"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-primary hover:underline"
+                    >
+                      politique de confidentialité
+                    </a>
+                    . Je peux retirer mon consentement à tout moment en supprimant mon compte.
+                  </Label>
+                </div>
+              </div>
+
 
               {error ? (
                 <Alert variant="destructive">
@@ -826,15 +1061,15 @@ function RegisterPage() {
                 </Alert>
               ) : null}
 
-              {success ? (
+
+              {success && !needsEmailConfirm ? (
                 <Alert>
                   <AlertDescription>
-                    {needsEmailConfirm
-                      ? "Compte créé ! Vérifiez votre boîte mail, ainsi que vos spams, pour confirmer votre inscription avant de vous connecter."
-                      : "Compte créé avec succès ! Redirection en cours…"}
+                    Compte créé ! Redirection vers le paiement sécurisé…
                   </AlertDescription>
                 </Alert>
               ) : null}
+
 
               <Button
                 type="submit"
@@ -843,6 +1078,7 @@ function RegisterPage() {
               >
                 {submitting ? "Création…" : "Créer mon compte"}
               </Button>
+
 
               <p className="text-center text-sm text-muted-foreground">
                 Déjà inscrit ?{" "}
@@ -853,6 +1089,19 @@ function RegisterPage() {
                   Se connecter
                 </Link>
               </p>
+
+
+              <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-2 text-xs text-muted-foreground">
+                <a href="/mentions-legales" className="hover:underline">
+                  Mentions légales
+                </a>
+                <a href="/cgv" className="hover:underline">
+                  CGV
+                </a>
+                <a href="/confidentialite" className="hover:underline">
+                  Confidentialité
+                </a>
+              </div>
             </form>
           </CardContent>
         </Card>

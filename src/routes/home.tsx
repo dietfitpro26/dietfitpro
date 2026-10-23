@@ -9,7 +9,6 @@ import { useAccessRights } from "@/hooks/useAccessRights";
 import {
   UtensilsCrossed,
   Bike,
-  MessageCircle,
   Video,
   Lock,
   TrendingDown,
@@ -23,19 +22,17 @@ import {
   BarChart2,
   Sparkles,
   UserRound,
+  Rss,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
 
 export const Route = createFileRoute("/home")({
   head: () => ({ meta: [{ title: "Accueil — DietFitPro" }] }),
   component: SubscriberHomePage,
 });
 
-
 function getBMIInfo(bmi: number | null) {
   if (!bmi) return null;
-
 
   if (bmi < 18.5) {
     return {
@@ -45,7 +42,6 @@ function getBMIInfo(bmi: number | null) {
     };
   }
 
-
   if (bmi < 25) {
     return {
       label: "Repère général",
@@ -53,7 +49,6 @@ function getBMIInfo(bmi: number | null) {
       bg: "bg-green-50 dark:bg-green-900/20",
     };
   }
-
 
   if (bmi < 30) {
     return {
@@ -63,7 +58,6 @@ function getBMIInfo(bmi: number | null) {
     };
   }
 
-
   return {
     label: "À interpréter avec un professionnel",
     color: "text-red-500",
@@ -71,13 +65,11 @@ function getBMIInfo(bmi: number | null) {
   };
 }
 
-
 function calcBMI(weight: number | null, height: number | null): number | null {
   if (!weight || !height || height <= 0) return null;
   const h = height / 100;
   return Math.round((weight / (h * h)) * 10) / 10;
 }
-
 
 const GOAL_LABELS: Record<string, { label: string; icon: ReactNode }> = {
   weight_loss: {
@@ -98,14 +90,12 @@ const GOAL_LABELS: Record<string, { label: string; icon: ReactNode }> = {
   },
 };
 
-
 function formatPlanLabel(plan: string | null | undefined) {
   if (!plan) return "Basic";
   if (plan === "premium") return "Premium";
   if (plan === "patient") return "Patient";
   return "Basic";
 }
-
 
 function SubscriberHomePage() {
   return (
@@ -117,11 +107,9 @@ function SubscriberHomePage() {
   );
 }
 
-
 function HomeContent() {
   const { user, profile } = useAuth();
   const { rights, loading } = useAccessRights();
-
 
   const firstName = profile?.full_name?.split(" ")[0] ?? "vous";
   const weightKg = profile?.weight_kg ?? null;
@@ -129,23 +117,19 @@ function HomeContent() {
   const dailyKcalTarget = profile?.daily_kcal_target ?? null;
   const heightCm = profile?.height_cm ?? null;
 
-
   const currentBmi = calcBMI(weightKg, heightCm);
   const bmiInfo = getBMIInfo(currentBmi);
   const goalInfo = profile?.goal ? GOAL_LABELS[profile.goal] : null;
   const hasWeightGoal = weightKg != null && targetWeightKg != null;
-
 
   const weightDiff = useMemo(() => {
     if (!hasWeightGoal) return null;
     return Math.round((weightKg - targetWeightKg) * 10) / 10;
   }, [hasWeightGoal, weightKg, targetWeightKg]);
 
-
   const displayedPlan = rights?.plan_label ?? "basic";
   const sportLimit = rights?.sport_session_limit ?? null;
   const isBasic = displayedPlan === "basic";
-
 
   if (loading || !rights) {
     return (
@@ -163,7 +147,6 @@ function HomeContent() {
       </div>
     );
   }
-
 
   const primaryAction = !profile?.goal
     ? {
@@ -188,7 +171,6 @@ function HomeContent() {
           label: "Ouvrir mon programme",
         };
 
-
   return (
     <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -206,7 +188,6 @@ function HomeContent() {
                   </p>
                 </div>
 
-
                 <div className="flex flex-wrap gap-2">
                   {goalInfo ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
@@ -214,7 +195,6 @@ function HomeContent() {
                       {goalInfo.label}
                     </span>
                   ) : null}
-
 
                   {currentBmi != null && bmiInfo ? (
                     <span
@@ -225,11 +205,9 @@ function HomeContent() {
                     </span>
                   ) : null}
 
-
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground">
                     Plan {formatPlanLabel(displayedPlan)}
                   </span>
-
 
                   {isBasic && sportLimit ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-700 dark:text-amber-300">
@@ -239,7 +217,6 @@ function HomeContent() {
                   ) : null}
                 </div>
               </div>
-
 
               <Link
                 to="/subscriber/profile"
@@ -252,9 +229,7 @@ function HomeContent() {
           </div>
         </section>
 
-
         {user ? <LevelBadgesCard userId={user.id} /> : null}
-
 
         <section className="rounded-3xl border border-primary/15 bg-primary/[0.04] p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -272,14 +247,12 @@ function HomeContent() {
           </div>
         </section>
 
-
         {(weightKg != null || targetWeightKg != null || dailyKcalTarget != null || currentBmi != null) && (
           <section className="rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
             <div className="mb-4 flex items-center gap-2">
               <Target className="h-5 w-5 text-primary" />
               <h2 className="font-semibold">Mes objectifs</h2>
             </div>
-
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {weightKg != null ? (
@@ -301,7 +274,6 @@ function HomeContent() {
               ) : null}
             </div>
 
-
             {weightDiff !== null ? (
               <div className="mt-4 flex items-start gap-2 rounded-2xl bg-muted/40 px-4 py-3">
                 <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -321,13 +293,11 @@ function HomeContent() {
               </div>
             ) : null}
 
-
             <p className="mt-4 text-xs text-muted-foreground">
               Ces indicateurs sont des repères généraux. Contactez votre professionnel de santé pour les interpréter dans votre contexte.
             </p>
           </section>
         )}
-
 
         <section className="grid gap-4 lg:grid-cols-2">
           <PrimaryModuleCard
@@ -342,7 +312,6 @@ function HomeContent() {
             active={rights.access_nutrition_programs}
             badge={rights.access_nutrition_programs ? "Disponible" : "Disponible dans Premium"}
           />
-
 
           <PrimaryModuleCard
             title="Sport"
@@ -366,60 +335,49 @@ function HomeContent() {
           />
         </section>
 
+        <section>
+          <PrimaryModuleCard
+            title="Feed"
+            description="Conseils, recettes et défis de votre coach. Aimez, partagez et échangez avec la communauté."
+            icon={<Rss className="h-5 w-5" />}
+            to="/feed"
+            active
+            badge="Disponible pour tous"
+          />
+        </section>
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-3">
           <SecondaryModuleCard
             icon={<UtensilsCrossed className="h-5 w-5" />}
             title="Recettes"
-            text="Consultez vos recettes avec l’offre Premium."
-            active={rights.access_recipes}
-            locked={!rights.access_recipes}
-            lockedLabel="Option Premium"
+            text="Une bibliothèque de recettes arrive prochainement."
+            active={false}
+            locked
+            lockedLabel="Bientôt disponible"
           />
-
-
-          <SecondaryModuleCard
-            icon={<MessageCircle className="h-5 w-5" />}
-            title="Messagerie"
-            text="Échangez avec votre coach avec l’offre Premium."
-            active={rights.access_messaging}
-            locked={!rights.access_messaging}
-            lockedLabel="Option Premium"
-          />
-
 
           <SecondaryModuleCard
             icon={<Sparkles className="h-5 w-5" />}
             title="Coach IA"
-            text={
-              rights.access_ai_coach
-                ? "Profitez de votre assistant intelligent."
-                : "Disponible dans Premium."
-            }
-            active={rights.access_ai_coach}
-            locked={!rights.access_ai_coach}
-            lockedLabel="Option Premium"
+            text="Votre assistant intelligent arrive prochainement."
+            active={false}
+            locked
+            lockedLabel="Bientôt disponible"
           />
-
 
           <SecondaryModuleCard
             icon={<Video className="h-5 w-5" />}
             title="Visio"
-            text={
-              rights.access_visio
-                ? "Réservez vos consultations vidéo."
-                : "Option disponible en supplément."
-            }
-            active={rights.access_visio}
-            locked={!rights.access_visio}
-            lockedLabel="Option en supplément"
+            text="La réservation de consultations vidéo arrive prochainement."
+            active={false}
+            locked
+            lockedLabel="Bientôt disponible"
           />
         </section>
       </div>
     </div>
   );
 }
-
 
 function MetricCard({
   label,
@@ -451,7 +409,6 @@ function MetricCard({
     </div>
   );
 }
-
 
 function PrimaryModuleCard({
   title,
@@ -491,7 +448,6 @@ function PrimaryModuleCard({
           </div>
         </div>
 
-
         {!active ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
             <Lock className="h-3 w-3" />
@@ -500,9 +456,7 @@ function PrimaryModuleCard({
         ) : null}
       </div>
 
-
       <p className="mb-4 text-sm text-muted-foreground">{description}</p>
-
 
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">
@@ -513,7 +467,6 @@ function PrimaryModuleCard({
     </div>
   );
 
-
   if (active && to) {
     return (
       <Link to={to} className="block">
@@ -522,10 +475,8 @@ function PrimaryModuleCard({
     );
   }
 
-
   return content;
 }
-
 
 function SecondaryModuleCard({
   icon,
@@ -543,7 +494,6 @@ function SecondaryModuleCard({
   lockedLabel?: string;
 }) {
   const isLocked = locked || !active;
-
 
   return (
     <div
@@ -565,9 +515,7 @@ function SecondaryModuleCard({
         {isLocked ? <Lock className="h-4 w-4 text-muted-foreground" /> : null}
       </div>
 
-
       <p className="mb-4 min-h-[48px] text-sm text-muted-foreground">{text}</p>
-
 
       {isLocked ? (
         <div className="mb-3 inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
@@ -575,7 +523,6 @@ function SecondaryModuleCard({
           {lockedLabel}
         </div>
       ) : null}
-
 
       <Button variant="outline" className="w-full rounded-2xl" disabled>
         {isLocked ? lockedLabel : "Bientôt disponible"}

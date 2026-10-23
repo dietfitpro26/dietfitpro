@@ -103,7 +103,7 @@ export function SubscriptionOfferCard() {
               <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
                 <li>3 programmes nutrition adaptés à vos besoins</li>
                 <li>Journal alimentaire, historique 1 mois</li>
-                <li>Séances de sport incluses</li>
+                <li>3 programmes de sport inclus</li>
               </ul>
               <Button
                 variant="outline"
@@ -142,9 +142,9 @@ export function SubscriptionOfferCard() {
               </p>
               <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
                 <li>12 programmes nutrition (3 Basic + 9 Premium)</li>
+                <li>9 programmes de sport Premium</li>
                 <li>Journal alimentaire, historique 3 mois</li>
                 <li>PDF et notes de votre diététicien</li>
-                <li>Messagerie, recettes, coach IA</li>
               </ul>
               <Button
                 className="mt-4 w-full rounded-2xl bg-[#6DB33F] text-white hover:bg-[#2D7A1F]"
@@ -201,9 +201,11 @@ export function SubscriptionOfferCard() {
               Consultation en visio
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Ouverte à tous, Basic comme Premium : {formatEuro(BILLING_PRICES.visioPerConsultation)}{" "}
-              par consultation, réglés au moment de la réservation.
+              Échangez en visio avec votre professionnel de santé.
             </p>
+            <Button size="sm" variant="outline" className="mt-3 w-full rounded-xl" disabled>
+              Bientôt disponible
+            </Button>
           </div>
         </div>
 

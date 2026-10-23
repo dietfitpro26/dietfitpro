@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { startCheckout } from "@/lib/billing";
 import { PENDING_PROFILE_KEY } from "@/routes/register";
 
 export const Route = createFileRoute("/login")({
@@ -20,6 +21,9 @@ export const Route = createFileRoute("/login")({
   }),
   component: LoginPage,
 });
+
+// Formule choisie à l'inscription (mémorisée quand l'email devait être confirmé).
+const PENDING_PLAN_KEY = "dietfitpro_pending_plan";
 
 // Si un profil nutrition (poids, taille, objectif, calculs BMR/TDEE...) a été
 // mis en attente lors de l'inscription (cas "confirmation email requise"),
@@ -47,6 +51,19 @@ async function applyPendingProfileIfAny(userId: string) {
   } catch (err) {
     console.error("[login] Erreur lecture profil en attente :", err);
   }
+}
+
+// Lit la formule mise en attente, puis l'efface tout de suite : l'abonné n'est
+// envoyé vers le paiement qu'une seule fois (pas de boucle s'il annule sur Stripe).
+function takePendingPlan(): "basic" | "premium" | null {
+  if (typeof window === "undefined") return null;
+
+  const value = window.localStorage.getItem(PENDING_PLAN_KEY);
+  if (!value) return null;
+
+  window.localStorage.removeItem(PENDING_PLAN_KEY);
+
+  return value === "premium" || value === "basic" ? value : null;
 }
 
 function LoginPage() {
@@ -86,6 +103,19 @@ function LoginPage() {
         } else if (userRole === "patient") {
           void navigate({ to: "/patient/dashboard" });
         } else if (userRole === "subscriber") {
+          // Première connexion après inscription : direction le paiement sécurisé
+          // de la formule choisie. En cas de problème, on va à l'accueil.
+          const pendingPlan = takePendingPlan();
+
+          if (pendingPlan) {
+            try {
+              await startCheckout({ kind: "subscription", plan: pendingPlan });
+              return;
+            } catch (checkoutError) {
+              console.error("[login] Ouverture du paiement impossible :", checkoutError);
+            }
+          }
+
           void navigate({ to: "/home" });
         }
       }

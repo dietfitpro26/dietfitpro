@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -7,9 +7,11 @@ import {
   BookOpen,
   Dumbbell,
   MessageSquare,
+  MessagesSquare,
   Video,
   Bell,
   UserCheck,
+  Rss,
   Settings,
   LogOut,
   Menu,
@@ -22,7 +24,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useConversations } from "@/hooks/useMessages";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+
+
 
 const NAV = [
   { to: "/pro/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -34,15 +39,69 @@ const NAV = [
   { to: "/pro/notifications", label: "Notifications", icon: Bell },
   { to: "/pro/subscribers", label: "Abonnés", icon: UserCheck },
   { to: "/pro/recipes", label: "Mes recettes", icon: BookOpen },
+  { to: "/pro/feed", label: "Feed", icon: Rss },
+  { to: "/groups", label: "Groupes", icon: MessagesSquare },
   { to: "/pro/settings", label: "Paramètres", icon: Settings },
 ] as const;
+
+
 
 export function ProLayout({ children }: { children: ReactNode }) {
   const { profile, signOut } = useAuth();
   const [open, setOpen] = useState(false);
+  const [pendingReports, setPendingReports] = useState(0);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const { totalUnread: unreadMessages } = useConversations();
+
+
+
+  // Nombre de contenus signalés en attente (mis à jour à chaque changement de page)
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPending = async () => {
+      const { data: reports } = await supabase
+        .from("feed_reports")
+        .select("target_type, target_id");
+
+      const rows = (reports ?? []) as { target_type: string; target_id: string }[];
+      const commentIds = Array.from(
+        new Set(rows.filter((r) => r.target_type === "comment").map((r) => r.target_id)),
+      );
+      const postIds = Array.from(
+        new Set(rows.filter((r) => r.target_type === "post").map((r) => r.target_id)),
+      );
+
+      let total = 0;
+
+      if (commentIds.length > 0) {
+        const { data: comments } = await supabase
+          .from("feed_comments")
+          .select("id")
+          .in("id", commentIds);
+        total += (comments ?? []).length;
+      }
+
+      if (postIds.length > 0) {
+        const { data: posts } = await supabase
+          .from("feed_content")
+          .select("id")
+          .in("id", postIds);
+        total += (posts ?? []).length;
+      }
+
+      if (!cancelled) setPendingReports(total);
+    };
+
+    void loadPending();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+
+
 
   const initials = (profile?.full_name ?? profile?.email ?? "?")
     .split(" ")
@@ -51,15 +110,21 @@ export function ProLayout({ children }: { children: ReactNode }) {
     .slice(0, 2)
     .toUpperCase();
 
+
+
   const handleSignOut = async () => {
     await signOut();
     void navigate({ to: "/login" });
   };
 
+
+
   const SidebarInner = (
     <div className="flex h-full w-64 flex-col bg-[#1A1A1A] text-white">
       <div className="flex items-center justify-between border-b border-white/10 p-4">
         <Logo className="[&_span]:text-white [&_span:last-child]:text-white/60" />
+
+
 
         <button
           type="button"
@@ -71,6 +136,8 @@ export function ProLayout({ children }: { children: ReactNode }) {
         </button>
       </div>
 
+
+
       <nav
         className="flex-1 space-y-1 overflow-y-auto px-3 py-4"
         aria-label="Navigation professionnelle"
@@ -79,6 +146,8 @@ export function ProLayout({ children }: { children: ReactNode }) {
           const active =
             pathname === item.to || pathname.startsWith(`${item.to}/`);
           const Icon = item.icon;
+
+
 
           return (
             <Link
@@ -96,9 +165,19 @@ export function ProLayout({ children }: { children: ReactNode }) {
               <Icon className="h-4 w-4 shrink-0" />
               <span className="min-w-0 flex-1 truncate">{item.label}</span>
 
+
+
               {item.to === "/pro/messages" && unreadMessages > 0 ? (
                 <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#6DB33F] px-1 text-[10px] font-semibold text-white">
                   {unreadMessages > 99 ? "99+" : unreadMessages}
+                </span>
+              ) : null}
+
+
+
+              {item.to === "/pro/feed" && pendingReports > 0 ? (
+                <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#6DB33F] px-1 text-[10px] font-semibold text-white">
+                  {pendingReports > 99 ? "99+" : pendingReports}
                 </span>
               ) : null}
             </Link>
@@ -106,12 +185,16 @@ export function ProLayout({ children }: { children: ReactNode }) {
         })}
       </nav>
 
+
+
       <div className="flex items-center gap-3 border-t border-white/10 p-3">
         <Avatar className="h-9 w-9">
           <AvatarFallback className="bg-[#6DB33F] text-xs text-white">
             {initials}
           </AvatarFallback>
         </Avatar>
+
+
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">
@@ -121,6 +204,8 @@ export function ProLayout({ children }: { children: ReactNode }) {
             Professionnel
           </span>
         </div>
+
+
 
         <Button
           type="button"
@@ -136,13 +221,19 @@ export function ProLayout({ children }: { children: ReactNode }) {
     </div>
   );
 
+
+
   return (
     <div className="flex min-h-screen bg-background">
       <UpcomingConsultationReminder />
 
+
+
       <aside className="fixed inset-y-0 left-0 z-40 hidden md:block">
         {SidebarInner}
       </aside>
+
+
 
       {open ? (
         <div className="fixed inset-0 z-50 flex md:hidden">
@@ -156,6 +247,8 @@ export function ProLayout({ children }: { children: ReactNode }) {
         </div>
       ) : null}
 
+
+
       <div className="flex min-w-0 flex-1 flex-col md:ml-64">
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 backdrop-blur md:hidden">
           <button
@@ -166,10 +259,16 @@ export function ProLayout({ children }: { children: ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
 
+
+
           <Logo />
+
+
 
           <NotificationBell to="/pro/notifications" />
         </header>
+
+
 
         <main className="min-w-0 flex-1">{children}</main>
       </div>
