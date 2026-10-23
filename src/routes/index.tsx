@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -22,32 +23,68 @@ export const Route = createFileRoute("/")({
   }),
   component: LandingPage,
 });
+=======
+import { createFileRoute, redirect } from '@tanstack/react-router'
+import { useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 
-const features = [
-  {
-    icon: Apple,
-    title: "Nutrition comportementale",
-    desc: "Sans comptage calorique. Faim, satiété, humeur, énergie — l'essentiel.",
-  },
-  {
-    icon: Dumbbell,
-    title: "Programmes sportifs sur-mesure",
-    desc: "Conçus par votre coach selon votre profil et vos objectifs.",
-  },
-  {
-    icon: Brain,
-    title: "Coach IA 24/7",
-    desc: "Un assistant qui connaît votre profil et vos progrès, jour et nuit.",
-  },
-  {
-    icon: MessageCircle,
-    title: "Messagerie avec David",
-    desc: "Échangez directement avec votre coach quand vous en avez besoin.",
-  },
-];
+export const Route = createFileRoute('/')({
+  component: IndexComponent,
+})
+>>>>>>> 99408d3e5828c26f7f68f4143aa8c5d8c6e2d77e
 
-function LandingPage() {
+function IndexComponent() {
+  useEffect(() => {
+    async function checkAuthAndRedirect() {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        // Pas connecté → login
+        window.location.href = '/login'
+        return
+      }
+
+      // Connecté·´e → charger profil et rediriger selon rôle
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, profile_complete')
+        .eq('id', session.user.id)
+        .single()
+
+      if (!profile) {
+        // Profil introuvable → logout + login
+        await supabase.auth.signOut()
+        window.location.href = '/login'
+        return
+      }
+
+      if (!profile.profile_complete) {
+        // Profil incomplet → bienvenue
+        window.location.href = '/bienvenue'
+        return
+      }
+
+      // Redirection selon rôle
+      switch (profile.role) {
+        case 'pro':
+          window.location.href = '/pro/dashboard'
+          break
+        case 'patient':
+          window.location.href = '/patient/dashboard'
+          break
+        case 'subscriber':
+          window.location.href = '/subscriber/nutrition'
+          break
+        default:
+          window.location.href = '/login'
+      }
+    }
+
+    checkAuthAndRedirect()
+  }, [])
+
   return (
+<<<<<<< HEAD
     <div className="min-h-screen bg-gradient-to-b from-white to-green-50/50">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border/40 bg-white/80 backdrop-blur">
@@ -315,6 +352,13 @@ function LandingPage() {
           </p>
         </div>
       </footer>
+=======
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <p className="text-muted-foreground">Redirection...</p>
+      </div>
+>>>>>>> 99408d3e5828c26f7f68f4143aa8c5d8c6e2d77e
     </div>
-  );
+  )
 }

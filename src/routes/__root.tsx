@@ -1,132 +1,150 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  Outlet,
-  Link,
-  createRootRouteWithContext,
-  useRouter,
-  HeadContent,
-  Scripts,
-} from "@tanstack/react-router";
+import { createRootRoute, Outlet, redirect } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import type { User } from '@supabase/supabase-js'
+import { ToastProvider } from '../components/ui/use-toast'
+import { ErrorBoundary } from '../lib/error-page'
 
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { Toaster } from "@/components/ui/sonner";
-import appCss from "../styles.css?url";
-
-
-function NotFoundComponent() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Go home
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
+interface Profile {
+  id: string
+  role: 'pro' | 'patient' | 'subscriber'
+  profile_complete: boolean
+  subscription_tier: 'basic' | 'premium'
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
-  const router = useRouter();
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Try again
-          </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Go home
-          </a>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "DietFitPro — Coach Nutrition & Sport" },
-      {
-        name: "description",
-        content:
-          "DietFitPro : votre coach nutrition et sport personnalisé. Pas de régime, juste de meilleures habitudes.",
-      },
-      { name: "author", content: "David — Diet N Trainer" },
-      { property: "og:title", content: "DietFitPro" },
-      { property: "og:description", content: "Pas de régime, juste de meilleures habitudes." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
-      },
-    ],
-  }),
-  shellComponent: RootShell,
+export const Route = createRootRoute({
   component: RootComponent,
-  notFoundComponent: NotFoundComponent,
-  errorComponent: ErrorComponent,
-});
-
-function RootShell({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
+  errorComponent: ErrorBoundary,
+})
 
 function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Charger session initiale
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+      if (session?.user) {
+        loadProfile(session.user.id)
+      } else {
+        setLoading(false)
+      }
+    })
+
+    // Écouter changements auth (session expiré·´e, logout, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChanged(async (event, session) => {
+      console.log('Auth event:', event, session?.user?.id)
+      
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+        setProfile(null)
+        setLoading(false)
+        window.location.href = '/login'
+        return
+      }
+
+      if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        setUser(session?.user ?? null)
+        if (session?.user) {
+          await loadProfile(session.user.id)
+        }
+      }
+
+      if (event === 'INITIAL_SESSION') {
+        setUser(session?.user ?? null)
+        if (session?.user) {
+          await loadProfile(session.user.id)
+        } else {
+          setLoading(false)
+        }
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  async function loadProfile(userId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, role, profile_complete, subscription_tier')
+        .eq('id', userId)
+        .single()
+
+      if (error || !data) {
+        console.error('Profile not found:', error)
+        setProfile(null)
+        setLoading(false)
+        return
+      }
+
+      setProfile(data)
+
+      // Redirection si profil incomplet
+      if (!data.profile_complete && window.location.pathname !== '/bienvenue') {
+        window.location.href = '/bienvenue'
+        return
+      }
+
+      setLoading(false)
+    } catch (err) {
+      console.error('Error loading profile:', err)
+      setLoading(false)
+    }
+  }
+
+  // Vérifier accès routes protégé·´es
+  useEffect(() => {
+    if (loading || !user || !profile) return
+
+    const path = window.location.pathname
+    const isProRoute = path.startsWith('/pro')
+    const isPatientRoute = path.startsWith('/patient')
+    const isSubscriberRoute = path.startsWith('/subscriber')
+
+    // Si profil incomplet → redirection vers /bienvenue
+    if (!profile.profile_complete && path !== '/bienvenue') {
+      window.location.href = '/bienvenue'
+      return
+    }
+
+    // Vérifier rôle
+    if (isProRoute && profile.role !== 'pro') {
+      window.location.href = '/unauthorized'
+      return
+    }
+
+    if (isPatientRoute && profile.role !== 'patient') {
+      window.location.href = '/unauthorized'
+      return
+    }
+
+    if (isSubscriberRoute && profile.role !== 'subscriber') {
+      window.location.href = '/unauthorized'
+      return
+    }
+  }, [user, profile, loading])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ErrorBoundary>
+    <ToastProvider>
+      <div className="relative">
         <Outlet />
-        <Toaster />
-      </ErrorBoundary>
-    </QueryClientProvider>
-
-  );
+      </div>
+    </ToastProvider>
+  )
 }
