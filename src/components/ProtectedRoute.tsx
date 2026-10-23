@@ -5,23 +5,15 @@ import { useAuth, type AppRole } from "@/hooks/useAuth";
 const ROLE_HOME: Record<AppRole, string> = {
   pro: "/pro/dashboard",
   patient: "/patient/dashboard",
-  subscriber: "/subscriber/dashboard",
+  subscriber: "/home",
 };
 
 interface Props {
   children: ReactNode;
-  /** If set, only these roles can access. Other roles get redirected to their home. */
   allow?: AppRole[];
-  /** If true, require profile_complete to be true. Otherwise redirect to /bienvenue */
   requireProfileComplete?: boolean;
 }
 
-/**
- * Garde de route :
- *  - non authentifié → /login
- *  - rôle non autorisé → redirige vers son interface
- *  - profile_complete = false → /bienvenue
- */
 export function ProtectedRoute({ children, allow, requireProfileComplete = true }: Props) {
   const { user, role, profile, loading } = useAuth();
   const navigate = useNavigate();
@@ -30,23 +22,22 @@ export function ProtectedRoute({ children, allow, requireProfileComplete = true 
   useEffect(() => {
     if (loading) return;
     
-    // Non authentifié → /login
     if (!user) {
       void navigate({ to: "/login", search: { redirect: location.pathname } });
       return;
     }
     
-    // Rôle non autorisé → redirige vers son interface
     if (allow && role && !allow.includes(role)) {
       void navigate({ to: ROLE_HOME[role] });
       return;
     }
     
-    // Profil incomplet → /bienvenue (sauf si on est déjà sur /bienvenue)
-    if (requireProfileComplete && profile?.profile_complete === false && location.pathname !== "/bienvenue") {
-      void navigate({ to: "/bienvenue" });
-      return;
-    }
+    // ✅ Optionnel : si tu veux garder le check profile_complete
+    // Pour l'instant, on le désactive complètement
+    // if (requireProfileComplete && role === "patient" && profile?.profile_complete === false) {
+    //   void navigate({ to: "/home" }); // ou laisse passer
+    //   return;
+    // }
   }, [user, role, profile, loading, allow, requireProfileComplete, navigate, location.pathname]);
 
   if (loading || !user) {
@@ -57,12 +48,6 @@ export function ProtectedRoute({ children, allow, requireProfileComplete = true 
     );
   }
   
-  // Profil incomplet → afficher rien pendant la redirection
-  if (requireProfileComplete && profile?.profile_complete === false) {
-    return null;
-  }
-  
-  // Rôle non autorisé → afficher rien pendant la redirection
   if (allow && role && !allow.includes(role)) return null;
   
   return <>{children}</>;

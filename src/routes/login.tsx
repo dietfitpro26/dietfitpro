@@ -9,6 +9,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { startCheckout } from "@/lib/billing";
+import { PENDING_PROFILE_KEY } from "@/routes/register";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -20,13 +22,56 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+// Formule choisie à l'inscription (mémorisée quand l'email devait être confirmé).
+const PENDING_PLAN_KEY = "dietfitpro_pending_plan";
+
+// Si un profil nutrition (poids, taille, objectif, calculs BMR/TDEE...) a été
+// mis en attente lors de l'inscription (cas "confirmation email requise"),
+// on l'applique ici à la table profiles, une seule fois, puis on nettoie.
+async function applyPendingProfileIfAny(userId: string) {
+  if (typeof window === "undefined") return;
+
+  const raw = window.localStorage.getItem(PENDING_PROFILE_KEY);
+  if (!raw) return;
+
+  try {
+    const pendingProfile = JSON.parse(raw);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update(pendingProfile)
+      .eq("id", userId);
+
+    if (error) {
+      console.error("[login] Erreur application profil en attente :", error);
+      return; // on garde le pending en local, on retentera au prochain login
+    }
+
+    window.localStorage.removeItem(PENDING_PROFILE_KEY);
+  } catch (err) {
+    console.error("[login] Erreur lecture profil en attente :", err);
+  }
+}
+
+// Lit la formule mise en attente, puis l'efface tout de suite : l'abonné n'est
+// envoyé vers le paiement qu'une seule fois (pas de boucle s'il annule sur Stripe).
+function takePendingPlan(): "basic" | "premium" | null {
+  if (typeof window === "undefined") return null;
+
+  const value = window.localStorage.getItem(PENDING_PLAN_KEY);
+  if (!value) return null;
+
+  window.localStorage.removeItem(PENDING_PLAN_KEY);
+
+  return value === "premium" || value === "basic" ? value : null;
+}
+
 function LoginPage() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,11 +83,13 @@ function LoginPage() {
     try {
       await signIn(email.trim(), password);
       
-      // ✅ Récupérer la session et le profil pour rediriger
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session) {
-        // Récupérer le profil pour connaître le rôle
+        // Rattrapage : applique le profil nutrition resté en attente
+        // depuis une inscription qui nécessitait une confirmation email.
+        await applyPendingProfileIfAny(session.user.id);
+
         const { data: profile } = await supabase
           .from("profiles")
           .select("role")
@@ -51,51 +98,29 @@ function LoginPage() {
         
         const userRole = profile?.role as "pro" | "patient" | "subscriber" | null;
         
-        // ✅ Rediriger selon le rôle
         if (userRole === "pro") {
           void navigate({ to: "/pro/dashboard" });
         } else if (userRole === "patient") {
           void navigate({ to: "/patient/dashboard" });
         } else if (userRole === "subscriber") {
+          // Première connexion après inscription : direction le paiement sécurisé
+          // de la formule choisie. En cas de problème, on va à l'accueil.
+          const pendingPlan = takePendingPlan();
+
+          if (pendingPlan) {
+            try {
+              await startCheckout({ kind: "subscription", plan: pendingPlan });
+              return;
+            } catch (checkoutError) {
+              console.error("[login] Ouverture du paiement impossible :", checkoutError);
+            }
+          }
+
           void navigate({ to: "/home" });
         }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur de connexion");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleInvitation = async (event: FormEvent) => {
-    event.preventDefault();
-    setError(null);
-    const trimmedCode = code.trim().toUpperCase();
-
-    if (trimmedCode.length !== 8) {
-      setError("Le code d'invitation doit contenir 8 caractères.");
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      await signIn(email.trim(), password);
-
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!userData.user) throw new Error("Connexion impossible.");
-
-      const { error: invitationError } = await supabase.rpc("activate_invitation_code", {
-        p_code: trimmedCode,
-      });
-
-      if (invitationError) throw invitationError;
-
-      // ✅ Nouveau patient avec code → /bienvenue pour finaliser
-      await navigate({ to: "/bienvenue" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur lors de l'activation du compte");
     } finally {
       setSubmitting(false);
     }
@@ -115,9 +140,8 @@ function LoginPage() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="login">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-1">
                 <TabsTrigger value="login">Connexion</TabsTrigger>
-                <TabsTrigger value="invitation">Code d'invitation</TabsTrigger>
               </TabsList>
               <TabsContent value="login" className="mt-4">
                 <form onSubmit={handleSignIn} className="space-y-4">
@@ -172,72 +196,6 @@ function LoginPage() {
                       S'inscrire
                     </Link>
                   </p>
-                </form>
-              </TabsContent>
-              <TabsContent value="invitation" className="mt-4">
-                <form onSubmit={handleInvitation} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email-inv">Email</Label>
-                    <Input
-                      id="email-inv"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      autoComplete="email"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password-inv">Mot de passe</Label>
-                    <div className="relative">
-                      <Input
-                        id="password-inv"
-                        type={showPassword ? "text" : "password"}
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        autoComplete="current-password"
-                      />
-                      <button
-                        type="button"
-                        className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
-                        onClick={() => setShowPassword((value) => !value)}
-                        aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
-                        disabled={submitting}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="code">Code d'invitation (8 caractères)</Label>
-                    <Input
-                      id="code"
-                      type="text"
-                      required
-                      maxLength={8}
-                      minLength={8}
-                      value={code}
-                      onChange={(e) => setCode(e.target.value.toUpperCase())}
-                      placeholder="ABCD1234"
-                      className="font-mono uppercase tracking-widest"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Saisissez le code fourni par votre coach pour activer votre compte patient.
-                    </p>
-                  </div>
-                  {error ? (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  ) : null}
-                  <Button type="submit" className="w-full" disabled={submitting}>
-                    {submitting ? "Validation…" : "Activer mon compte patient"}
-                  </Button>
                 </form>
               </TabsContent>
             </Tabs>

@@ -15,15 +15,18 @@ import { Logo } from "@/components/Logo";
 import { NotificationBell } from "@/components/NotificationBell";
 import { MessagesBell } from "@/components/MessagesBell";
 import { UpcomingConsultationReminder } from "@/components/UpcomingConsultationReminder";
+import { WeeklyCheckinDialog } from "@/components/gamification/WeeklyCheckinDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useConversations } from "@/hooks/useMessages";
 import { cn } from "@/lib/utils";
+
 
 type Tab = {
   to: string;
   label: string;
   icon: React.ElementType;
 };
+
 
 const TABS: Tab[] = [
   { to: "/patient/dashboard", label: "Accueil", icon: Home },
@@ -33,6 +36,7 @@ const TABS: Tab[] = [
   { to: "/patient/messages", label: "Messages", icon: MessageSquare },
   { to: "/patient/feed", label: "Feed", icon: Rss },
 ];
+
 
 export function PatientLayout({
   children,
@@ -47,31 +51,39 @@ export function PatientLayout({
   const firstName = profile?.full_name?.split(" ")[0] ?? "";
   const { totalUnread: unread } = useConversations();
 
+
   const handleSignOut = async () => {
     await signOut();
     void navigate({ to: "/login" });
   };
 
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <UpcomingConsultationReminder />
 
+
       <header className="sticky top-0 z-30 border-b bg-background">
         <div className="flex h-14 items-center justify-between px-4">
           <Logo />
+
 
           <div className="flex items-center gap-2 sm:gap-3 text-sm">
             {firstName && (
               <span className="hidden font-medium sm:inline">{firstName}</span>
             )}
 
+
             <span className="flex items-center gap-1 text-[#6DB33F] font-semibold">
               <Flame className="h-4 w-4" /> {streak}
             </span>
 
+
             <MessagesBell to="/patient/messages" />
 
+
             <NotificationBell to="/patient/notifications" />
+
 
             <Link
               to="/patient/profil"
@@ -81,6 +93,7 @@ export function PatientLayout({
             >
               <User className="h-4 w-4" />
             </Link>
+
 
             <button
               onClick={handleSignOut}
@@ -94,7 +107,9 @@ export function PatientLayout({
         </div>
       </header>
 
+
       <main className="flex-1 pb-20">{children}</main>
+
 
       <nav className="fixed bottom-0 inset-x-0 z-40 border-t bg-background">
         <div className="grid h-16 grid-cols-6">
@@ -102,6 +117,7 @@ export function PatientLayout({
             const active = pathname === tab.to || pathname.startsWith(tab.to + "/");
             const Icon = tab.icon;
             const isMessages = tab.to === "/patient/messages";
+
 
             return (
               <Link
@@ -121,12 +137,16 @@ export function PatientLayout({
                   )}
                 </div>
 
+
                 <span className="truncate">{tab.label}</span>
               </Link>
             );
           })}
         </div>
       </nav>
+
+
+      <WeeklyCheckinDialog />
     </div>
   );
 }

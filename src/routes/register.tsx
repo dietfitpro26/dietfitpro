@@ -1,7 +1,7 @@
-<<<<<<< HEAD
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { Activity, Eye, EyeOff } from "lucide-react";
+import { Activity, Eye, EyeOff, Mail } from "lucide-react";
+
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,16 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
+import { startCheckout } from "@/lib/billing";
+import {
+  calculateNutritionProfile,
+  isMinor,
+  type ActivityLevel,
+  type Gender,
+  type NutritionGoal,
+} from "@/lib/nutritionCalc";
+
 
 export const Route = createFileRoute("/register")({
   head: () => ({
@@ -29,35 +39,46 @@ export const Route = createFileRoute("/register")({
   component: RegisterPage,
 });
 
-const GOALS = [
-  { value: "weight_loss", label: "🥗 Perte de poids" },
-  { value: "muscle_gain", label: "💪 Prise de masse" },
-  { value: "maintenance", label: "⚖️ Maintien du poids" },
-  { value: "general_health", label: "❤️ Santé générale" },
+
+// Version des textes légaux acceptés à l'inscription (CGV + confidentialité).
+// À changer à chaque mise à jour importante de ces textes.
+const LEGAL_DOCUMENTS_VERSION = "2026-10-14";
+
+
+const GOALS: { value: NutritionGoal; label: string }[] = [
+  { value: "perte_de_poids", label: "🥗 Perte de poids" },
+  { value: "prise_de_masse", label: "💪 Prise de masse" },
+  { value: "maintien", label: "⚖️ Maintien du poids" },
+  { value: "equilibre", label: "❤️ Santé générale" },
 ];
 
-const DAILY_KCAL: Record<string, number> = {
-  weight_loss: 1800,
-  muscle_gain: 2600,
-  maintenance: 2200,
-  general_health: 2000,
-};
+
+const ACTIVITY_LEVELS: { value: ActivityLevel; label: string; hint: string }[] = [
+  { value: "sedentaire", label: "🪑 Sédentaire", hint: "Bureau, peu ou pas de sport" },
+  { value: "actif", label: "🏃 Actif", hint: "Sport 2-3x / semaine" },
+  { value: "tres_actif", label: "🔥 Très actif", hint: "Sport 4-6x / semaine ou métier physique" },
+];
+
 
 function calcBMI(weight: number, height: number): number | null {
   if (!Number.isFinite(weight) || !Number.isFinite(height)) {
     return null;
   }
 
+
   if (weight <= 0 || height <= 0) {
     return null;
   }
 
+
   const heightInMeters = height / 100;
+
 
   return Math.round(
     (weight / (heightInMeters * heightInMeters)) * 10,
   ) / 10;
 }
+
 
 function getBMILabel(bmi: number): {
   label: string;
@@ -70,12 +91,14 @@ function getBMILabel(bmi: number): {
     };
   }
 
+
   if (bmi < 25) {
     return {
       label: "Poids normal ✅",
       color: "text-green-500",
     };
   }
+
 
   if (bmi < 30) {
     return {
@@ -84,16 +107,19 @@ function getBMILabel(bmi: number): {
     };
   }
 
+
   return {
     label: "Obésité",
     color: "text-red-500",
   };
 }
 
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
     return error.message;
   }
+
 
   if (typeof error === "object" && error !== null) {
     const possibleError = error as {
@@ -102,6 +128,7 @@ function getErrorMessage(error: unknown): string {
       hint?: unknown;
       code?: unknown;
     };
+
 
     const parts = [
       possibleError.message,
@@ -115,40 +142,105 @@ function getErrorMessage(error: unknown): string {
       )
       .map((value) => value.trim());
 
+
     if (parts.length > 0) {
       return parts.join(" — ");
     }
   }
 
+
   return "Erreur inconnue pendant la création du compte.";
 }
+
+
+// Clé de stockage local temporaire : si l'email doit être confirmé avant la première
+// connexion, on garde le profil physique en attente pour le réinjecter au premier login.
+export const PENDING_PROFILE_KEY = "dietfitpro_pending_profile";
+
+// Même principe pour la formule choisie : après confirmation de l'email et première
+// connexion, l'abonné est envoyé directement sur la page de paiement.
+export const PENDING_PLAN_KEY = "dietfitpro_pending_plan";
+
+
+// IMPORTANT : ces champs correspondent exactement aux colonnes existantes de la
+// table public.profiles ET sont autorisés par le trigger de sécurité
+// prevent_profile_security_changes(). Ne JAMAIS inclure ici : role, plan,
+// pro_id, subscription_status, stripe_customer_id, stripe_subscription_id.
+// Ces champs "sensibles" sont gérés uniquement via handle_new_user() à la
+// création, ou via set_patient_plan()/pro_set_subscriber_plan() après paiement.
+export interface PendingProfileData {
+  age: number;
+  gender: Gender | null;
+  weight_kg: number | null;
+  height_cm: number | null;
+  bmi: number | null;
+  goal: string;
+  activity_level: ActivityLevel | null;
+  is_pregnant_or_breastfeeding: boolean;
+  target_weight_kg: number | null;
+  program_start_date: string;
+  bmr_kcal: number | null;
+  tdee_kcal: number | null;
+  daily_kcal_target: number | null;
+  target_kcal: number | null;
+  target_protein_g: number | null;
+  target_carbs_g: number | null;
+  target_fat_g: number | null;
+  profile_complete: boolean;
+}
+
+
+function savePendingProfile(data: PendingProfileData) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(PENDING_PROFILE_KEY, JSON.stringify(data));
+}
+
+
+function savePendingPlan(plan: "basic" | "premium") {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(PENDING_PLAN_KEY, plan);
+}
+
 
 function RegisterPage() {
   const { signUp } = useAuth();
   const navigate = useNavigate();
+
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+
   const [age, setAge] = useState("");
+  const [gender, setGender] = useState<Gender | "">("");
   const [weightKg, setWeightKg] = useState("");
   const [heightCm, setHeightCm] = useState("");
   const [targetWeightKg, setTargetWeightKg] = useState("");
-  const [goal, setGoal] = useState("");
+  const [goal, setGoal] = useState<NutritionGoal | "">("");
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel | "">("");
+  const [isPregnantOrBreastfeeding, setIsPregnantOrBreastfeeding] = useState(false);
   const [plan, setPlan] = useState<"basic" | "premium">("basic");
+
+
+  const [acceptCgv, setAcceptCgv] = useState(false);
+  const [acceptHealthData, setAcceptHealthData] = useState(false);
+
 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [needsEmailConfirm, setNeedsEmailConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+
   const bmi = calcBMI(Number(weightKg), Number(heightCm));
   const bmiInfo = bmi !== null ? getBMILabel(bmi) : null;
+
 
   const targetBmi = calcBMI(
     Number(targetWeightKg),
@@ -157,45 +249,122 @@ function RegisterPage() {
   const targetBmiInfo =
     targetBmi !== null ? getBMILabel(targetBmi) : null;
 
+
+  const numericAgeForPreview = age ? Number(age) : null;
+  const isMinorProfile =
+    numericAgeForPreview !== null && Number.isFinite(numericAgeForPreview)
+      ? isMinor(numericAgeForPreview)
+      : false;
+
+
+  // Aperçu du calcul nutrition en direct, dès que tous les champs nécessaires sont remplis.
+  const nutritionPreview =
+    !isMinorProfile &&
+    weightKg &&
+    heightCm &&
+    age &&
+    gender &&
+    activityLevel &&
+    goal
+      ? calculateNutritionProfile({
+          weightKg: Number(weightKg),
+          heightCm: Number(heightCm),
+          age: Number(age),
+          gender: gender as Gender,
+          activityLevel: activityLevel as ActivityLevel,
+          goal: goal as NutritionGoal,
+          programStartDate: new Date().toISOString().slice(0, 10),
+          isPregnantOrBreastfeeding,
+        })
+      : null;
+
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
 
     if (submitting || success) {
       return;
     }
 
+
     setError(null);
     setNeedsEmailConfirm(false);
 
+
     const cleanName = fullName.trim();
     const cleanEmail = email.trim().toLowerCase();
+
 
     if (!cleanName) {
       setError("Veuillez renseigner votre nom complet.");
       return;
     }
 
+
     if (!cleanEmail) {
       setError("Veuillez renseigner votre adresse email.");
       return;
     }
+
 
     if (password.length < 6) {
       setError("Le mot de passe doit contenir au moins 6 caractères.");
       return;
     }
 
+
     if (password !== confirmPassword) {
       setError("Les deux mots de passe ne correspondent pas.");
       return;
     }
+
 
     if (!goal) {
       setError("Veuillez sélectionner votre objectif.");
       return;
     }
 
+
+    const numericAge = age ? Number(age) : null;
+
+
+    if (numericAge === null) {
+      setError("Veuillez renseigner votre âge.");
+      return;
+    }
+
+
+    if (!isMinor(numericAge)) {
+      if (!gender) {
+        setError("Veuillez indiquer votre sexe (nécessaire pour calculer vos besoins caloriques).");
+        return;
+      }
+
+
+      if (!activityLevel) {
+        setError("Veuillez sélectionner votre niveau d'activité physique.");
+        return;
+      }
+    }
+
+
+    if (!acceptCgv) {
+      setError("Veuillez accepter les conditions générales de vente pour créer votre compte.");
+      return;
+    }
+
+
+    if (!acceptHealthData) {
+      setError(
+        "Votre consentement au traitement de vos données de santé est nécessaire pour personnaliser vos programmes.",
+      );
+      return;
+    }
+
+
     setSubmitting(true);
+
 
     try {
       const weight = weightKg ? Number(weightKg) : null;
@@ -203,137 +372,176 @@ function RegisterPage() {
       const targetWeight = targetWeightKg
         ? Number(targetWeightKg)
         : null;
-      const numericAge = age ? Number(age) : null;
+
 
       const currentBmi =
         weight !== null && height !== null
           ? calcBMI(weight, height)
           : null;
 
-      const calculatedTargetBmi =
-        targetWeight !== null && height !== null
-          ? calcBMI(targetWeight, height)
-          : null;
 
-      /*
-       * Important :
-       * Toutes les données sont envoyées dans les métadonnées Auth.
-       *
-       * Nous ne faisons plus :
-       * - getSession() juste après signUp()
-       * - update() manuel de profiles
-       *
-       * Quand la confirmation email est active, Supabase ne fournit
-       * normalement pas encore de session après signUp().
-       */
-      const result = await signUp(cleanEmail, password, {
-        full_name: cleanName,
-        role: "subscriber",
+      const programStartDate = new Date().toISOString().slice(0, 10);
+
+
+      // Cas mineur : pas de calcul Black et al., profil marqué incomplet
+      // pour déclencher un suivi manuel côté Pro.
+      const minor = isMinor(numericAge);
+
+
+      const nutrition = minor
+        ? null
+        : calculateNutritionProfile({
+            weightKg: weight ?? 0,
+            heightCm: height ?? 0,
+            age: numericAge,
+            gender: gender as Gender,
+            activityLevel: activityLevel as ActivityLevel,
+            goal: goal as NutritionGoal,
+            programStartDate,
+            isPregnantOrBreastfeeding,
+          });
+
+
+      // NOTE IMPORTANTE : "plan" n'est jamais envoyé ici. Le compte est
+      // toujours créé en "basic" par handle_new_user() (sécurité anti-triche
+      // côté base). Le passage en Premium se fait après paiement confirmé,
+      // via le flux de paiement Stripe.
+      const profileUpdate: PendingProfileData = {
         age: numericAge,
+        gender: minor ? null : (gender as Gender),
         weight_kg: weight,
         height_cm: height,
         bmi: currentBmi,
         goal,
+        activity_level: minor ? null : (activityLevel as ActivityLevel),
+        is_pregnant_or_breastfeeding: minor ? false : isPregnantOrBreastfeeding,
         target_weight_kg: targetWeight,
-        target_bmi: calculatedTargetBmi,
-        daily_kcal_target: DAILY_KCAL[goal],
-        plan,
-        // ✅ Nouveau : profil incomplet par défaut
-        profile_complete: false,
+        program_start_date: programStartDate,
+        bmr_kcal: nutrition?.bmrKcal ?? null,
+        tdee_kcal: nutrition?.tdeeKcal ?? null,
+        daily_kcal_target: nutrition?.targetKcal ?? null,
+        target_kcal: nutrition?.targetKcal ?? null,
+        target_protein_g: nutrition?.targetProteinG ?? null,
+        target_carbs_g: nutrition?.targetCarbsG ?? null,
+        target_fat_g: nutrition?.targetFatG ?? null,
+        profile_complete: !minor,
+      };
+
+
+      // Preuve du consentement : date et version des textes acceptés,
+      // conservées par Supabase avec le compte.
+      const consentAt = new Date().toISOString();
+
+
+      const result = await signUp(cleanEmail, password, {
+        full_name: cleanName,
+        cgv_accepted_at: consentAt,
+        health_consent_at: consentAt,
+        legal_documents_version: LEGAL_DOCUMENTS_VERSION,
       });
 
-      setSuccess(true);
 
       if (result.data.session) {
-        window.setTimeout(() => {
-          // ✅ Rediriger vers /bienvenue pour finaliser le profil
-          void navigate({ to: "/bienvenue" as never });
-        }, 1000);
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update(profileUpdate)
+          .eq("id", result.data.session.user.id);
 
-        return;
+
+        if (updateError) {
+          console.error("[register] Erreur mise à jour profil :", updateError);
+          setError(getErrorMessage(updateError));
+          setSubmitting(false);
+          return;
+        }
+
+
+        setSuccess(true);
+
+
+        // Compte actif tout de suite : on envoie l'abonné directement sur la
+        // page de paiement sécurisée Stripe, avec la formule qu'il a choisie.
+        try {
+          await startCheckout({ kind: "subscription", plan });
+          return;
+        } catch (checkoutError) {
+          console.error("[register] Ouverture du paiement impossible :", checkoutError);
+          setError(
+            "Votre compte est créé, mais la page de paiement n'a pas pu s'ouvrir. Vous pourrez choisir votre formule depuis votre profil.",
+          );
+          window.setTimeout(() => {
+            void navigate({ to: "/home" });
+          }, 3000);
+          return;
+        }
       }
 
+
+      // Confirmation d'email requise : on garde le profil et la formule choisie
+      // pour les appliquer à la première connexion.
+      savePendingProfile(profileUpdate);
+      savePendingPlan(plan);
+      setSuccess(true);
       setNeedsEmailConfirm(true);
     } catch (err) {
       console.error("[register] Erreur complète inscription :", err);
       setError(getErrorMessage(err));
-=======
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
-import { supabase } from '../lib/supabase'
-import { Button } from '../components/ui/button'
-import { Input } from '../components/ui/input'
-import { Label } from '../components/ui/label'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card'
-import { Alert, AlertDescription } from '../components/ui/alert'
-import { Loader2 } from 'lucide-react'
-
-export const Route = createFileRoute('/register')({
-  component: RegisterComponent,
-})
-
-function RegisterComponent() {
-  const navigate = useNavigate()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    role: 'patient' as 'pro' | 'patient' | 'subscriber',
-  })
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-
-    // Validations
-    if (formData.password !== formData.confirmPassword) {
-      setError('Les mots de passe ne correspondent pas')
-      return
-    }
-
-    if (formData.password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractè·´res')
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      // 1. Créer utilisateur
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-      })
-
-      if (authError) throw authError
-      if (!authData.user) throw new Error('Erreur création compte')
-
-      // 2. Créer profil avec profile_complete=false et subscription_tier=basic
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: authData.user.id,
-        email: formData.email,
-        role: formData.role,
-        profile_complete: false,
-        subscription_tier: 'basic',
-      })
-
-      if (profileError) throw profileError
-
-      // 3. Rediriger vers bienvenue pour compléter profil
-      navigate({ to: '/bienvenue' })
-    } catch (err: any) {
-      console.error('Register error:', err)
-      setError(err.message || 'Une erreur est survenue')
->>>>>>> 99408d3e5828c26f7f68f4143aa8c5d8c6e2d77e
     } finally {
-      setLoading(false)
+      setSubmitting(false);
     }
+  };
+
+
+  // Écran dédié : vérification de l'adresse email.
+  if (success && needsEmailConfirm) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
+        <div className="w-full max-w-md">
+          <div className="mb-8 flex items-center justify-center gap-2">
+            <Activity className="h-7 w-7 text-primary" />
+            <span className="text-2xl font-bold text-foreground">
+              DietFitPro
+            </span>
+          </div>
+
+
+          <Card>
+            <CardHeader className="items-center text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Mail className="h-7 w-7" />
+              </div>
+              <CardTitle className="mt-3">Vérifiez votre adresse e-mail</CardTitle>
+              <CardDescription>
+                Nous venons d'envoyer un message de confirmation à{" "}
+                <span className="font-medium text-foreground">{email.trim().toLowerCase()}</span>.
+              </CardDescription>
+            </CardHeader>
+
+
+            <CardContent className="space-y-4">
+              <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+                <li>Ouvrez votre boîte mail (pensez à regarder vos spams).</li>
+                <li>Cliquez sur le lien de confirmation.</li>
+                <li>
+                  Connectez-vous : vous serez envoyé directement sur la page de paiement
+                  sécurisée de votre formule {plan === "premium" ? "Premium" : "Basic"}
+                  {plan === "basic" ? " (7 jours d'essai gratuits)" : ""}.
+                </li>
+              </ol>
+
+
+              <Button asChild className="w-full">
+                <Link to="/login">Aller à la connexion</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
+
   return (
-<<<<<<< HEAD
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md">
         <div className="mb-8 flex items-center justify-center gap-2">
@@ -343,6 +551,7 @@ function RegisterComponent() {
           </span>
         </div>
 
+
         <Card>
           <CardHeader>
             <CardTitle>Créer un compte</CardTitle>
@@ -350,6 +559,7 @@ function RegisterComponent() {
               Rejoignez la communauté DietFitPro
             </CardDescription>
           </CardHeader>
+
 
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -366,6 +576,7 @@ function RegisterComponent() {
                 />
               </div>
 
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -379,8 +590,10 @@ function RegisterComponent() {
                 />
               </div>
 
+
               <div className="space-y-2">
                 <Label htmlFor="password">Mot de passe</Label>
+
 
                 <div className="relative">
                   <Input
@@ -395,6 +608,7 @@ function RegisterComponent() {
                     autoComplete="new-password"
                     disabled={submitting || success}
                   />
+
 
                   <button
                     type="button"
@@ -415,15 +629,18 @@ function RegisterComponent() {
                   </button>
                 </div>
 
+
                 <p className="text-xs text-muted-foreground">
                   6 caractères minimum.
                 </p>
               </div>
 
+
               <div className="space-y-2">
                 <Label htmlFor="confirm_password">
                   Confirmer le mot de passe
                 </Label>
+
 
                 <div className="relative">
                   <Input
@@ -438,6 +655,7 @@ function RegisterComponent() {
                     autoComplete="new-password"
                     disabled={submitting || success}
                   />
+
 
                   <button
                     type="button"
@@ -459,10 +677,12 @@ function RegisterComponent() {
                 </div>
               </div>
 
+
               <div className="border-t pt-4">
                 <p className="mb-3 text-sm font-medium text-foreground">
                   Choisissez votre offre
                 </p>
+
 
                 <div className="grid grid-cols-2 gap-3">
                   <button
@@ -490,6 +710,7 @@ function RegisterComponent() {
                     </p>
                   </button>
 
+
                   <button
                     type="button"
                     onClick={() => setPlan("premium")}
@@ -513,16 +734,23 @@ function RegisterComponent() {
                   </button>
                 </div>
 
+
                 <p className="mt-2 text-center text-xs text-muted-foreground">
                   Sans engagement — Annulable à tout moment
                 </p>
+                <p className="mt-1 text-center text-xs text-muted-foreground">
+                  Après votre inscription, vous serez dirigé vers la page de
+                  paiement sécurisée de la formule choisie.
+                </p>
               </div>
+
 
               <div className="border-t pt-4">
                 <p className="mb-3 text-sm font-medium text-foreground">
                   Votre profil physique
                 </p>
               </div>
+
 
               <div className="space-y-2">
                 <Label htmlFor="age">Âge</Label>
@@ -537,6 +765,70 @@ function RegisterComponent() {
                   disabled={submitting || success}
                 />
               </div>
+
+
+              {isMinorProfile ? (
+                <Alert>
+                  <AlertDescription>
+                    Les moins de 18 ans nécessitent un accompagnement personnalisé.
+                    Après la création du compte, votre professionnel prendra contact
+                    avec vous directement pour établir votre programme.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label>Sexe</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setGender("homme")}
+                        disabled={submitting || success}
+                        className={`rounded-lg border px-4 py-2 text-center text-sm font-medium transition-all ${
+                          gender === "homme"
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                        }`}
+                      >
+                        👨 Homme
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGender("femme")}
+                        disabled={submitting || success}
+                        className={`rounded-lg border px-4 py-2 text-center text-sm font-medium transition-all ${
+                          gender === "femme"
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                        }`}
+                      >
+                        👩 Femme
+                      </button>
+                    </div>
+                  </div>
+
+
+                  {gender === "femme" ? (
+                    <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-3">
+                      <input
+                        id="pregnant"
+                        type="checkbox"
+                        checked={isPregnantOrBreastfeeding}
+                        onChange={(event) =>
+                          setIsPregnantOrBreastfeeding(event.target.checked)
+                        }
+                        disabled={submitting || success}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="pregnant" className="text-sm font-normal">
+                        Je suis enceinte ou j'allaite (facultatif — ajoute un bonus
+                        calorique adapté)
+                      </Label>
+                    </div>
+                  ) : null}
+                </>
+              )}
+
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -556,6 +848,7 @@ function RegisterComponent() {
                   />
                 </div>
 
+
                 <div className="space-y-2">
                   <Label htmlFor="height">Taille (cm)</Label>
                   <Input
@@ -574,11 +867,13 @@ function RegisterComponent() {
                 </div>
               </div>
 
+
               {bmi !== null && bmiInfo ? (
                 <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-3">
                   <span className="text-sm text-muted-foreground">
                     Votre IMC actuel
                   </span>
+
 
                   <div className="text-right">
                     <span className="text-lg font-bold text-foreground">
@@ -590,6 +885,7 @@ function RegisterComponent() {
                   </div>
                 </div>
               ) : null}
+
 
               <div className="space-y-2">
                 <Label htmlFor="targetWeight">Poids cible (kg)</Label>
@@ -608,11 +904,13 @@ function RegisterComponent() {
                 />
               </div>
 
+
               {targetBmi !== null && targetBmiInfo ? (
                 <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-3">
                   <span className="text-sm text-muted-foreground">
                     IMC cible
                   </span>
+
 
                   <div className="text-right">
                     <span className="text-lg font-bold text-foreground">
@@ -627,8 +925,37 @@ function RegisterComponent() {
                 </div>
               ) : null}
 
+
+              {!isMinorProfile ? (
+                <div className="space-y-2">
+                  <Label>Niveau d'activité physique</Label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {ACTIVITY_LEVELS.map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => setActivityLevel(item.value)}
+                        disabled={submitting || success}
+                        className={`rounded-lg border px-3 py-2 text-left text-sm transition-all ${
+                          activityLevel === item.value
+                            ? "border-primary bg-primary/10 font-medium text-primary"
+                            : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                        }`}
+                      >
+                        {item.label}
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          — {item.hint}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+
               <div className="space-y-2">
                 <Label>Votre objectif principal</Label>
+
 
                 <div className="grid grid-cols-2 gap-2">
                   {GOALS.map((item) => (
@@ -648,15 +975,83 @@ function RegisterComponent() {
                   ))}
                 </div>
 
-                {goal ? (
-                  <p className="text-xs text-muted-foreground">
-                    Calories/jour estimées :{" "}
-                    <span className="font-medium text-foreground">
-                      {DAILY_KCAL[goal]} kcal
-                    </span>
-                  </p>
+
+                {nutritionPreview && nutritionPreview.warnings.length === 0 ? (
+                  <div className="space-y-1 rounded-lg border bg-muted/40 px-4 py-3">
+                    <p className="text-xs text-muted-foreground">
+                      Calories/jour estimées :{" "}
+                      <span className="font-medium text-foreground">
+                        {nutritionPreview.targetKcal} kcal
+                      </span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Protéines {nutritionPreview.targetProteinG}g — Glucides{" "}
+                      {nutritionPreview.targetCarbsG}g — Lipides{" "}
+                      {nutritionPreview.targetFatG}g
+                    </p>
+                  </div>
                 ) : null}
+
+
+                {nutritionPreview?.warnings.map((warning) => (
+                  <Alert key={warning}>
+                    <AlertDescription>{warning}</AlertDescription>
+                  </Alert>
+                ))}
               </div>
+
+
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-start gap-2 rounded-lg border bg-muted/40 px-4 py-3">
+                  <input
+                    id="accept_cgv"
+                    type="checkbox"
+                    checked={acceptCgv}
+                    onChange={(event) => setAcceptCgv(event.target.checked)}
+                    disabled={submitting || success}
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                  />
+                  <Label htmlFor="accept_cgv" className="text-sm font-normal leading-snug">
+                    J'ai lu et j'accepte les{" "}
+                    <a
+                      href="/cgv"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-primary hover:underline"
+                    >
+                      conditions générales de vente
+                    </a>
+                    .
+                  </Label>
+                </div>
+
+
+                <div className="flex items-start gap-2 rounded-lg border bg-muted/40 px-4 py-3">
+                  <input
+                    id="accept_health"
+                    type="checkbox"
+                    checked={acceptHealthData}
+                    onChange={(event) => setAcceptHealthData(event.target.checked)}
+                    disabled={submitting || success}
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                  />
+                  <Label htmlFor="accept_health" className="text-sm font-normal leading-snug">
+                    Je consens expressément (ou mon représentant légal si je suis mineur) à ce
+                    que DietFitPro traite mes données de santé (âge, poids, taille, objectifs,
+                    suivi alimentaire) pour personnaliser mes programmes, comme décrit dans la{" "}
+                    <a
+                      href="/confidentialite"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-primary hover:underline"
+                    >
+                      politique de confidentialité
+                    </a>
+                    . Je peux retirer mon consentement à tout moment en supprimant mon compte.
+                  </Label>
+                </div>
+              </div>
+
 
               {error ? (
                 <Alert variant="destructive">
@@ -666,15 +1061,15 @@ function RegisterComponent() {
                 </Alert>
               ) : null}
 
-              {success ? (
+
+              {success && !needsEmailConfirm ? (
                 <Alert>
                   <AlertDescription>
-                    {needsEmailConfirm
-                      ? "Compte créé ! Vérifiez votre boîte mail, ainsi que vos spams, pour confirmer votre inscription avant de vous connecter."
-                      : "Compte créé avec succès ! Redirection en cours…"}
+                    Compte créé ! Redirection vers le paiement sécurisé…
                   </AlertDescription>
                 </Alert>
               ) : null}
+
 
               <Button
                 type="submit"
@@ -683,6 +1078,7 @@ function RegisterComponent() {
               >
                 {submitting ? "Création…" : "Créer mon compte"}
               </Button>
+
 
               <p className="text-center text-sm text-muted-foreground">
                 Déjà inscrit ?{" "}
@@ -693,98 +1089,23 @@ function RegisterComponent() {
                   Se connecter
                 </Link>
               </p>
-            </form>
-=======
-    <div className="min-h-screen flex items-center justify-center bg-muted/20 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Cré·´er un compte</CardTitle>
-          <CardDescription>
-            Rejoignez DietFitPro pour commencer votre parcours santé
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="votre@email.com"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-                disabled={loading}
-              />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-                disabled={loading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirmer mot de passe</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                required
-                disabled={loading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Je suis</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['pro', 'patient', 'subscriber'] as const).map((role) => (
-                  <Button
-                    key={role}
-                    type="button"
-                    variant={formData.role === role ? 'default' : 'outline'}
-                    className="w-full"
-                    onClick={() => setFormData({ ...formData, role })}
-                    disabled={loading}
-                  >
-                    {role === 'pro' && 'Pro'}
-                    {role === 'patient' && 'Patient'}
-                    {role === 'subscriber' && 'Subscriber'}
-                  </Button>
-                ))}
+              <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-2 text-xs text-muted-foreground">
+                <a href="/mentions-legales" className="hover:underline">
+                  Mentions légales
+                </a>
+                <a href="/cgv" className="hover:underline">
+                  CGV
+                </a>
+                <a href="/confidentialite" className="hover:underline">
+                  Confidentialité
+                </a>
               </div>
-            </div>
->>>>>>> 99408d3e5828c26f7f68f4143aa8c5d8c6e2d77e
+            </form>
           </CardContent>
-          <CardFooter>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              S'inscrire
-            </Button>
-          </CardFooter>
-        </form>
-        <div className="px-6 pb-6 text-center text-sm text-muted-foreground">
-          Déjà·´ un compte ?{' '}
-          <Button variant="link" className="p-0" onClick={() => navigate({ to: '/login' })}>
-            Se connecter
-          </Button>
-        </div>
-      </Card>
+        </Card>
+      </div>
     </div>
-  )
+  );
 }

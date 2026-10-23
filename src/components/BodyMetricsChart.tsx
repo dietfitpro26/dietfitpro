@@ -9,7 +9,8 @@ import { fr } from "date-fns/locale";
 export type MetricKey =
   | "weight_kg" | "bmi" | "body_fat_pct"
   | "muscle_mass_kg" | "water_pct" | "metabolic_age"
-  | "bone_mass_kg" | "visceral_fat";
+  | "bone_mass_kg" | "visceral_fat"
+  | "waist_cm" | "hip_cm" | "arm_cm" | "thigh_cm" | "chest_cm";
 
 export const METRICS_CONFIG: Record<MetricKey, { label: string; color: string; unit: string }> = {
   weight_kg:      { label: "Poids",            color: "#01696f", unit: "kg"  },
@@ -20,6 +21,11 @@ export const METRICS_CONFIG: Record<MetricKey, { label: string; color: string; u
   metabolic_age:  { label: "Âge métabolique",   color: "#a86fdf", unit: "ans" },
   bone_mass_kg:   { label: "Masse osseuse",     color: "#d19900", unit: "kg"  },
   visceral_fat:   { label: "Graisse viscérale", color: "#a12c7b", unit: ""    },
+  waist_cm:       { label: "Tour de taille",    color: "#8b5cf6", unit: "cm"  },
+  hip_cm:         { label: "Tour de hanches",   color: "#ec4899", unit: "cm"  },
+  arm_cm:         { label: "Tour de bras",      color: "#f97316", unit: "cm"  },
+  thigh_cm:       { label: "Tour de cuisse",    color: "#14b8a6", unit: "cm"  },
+  chest_cm:       { label: "Tour de poitrine",  color: "#0ea5e9", unit: "cm"  },
 };
 
 export interface BodyDataPoint {
@@ -33,6 +39,11 @@ export interface BodyDataPoint {
   bone_mass_kg?:   number | null;
   visceral_fat?:   number | null;
   height_cm?:      number | null;
+  waist_cm?:       number | null;
+  hip_cm?:         number | null;
+  arm_cm?:         number | null;
+  thigh_cm?:       number | null;
+  chest_cm?:       number | null;
 }
 
 function enrichData(data: BodyDataPoint[]): BodyDataPoint[] {
@@ -49,24 +60,31 @@ function enrichData(data: BodyDataPoint[]): BodyDataPoint[] {
 interface Props {
   data: BodyDataPoint[];
   availableMetrics?: MetricKey[];
+  height?: number;
+  showStats?: boolean;
 }
 
 export function BodyMetricsChart({
   data,
   availableMetrics = ["weight_kg", "bmi", "body_fat_pct", "muscle_mass_kg", "water_pct", "metabolic_age"],
+  height = 280,
+  showStats = true,
 }: Props) {
   const [selected, setSelected] = useState<MetricKey>(availableMetrics[0]);
+
+  // Si la liste de métriques change (ex: changement d'onglet/patient) et que la
+  // métrique sélectionnée n'en fait plus partie, on retombe sur la première.
+  const activeSelected = availableMetrics.includes(selected) ? selected : availableMetrics[0];
 
   const enriched = enrichData(data).map((d) => ({
     ...d,
     date: format(new Date(d.measured_at), "dd MMM yy", { locale: fr }),
   }));
 
-  const cfg = METRICS_CONFIG[selected];
+  const cfg = METRICS_CONFIG[activeSelected];
 
-  // Calcul min/max pour afficher la variation
   const values = enriched
-    .map((d) => d[selected] as number | null | undefined)
+    .map((d) => d[activeSelected] as number | null | undefined)
     .filter((v): v is number => v != null);
   const min = values.length ? Math.min(...values) : null;
   const max = values.length ? Math.max(...values) : null;
@@ -91,11 +109,11 @@ export function BodyMetricsChart({
             key={key}
             onClick={() => setSelected(key)}
             className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-              selected === key
+              activeSelected === key
                 ? "text-white"
                 : "bg-muted text-muted-foreground hover:bg-muted/80"
             }`}
-            style={selected === key ? { backgroundColor: METRICS_CONFIG[key].color } : {}}
+            style={activeSelected === key ? { backgroundColor: METRICS_CONFIG[key].color } : {}}
           >
             {METRICS_CONFIG[key].label}
           </button>
@@ -103,7 +121,7 @@ export function BodyMetricsChart({
       </div>
 
       {/* Stats rapides */}
-      {values.length > 0 && (
+      {showStats && values.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-muted/40 rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">Actuel</p>
@@ -125,7 +143,7 @@ export function BodyMetricsChart({
       )}
 
       {/* Graphique */}
-      <ResponsiveContainer width="100%" height={280}>
+      <ResponsiveContainer width="100%" height={height}>
         <LineChart data={enriched} margin={{ top: 8, right: 16, bottom: 0, left: -10 }}>
           <CartesianGrid strokeDasharray="3 3" opacity={0.4} />
           <XAxis dataKey="date" tick={{ fontSize: 11 }} />
@@ -143,7 +161,7 @@ export function BodyMetricsChart({
           )}
           <Line
             type="monotone"
-            dataKey={selected}
+            dataKey={activeSelected}
             name={cfg.label}
             stroke={cfg.color}
             strokeWidth={2.5}
