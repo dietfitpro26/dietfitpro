@@ -1,127 +1,186 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import {
+  createFileRoute,
+  Link,
+  useNavigate,
+} from "@tanstack/react-router";
+import { useRef, useState, type FormEvent } from "react";
 import { Activity, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { startCheckout } from "@/lib/billing";
-import { PENDING_PROFILE_KEY } from "@/routes/register";
+import {
+  clearPendingProfile,
+  getPendingRegistration,
+  takePendingPlan,
+} from "@/lib/pendingRegistration";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
       { title: "Connexion — DietFitPro" },
-      { name: "description", content: "Connectez-vous à votre espace DietFitPro." },
+      {
+        name: "description",
+        content: "Connectez-vous à votre espace DietFitPro.",
+      },
     ],
   }),
   component: LoginPage,
 });
 
-// Formule choisie à l'inscription (mémorisée quand l'email devait être confirmé).
-const PENDING_PLAN_KEY = "dietfitpro_pending_plan";
-
-// Si un profil nutrition (poids, taille, objectif, calculs BMR/TDEE...) a été
-// mis en attente lors de l'inscription (cas "confirmation email requise"),
-// on l'applique ici à la table profiles, une seule fois, puis on nettoie.
-async function applyPendingProfileIfAny(userId: string) {
-  if (typeof window === "undefined") return;
-
-  const raw = window.localStorage.getItem(PENDING_PROFILE_KEY);
-  if (!raw) return;
-
-  try {
-    const pendingProfile = JSON.parse(raw);
-
-    const { error } = await supabase
-      .from("profiles")
-      .update(pendingProfile)
-      .eq("id", userId);
-
-    if (error) {
-      console.error("[login] Erreur application profil en attente :", error);
-      return; // on garde le pending en local, on retentera au prochain login
-    }
-
-    window.localStorage.removeItem(PENDING_PROFILE_KEY);
-  } catch (err) {
-    console.error("[login] Erreur lecture profil en attente :", err);
-  }
-}
-
-// Lit la formule mise en attente, puis l'efface tout de suite : l'abonné n'est
-// envoyé vers le paiement qu'une seule fois (pas de boucle s'il annule sur Stripe).
-function takePendingPlan(): "basic" | "premium" | null {
-  if (typeof window === "undefined") return null;
-
-  const value = window.localStorage.getItem(PENDING_PLAN_KEY);
-  if (!value) return null;
-
-  window.localStorage.removeItem(PENDING_PLAN_KEY);
-
-  return value === "premium" || value === "basic" ? value : null;
-}
-
 function LoginPage() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   const handleSignIn = async (event: FormEvent) => {
     event.preventDefault();
-    setError(null);
+
+    if (submittingRef.current) return;
+
+    submittingRef.current = true;
     setSubmitting(true);
-    
+    setError(null);
+
     try {
       await signIn(email.trim(), password);
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        // Rattrapage : applique le profil nutrition resté en attente
-        // depuis une inscription qui nécessitait une confirmation email.
-        await applyPendingProfileIfAny(session.user.id);
 
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .maybeSingle();
-        
-        const userRole = profile?.role as "pro" | "patient" | "subscriber" | null;
-        
-        if (userRole === "pro") {
-          void navigate({ to: "/pro/dashboard" });
-        } else if (userRole === "patient") {
-          void navigate({ to: "/patient/dashboard" });
-        } else if (userRole === "subscriber") {
-          // Première connexion après inscription : direction le paiement sécurisé
-          // de la formule choisie. En cas de problème, on va à l'accueil.
-          const pendingPlan = takePendingPlan();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
-          if (pendingPlan) {
-            try {
-              await startCheckout({ kind: "subscription", plan: pendingPlan });
-              return;
-            } catch (checkoutError) {
-              console.error("[login] Ouverture du paiement impossible :", checkoutError);
-            }
+      if (sessionError) throw sessionError;
+
+      if (!session) {
+        throw new Error(
+          "Votre session n'a pas pu être récupérée. Réessayez de vous connecter.",
+        );
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, role, profile_complete")
+        .eq("id", session.user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error("[login] Lecture du profil :", profileError);
+        throw new Error(
+          "Votre connexion a réussi, mais votre profil n'a pas pu être chargé. Réessayez dans quelques instants.",
+        );
+      }
+
+      if (!profile) {
+        throw new Error(
+          "Aucun profil n'est associé à ce compte. Contactez votre professionnel.",
+        );
+      }
+
+      if (profile.role === "pro") {
+        await navigate({ to: "/pro/dashboard", replace: true });
+        return;
+      }
+
+      if (profile.role === "patient") {
+        await navigate({ to: "/patient/dashboard", replace: true });
+        return;
+      }
+
+      if (profile.role !== "subscriber") {
+        throw new Error(
+          "Le rôle de ce compte n'est pas reconnu. Contactez votre professionnel.",
+        );
+      }
+
+      const pending = getPendingRegistration(session.user.id);
+      let pendingCleanupSucceeded = true;
+
+      if (pending?.profile) {
+        // Un profil déjà terminé ne doit pas être écrasé
+        // par une ancienne copie conservée dans le navigateur.
+        if (profile.profile_complete !== true) {
+          const { data: updatedProfile, error: updateError } =
+            await supabase
+              .from("profiles")
+              .update(pending.profile)
+              .eq("id", session.user.id)
+              .eq("role", "subscriber")
+              .select("id")
+              .maybeSingle();
+
+          if (updateError || !updatedProfile) {
+            console.error(
+              "[login] Application du profil en attente :",
+              updateError,
+            );
+
+            throw new Error(
+              "Vous êtes connecté, mais vos informations d'inscription n'ont pas pu être enregistrées. Réessayez ; elles restent en attente sur ce navigateur.",
+            );
           }
+        }
 
-          void navigate({ to: "/home" });
+        pendingCleanupSucceeded = clearPendingProfile(session.user.id);
+
+        if (!pendingCleanupSucceeded) {
+          toast.warning(
+            "Le nettoyage des informations temporaires a échoué. Vérifiez votre profil avant de poursuivre.",
+          );
         }
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur de connexion");
+
+      const pendingPlan = pendingCleanupSucceeded
+        ? takePendingPlan(session.user.id)
+        : null;
+
+      if (pendingPlan) {
+        try {
+          await startCheckout({
+            kind: "subscription",
+            plan: pendingPlan,
+          });
+          return;
+        } catch (checkoutError) {
+          console.error(
+            "[login] Ouverture du paiement :",
+            checkoutError,
+          );
+
+          toast.error(
+            checkoutError instanceof Error
+              ? checkoutError.message
+              : "Le paiement n'a pas pu s'ouvrir. Retrouvez votre formule depuis votre profil.",
+          );
+        }
+      }
+
+      await navigate({ to: "/home", replace: true });
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Erreur de connexion. Réessayez.",
+      );
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -131,74 +190,93 @@ function LoginPage() {
       <div className="w-full max-w-md">
         <div className="mb-8 flex items-center justify-center gap-2">
           <Activity className="h-7 w-7 text-primary" />
-          <span className="text-2xl font-bold text-foreground">DietFitPro</span>
+          <span className="text-2xl font-bold text-foreground">
+            DietFitPro
+          </span>
         </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Connexion</CardTitle>
-            <CardDescription>Accédez à votre espace personnel</CardDescription>
+            <CardDescription>
+              Accédez à votre espace personnel
+            </CardDescription>
           </CardHeader>
+
           <CardContent>
-            <Tabs defaultValue="login">
-              <TabsList className="grid w-full grid-cols-1">
-                <TabsTrigger value="login">Connexion</TabsTrigger>
-              </TabsList>
-              <TabsContent value="login" className="mt-4">
-                <form onSubmit={handleSignIn} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      autoComplete="email"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Mot de passe</Label>
-                    <div className="relative">
-                      <Input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        autoComplete="current-password"
-                      />
-                      <button
-                        type="button"
-                        className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
-                        onClick={() => setShowPassword((value) => !value)}
-                        aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
-                        disabled={submitting}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                  {error ? (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  ) : null}
-                  <Button type="submit" className="w-full" disabled={submitting}>
-                    {submitting ? "Connexion…" : "Se connecter"}
-                  </Button>
-                  <p className="text-center text-sm text-muted-foreground">
-                    Pas de compte ?{" "}
-                    <Link to="/register" className="font-medium text-primary hover:underline">
-                      S'inscrire
-                    </Link>
-                  </p>
-                </form>
-              </TabsContent>
-            </Tabs>
+            <form onSubmit={handleSignIn} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Mot de passe</Label>
+
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    autoComplete="current-password"
+                    disabled={submitting}
+                    className="pr-10"
+                  />
+
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
+                    onClick={() => setShowPassword((value) => !value)}
+                    aria-label={
+                      showPassword
+                        ? "Masquer le mot de passe"
+                        : "Afficher le mot de passe"
+                    }
+                    disabled={submitting}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <Alert variant="destructive" role="alert">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={submitting}
+              >
+                {submitting ? "Connexion…" : "Se connecter"}
+              </Button>
+
+              <p className="text-center text-sm text-muted-foreground">
+                Pas de compte ?{" "}
+                <Link
+                  to="/register"
+                  className="font-medium text-primary hover:underline"
+                >
+                  S&apos;inscrire
+                </Link>
+              </p>
+            </form>
           </CardContent>
         </Card>
       </div>
