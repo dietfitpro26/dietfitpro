@@ -1,23 +1,28 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { ProLayout } from "@/layouts/ProLayout";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { FeedView } from "@/components/FeedView";
+import { FeedAttachment } from "@/components/FeedAttachment";
 import {
-  Rss, Plus, X, Image, Video, FileText,
+  Rss, Plus, X, Video, FileText,
   Lightbulb, Trophy, ChefHat, Eye, EyeOff,
-  Trash2, Upload, Loader2
+  Trash2, Upload, Loader2, ShieldAlert, RotateCcw, Check, Ban, ShieldOff
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
+
 export const Route = createFileRoute("/pro/feed")({
   component: Page,
 });
 
+
 // ── Types ─────────────────────────────────────────────────
 type FeedType = "article" | "tip" | "recipe" | "challenge" | "video";
+
 
 type FeedPost = {
   id: string;
@@ -33,6 +38,31 @@ type FeedPost = {
   created_at: string;
 };
 
+
+type ModComment = {
+  id: string;
+  content_id: string;
+  user_id: string;
+  body: string;
+  is_hidden: boolean;
+  created_at: string;
+};
+
+
+type ModPost = {
+  id: string;
+  author_id: string | null;
+  title: string;
+  body: string | null;
+  image_url: string | null;
+  is_published: boolean;
+  created_at: string;
+};
+
+
+type PageTab = "mine" | "general" | "moderation";
+
+
 // ── Helpers ───────────────────────────────────────────────
 const TYPE_CONFIG: Record<FeedType, { label: string; icon: React.ReactNode; color: string }> = {
   article:   { label: "Article",   icon: <FileText className="h-3.5 w-3.5" />,  color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
@@ -42,11 +72,20 @@ const TYPE_CONFIG: Record<FeedType, { label: string; icon: React.ReactNode; colo
   video:     { label: "Vidéo",     icon: <Video className="h-3.5 w-3.5" />,     color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
 };
 
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("fr-FR", {
     day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
   });
 }
+
+
+function storagePathFromUrl(url: string | null) {
+  if (!url) return null;
+  const part = url.split("/feed/")[1];
+  return part ? decodeURIComponent(part.split("?")[0]) : null;
+}
+
 
 // ── Composant carte post ──────────────────────────────────
 function PostCard({
@@ -59,15 +98,8 @@ function PostCard({
   const cfg = TYPE_CONFIG[post.type];
   return (
     <div className={`rounded-xl border bg-card overflow-hidden transition-all ${!post.is_published ? "opacity-60" : ""}`}>
-      {/* Image */}
-      {post.image_url && (
-        <img
-          src={post.image_url}
-          alt={post.title}
-          className="w-full h-48 object-cover"
-          loading="lazy"
-        />
-      )}
+      <FeedAttachment reference={post.image_url} alt={post.title} imageClassName="w-full h-48 object-contain" />
+      <FeedAttachment reference={post.video_url} kind="video" />
       <div className="p-4 space-y-3">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
@@ -84,10 +116,12 @@ function PostCard({
           </div>
         </div>
 
+
         {/* Corps */}
         {post.body && (
           <p className="text-sm text-muted-foreground line-clamp-2">{post.body}</p>
         )}
+
 
         {/* Tags */}
         {post.tags && post.tags.length > 0 && (
@@ -99,6 +133,7 @@ function PostCard({
             ))}
           </div>
         )}
+
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-1 border-t">
@@ -130,6 +165,7 @@ function PostCard({
   );
 }
 
+
 // ── Formulaire nouveau post ───────────────────────────────
 function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () => void }) {
   const [type, setType]         = useState<FeedType>("article");
@@ -142,6 +178,7 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
   const [error, setError]       = useState<string | null>(null);
   const fileRef                 = useRef<HTMLInputElement>(null);
 
+
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -153,14 +190,17 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
     }
   };
 
+
   const handleSubmit = async (publish: boolean) => {
     if (!title.trim()) { setError("Le titre est obligatoire."); return; }
     setError(null);
     setUploading(true);
 
+
     try {
       let image_url: string | null = null;
       let video_url: string | null = null;
+
 
       // Upload fichier si présent
       if (file) {
@@ -171,13 +211,16 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
           .upload(path, file, { upsert: false });
         if (upErr) throw upErr;
 
+
         const { data: urlData } = supabase.storage.from("feed").getPublicUrl(path);
         if (file.type.startsWith("image/")) image_url = urlData.publicUrl;
         else if (file.type.startsWith("video/")) video_url = urlData.publicUrl;
         else image_url = urlData.publicUrl; // PDF → on stocke dans image_url pour l'affichage
       }
 
+
       const tagArray = tags.split(",").map(t => t.trim()).filter(Boolean);
+
 
       const { error: insertErr } = await supabase.from("feed_content").insert({
         author_id:    authorId,
@@ -191,12 +234,15 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
         published_at: publish ? new Date().toISOString() : null,
       });
 
+
       if (insertErr) throw insertErr;
+
 
       // Reset
       setTitle(""); setBody(""); setTags(""); setFile(null); setPreview(null);
       if (fileRef.current) fileRef.current.value = "";
       onCreated();
+
 
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de la publication");
@@ -205,11 +251,13 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
     }
   };
 
+
   return (
     <div className="rounded-xl border bg-card p-5 space-y-4">
       <h2 className="font-semibold flex items-center gap-2">
         <Plus className="h-4 w-4 text-primary" /> Nouvelle publication
       </h2>
+
 
       {/* Type */}
       <div className="flex flex-wrap gap-2">
@@ -232,6 +280,7 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
         })}
       </div>
 
+
       {/* Titre */}
       <div>
         <Input
@@ -240,6 +289,7 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
           onChange={(e) => setTitle(e.target.value)}
         />
       </div>
+
 
       {/* Corps */}
       <div>
@@ -252,6 +302,7 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
         />
       </div>
 
+
       {/* Tags */}
       <div>
         <Input
@@ -260,6 +311,7 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
           onChange={(e) => setTags(e.target.value)}
         />
       </div>
+
 
       {/* Upload fichier */}
       <div>
@@ -279,6 +331,7 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
           {file ? file.name : "Ajouter une photo, vidéo ou PDF"}
         </button>
 
+
         {/* Prévisualisation image */}
         {preview && (
           <div className="relative mt-2">
@@ -292,6 +345,7 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
             </button>
           </div>
         )}
+
 
         {/* Nom fichier non-image */}
         {file && !preview && (
@@ -307,10 +361,12 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
         )}
       </div>
 
+
       {/* Erreur */}
       {error && (
         <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{error}</p>
       )}
+
 
       {/* Boutons */}
       <div className="flex gap-3">
@@ -338,17 +394,15 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
   );
 }
 
-// ── Page principale ───────────────────────────────────────
-function Page() {
-  return <ProLayout><Content /></ProLayout>;
-}
 
-function Content() {
+// ── Onglet 1 : Mes publications ───────────────────────────
+function MyPosts() {
   const { user }                = useAuth();
   const [posts, setPosts]       = useState<FeedPost[]>([]);
   const [loading, setLoading]   = useState(true);
   const [filterType, setFilterType] = useState<FeedType | "all">("all");
   const [showForm, setShowForm] = useState(false);
+
 
   const fetchPosts = async () => {
     if (!user) return;
@@ -356,12 +410,15 @@ function Content() {
       .from("feed_content")
       .select("*")
       .eq("author_id", user.id)
+      .eq("source", "coach")
       .order("created_at", { ascending: false });
     if (!error && data) setPosts(data as FeedPost[]);
     setLoading(false);
   };
 
+
   useEffect(() => { void fetchPosts(); }, [user]);
+
 
   const togglePublish = async (id: string, current: boolean) => {
     await supabase.from("feed_content").update({
@@ -372,6 +429,7 @@ function Content() {
       p.id === id ? { ...p, is_published: !current } : p
     ));
   };
+
 
   const deletePost = async (id: string, imageUrl: string | null) => {
     if (!confirm("Supprimer cette publication ?")) return;
@@ -384,20 +442,23 @@ function Content() {
     setPosts((prev) => prev.filter((p) => p.id !== id));
   };
 
+
   const filtered = filterType === "all"
     ? posts
     : posts.filter((p) => p.type === filterType);
 
+
   const published = posts.filter((p) => p.is_published).length;
   const drafts    = posts.filter((p) => !p.is_published).length;
 
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
+
 
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Rss className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Feed</h1>
+        <h2 className="text-lg font-semibold">Mes publications</h2>
         <div className="ml-auto flex items-center gap-2">
           <Badge variant="secondary">{published} publiés</Badge>
           {drafts > 0 && <Badge variant="outline">{drafts} brouillons</Badge>}
@@ -408,6 +469,7 @@ function Content() {
         </div>
       </div>
 
+
       {/* Formulaire */}
       {showForm && user && (
         <NewPostForm
@@ -415,6 +477,7 @@ function Content() {
           onCreated={() => { setShowForm(false); void fetchPosts(); }}
         />
       )}
+
 
       {/* Filtres par type */}
       <div className="flex flex-wrap gap-2">
@@ -448,6 +511,7 @@ function Content() {
         })}
       </div>
 
+
       {/* Liste posts */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -477,6 +541,566 @@ function Content() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+
+// ── Onglet 3 : Modération ─────────────────────────────────
+const COMMENT_COLUMNS = "id, content_id, user_id, body, is_hidden, created_at";
+const POST_COLUMNS = "id, author_id, title, body, image_url, is_published, created_at";
+
+function ModerationPanel({ onChanged }: { onChanged: () => void }) {
+  const [comments, setComments]           = useState<ModComment[]>([]);
+  const [posts, setPosts]                 = useState<ModPost[]>([]);
+  const [commentReports, setCommentReports] = useState<Record<string, number>>({});
+  const [postReports, setPostReports]     = useState<Record<string, number>>({});
+  const [pseudos, setPseudos]             = useState<Record<string, string>>({});
+  const [titles, setTitles]               = useState<Record<string, string>>({});
+  const [loading, setLoading]             = useState(true);
+  const [busyId, setBusyId]               = useState<string | null>(null);
+  const [error, setError]                 = useState<string | null>(null);
+  const [notice, setNotice]               = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const { data: rData } = await supabase
+      .from("feed_reports")
+      .select("target_type, target_id");
+
+    const cCounts: Record<string, number> = {};
+    const pCounts: Record<string, number> = {};
+    ((rData ?? []) as { target_type: string; target_id: string }[]).forEach((r) => {
+      if (r.target_type === "comment") cCounts[r.target_id] = (cCounts[r.target_id] ?? 0) + 1;
+      if (r.target_type === "post") pCounts[r.target_id] = (pCounts[r.target_id] ?? 0) + 1;
+    });
+    const reportedCommentIds = Object.keys(cCounts);
+    const reportedPostIds = Object.keys(pCounts);
+
+    // Commentaires : 50 derniers + commentaires signalés
+    const { data: recentComments } = await supabase
+      .from("feed_comments")
+      .select(COMMENT_COLUMNS)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    const cMap = new Map<string, ModComment>();
+    ((recentComments ?? []) as ModComment[]).forEach((c) => cMap.set(c.id, c));
+    if (reportedCommentIds.length > 0) {
+      const { data: repC } = await supabase
+        .from("feed_comments")
+        .select(COMMENT_COLUMNS)
+        .in("id", reportedCommentIds);
+      ((repC ?? []) as ModComment[]).forEach((c) => cMap.set(c.id, c));
+    }
+    const allComments = Array.from(cMap.values());
+
+    // Publications de membres : 30 dernières + publications signalées
+    const { data: recentPosts } = await supabase
+      .from("feed_content")
+      .select(POST_COLUMNS)
+      .eq("source", "member")
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    const pMap = new Map<string, ModPost>();
+    ((recentPosts ?? []) as ModPost[]).forEach((p) => pMap.set(p.id, p));
+    if (reportedPostIds.length > 0) {
+      const { data: repP } = await supabase
+        .from("feed_content")
+        .select(POST_COLUMNS)
+        .in("id", reportedPostIds);
+      ((repP ?? []) as ModPost[]).forEach((p) => pMap.set(p.id, p));
+    }
+    const allPosts = Array.from(pMap.values());
+
+    // Pseudos (auteurs des commentaires et des publications)
+    const userIds = Array.from(
+      new Set([
+        ...allComments.map((c) => c.user_id),
+        ...allPosts.filter((p) => p.author_id).map((p) => p.author_id as string),
+      ]),
+    );
+    const pseudoMap: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const { data: pData } = await supabase
+        .from("community_profiles")
+        .select("user_id, pseudo")
+        .in("user_id", userIds);
+      ((pData ?? []) as { user_id: string; pseudo: string }[]).forEach((p) => {
+        pseudoMap[p.user_id] = p.pseudo;
+      });
+    }
+
+    // Titres des publications sous lesquelles on a commenté
+    const contentIds = Array.from(new Set(allComments.map((c) => c.content_id)));
+    const titleMap: Record<string, string> = {};
+    if (contentIds.length > 0) {
+      const { data: tData } = await supabase
+        .from("feed_content")
+        .select("id, title")
+        .in("id", contentIds);
+      ((tData ?? []) as { id: string; title: string }[]).forEach((t) => {
+        titleMap[t.id] = t.title;
+      });
+    }
+
+    setComments(allComments);
+    setPosts(allPosts);
+    setCommentReports(cCounts);
+    setPostReports(pCounts);
+    setPseudos(pseudoMap);
+    setTitles(titleMap);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const refresh = async () => {
+    await load();
+    onChanged();
+  };
+
+  const clearReports = (type: "comment" | "post", id: string) =>
+    supabase.from("feed_reports").delete().eq("target_type", type).eq("target_id", id);
+
+  const fail = (message?: string) => setError("Action impossible : " + (message ?? "erreur inconnue"));
+
+  // ── Bannissement de l'auteur
+  const banAuthor = async (authorId: string | null, scope: "groups" | "all", busyKey: string) => {
+    if (!authorId) return;
+
+    const question =
+      scope === "groups"
+        ? "Bannir cette personne de TOUS les groupes ? Elle sera retirée de ses groupes et ne pourra plus en créer ni en rejoindre. Elle garde l'accès au feed général."
+        : "Bannir cette personne de TOUTE la communauté ? Elle sera retirée de ses groupes et ne pourra plus publier, commenter ni utiliser les groupes.";
+
+    const reason = window.prompt(`${question}\n\nMotif (facultatif) :`, "");
+    if (reason === null) return;
+
+    setBusyId(busyKey); setError(null); setNotice(null);
+    const { error: e } = await supabase.rpc("ban_community_member", {
+      p_user: authorId,
+      p_reason: reason.trim() || null,
+      p_scope: scope,
+    });
+
+    if (e) {
+      fail(e.message.includes("cannot_ban") ? "cette personne ne peut pas être bannie." : e.message);
+    } else {
+      setNotice(
+        scope === "groups"
+          ? "Personne bannie de tous les groupes. Vous pouvez lever ce bannissement depuis la page Groupes."
+          : "Personne bannie de la communauté. Vous pouvez lever ce bannissement depuis la page Groupes.",
+      );
+    }
+    await refresh();
+    setBusyId(null);
+  };
+
+  // ── Actions sur les commentaires
+  const hideComment = async (id: string) => {
+    setBusyId(id); setError(null); setNotice(null);
+    const { error: e } = await supabase.from("feed_comments").update({ is_hidden: true }).eq("id", id);
+    if (e) fail(e.message);
+    await refresh();
+    setBusyId(null);
+  };
+
+  const restoreComment = async (id: string) => {
+    setBusyId(id); setError(null); setNotice(null);
+    const { error: e1 } = await supabase.from("feed_comments").update({ is_hidden: false }).eq("id", id);
+    const { error: e2 } = await clearReports("comment", id);
+    if (e1 || e2) fail(e1?.message ?? e2?.message);
+    await refresh();
+    setBusyId(null);
+  };
+
+  const ignoreComment = async (id: string) => {
+    setBusyId(id); setError(null); setNotice(null);
+    const { error: e } = await clearReports("comment", id);
+    if (e) fail(e.message);
+    await refresh();
+    setBusyId(null);
+  };
+
+  const deleteComment = async (id: string) => {
+    if (!confirm("Supprimer définitivement ce commentaire ?")) return;
+    setBusyId(id); setError(null); setNotice(null);
+    const { error: e1 } = await supabase.from("feed_comments").delete().eq("id", id);
+    const { error: e2 } = await clearReports("comment", id);
+    if (e1 || e2) fail(e1?.message ?? e2?.message);
+    await refresh();
+    setBusyId(null);
+  };
+
+  // ── Actions sur les publications de membres
+  const hidePost = async (id: string) => {
+    setBusyId(id); setError(null); setNotice(null);
+    const { error: e } = await supabase.from("feed_content").update({ is_published: false }).eq("id", id);
+    if (e) fail(e.message);
+    await refresh();
+    setBusyId(null);
+  };
+
+  const restorePost = async (id: string) => {
+    setBusyId(id); setError(null); setNotice(null);
+    const { error: e1 } = await supabase.from("feed_content").update({ is_published: true }).eq("id", id);
+    const { error: e2 } = await clearReports("post", id);
+    if (e1 || e2) fail(e1?.message ?? e2?.message);
+    await refresh();
+    setBusyId(null);
+  };
+
+  const ignorePost = async (id: string) => {
+    setBusyId(id); setError(null); setNotice(null);
+    const { error: e } = await clearReports("post", id);
+    if (e) fail(e.message);
+    await refresh();
+    setBusyId(null);
+  };
+
+  const deletePost = async (post: ModPost) => {
+    if (!confirm("Supprimer définitivement cette publication ?")) return;
+    setBusyId(post.id); setError(null); setNotice(null);
+    const { error: e1 } = await supabase.from("feed_content").delete().eq("id", post.id);
+    if (e1) {
+      fail(e1.message);
+    } else {
+      const path = storagePathFromUrl(post.image_url);
+      if (path) await supabase.storage.from("feed").remove([path]);
+      await clearReports("post", post.id);
+    }
+    await refresh();
+    setBusyId(null);
+  };
+
+  const btn = "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors disabled:opacity-50";
+
+  const renderComment = (c: ModComment) => {
+    const count = commentReports[c.id] ?? 0;
+    const busy = busyId === c.id || busyId === `ban-${c.id}`;
+
+    return (
+      <div key={`c-${c.id}`} className={`rounded-xl border bg-card p-4 space-y-2 ${c.is_hidden ? "border-orange-300" : ""}`}>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <Badge variant="secondary" className="text-xs">Commentaire</Badge>
+          <span className="font-medium text-foreground">{pseudos[c.user_id] ?? "Membre sans pseudo"}</span>
+          <span>·</span>
+          <span>{formatDate(c.created_at)}</span>
+          {count > 0 && (
+            <Badge variant="outline" className="text-xs border-red-300 text-red-600">
+              {count} signalement{count > 1 ? "s" : ""}
+            </Badge>
+          )}
+          {c.is_hidden && (
+            <Badge variant="outline" className="text-xs border-orange-300 text-orange-600">Masqué</Badge>
+          )}
+        </div>
+
+        <p className="text-sm whitespace-pre-line">{c.body}</p>
+
+        <p className="text-xs text-muted-foreground">
+          Sous la publication : {titles[c.content_id] ?? "publication introuvable"}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t">
+          {c.is_hidden ? (
+            <button
+              disabled={busy}
+              onClick={() => void restoreComment(c.id)}
+              className={`${btn} text-green-700 bg-green-50 hover:bg-green-100 dark:bg-green-900/20`}
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Rétablir
+            </button>
+          ) : (
+            <button
+              disabled={busy}
+              onClick={() => void hideComment(c.id)}
+              className={`${btn} text-orange-700 bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/20`}
+            >
+              <EyeOff className="h-3.5 w-3.5" /> Masquer
+            </button>
+          )}
+
+          {count > 0 && !c.is_hidden && (
+            <button
+              disabled={busy}
+              onClick={() => void ignoreComment(c.id)}
+              className={`${btn} text-muted-foreground bg-muted hover:bg-muted/80`}
+            >
+              <Check className="h-3.5 w-3.5" /> Ignorer le signalement
+            </button>
+          )}
+
+          <button
+            disabled={busy}
+            onClick={() => void banAuthor(c.user_id, "groups", `ban-${c.id}`)}
+            className={`${btn} text-orange-700 bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/20`}
+          >
+            <Ban className="h-3.5 w-3.5" /> Bannir des groupes
+          </button>
+
+          <button
+            disabled={busy}
+            onClick={() => void banAuthor(c.user_id, "all", `ban-${c.id}`)}
+            className={`${btn} text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20`}
+          >
+            <ShieldOff className="h-3.5 w-3.5" /> Bannir de la communauté
+          </button>
+
+          <button
+            disabled={busy}
+            onClick={() => void deleteComment(c.id)}
+            className={`${btn} ml-auto text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20`}
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Supprimer
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPost = (p: ModPost) => {
+    const count = postReports[p.id] ?? 0;
+    const busy = busyId === p.id || busyId === `ban-${p.id}`;
+    const hidden = !p.is_published;
+
+    return (
+      <div key={`p-${p.id}`} className={`rounded-xl border bg-card p-4 space-y-2 ${hidden ? "border-orange-300" : ""}`}>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <Badge variant="secondary" className="text-xs">Publication</Badge>
+          <span className="font-medium text-foreground">
+            {p.author_id ? pseudos[p.author_id] ?? "Membre sans pseudo" : "Membre"}
+          </span>
+          <span>·</span>
+          <span>{formatDate(p.created_at)}</span>
+          {count > 0 && (
+            <Badge variant="outline" className="text-xs border-red-300 text-red-600">
+              {count} signalement{count > 1 ? "s" : ""}
+            </Badge>
+          )}
+          {hidden && (
+            <Badge variant="outline" className="text-xs border-orange-300 text-orange-600">Masquée</Badge>
+          )}
+        </div>
+
+        {p.body ? (
+          <p className="text-sm whitespace-pre-line">{p.body}</p>
+        ) : (
+          <p className="text-sm italic text-muted-foreground">(sans texte)</p>
+        )}
+
+        <FeedAttachment reference={p.image_url} alt="Photo jointe" imageClassName="max-h-48 rounded-lg object-contain" />
+
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t">
+          {hidden ? (
+            <button
+              disabled={busy}
+              onClick={() => void restorePost(p.id)}
+              className={`${btn} text-green-700 bg-green-50 hover:bg-green-100 dark:bg-green-900/20`}
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Rétablir
+            </button>
+          ) : (
+            <button
+              disabled={busy}
+              onClick={() => void hidePost(p.id)}
+              className={`${btn} text-orange-700 bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/20`}
+            >
+              <EyeOff className="h-3.5 w-3.5" /> Masquer
+            </button>
+          )}
+
+          {count > 0 && !hidden && (
+            <button
+              disabled={busy}
+              onClick={() => void ignorePost(p.id)}
+              className={`${btn} text-muted-foreground bg-muted hover:bg-muted/80`}
+            >
+              <Check className="h-3.5 w-3.5" /> Ignorer le signalement
+            </button>
+          )}
+
+          <button
+            disabled={busy}
+            onClick={() => void banAuthor(p.author_id, "groups", `ban-${p.id}`)}
+            className={`${btn} text-orange-700 bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/20`}
+          >
+            <Ban className="h-3.5 w-3.5" /> Bannir des groupes
+          </button>
+
+          <button
+            disabled={busy}
+            onClick={() => void banAuthor(p.author_id, "all", `ban-${p.id}`)}
+            className={`${btn} text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20`}
+          >
+            <ShieldOff className="h-3.5 w-3.5" /> Bannir de la communauté
+          </button>
+
+          <button
+            disabled={busy}
+            onClick={() => void deletePost(p)}
+            className={`${btn} ml-auto text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20`}
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Supprimer
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2].map((i) => (
+          <div key={i} className="rounded-xl border bg-card p-4 animate-pulse space-y-2">
+            <div className="h-3 bg-muted rounded w-1/3" />
+            <div className="h-4 bg-muted rounded w-full" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const reportedComments = comments
+    .filter((c) => (commentReports[c.id] ?? 0) > 0)
+    .sort((a, b) => (commentReports[b.id] ?? 0) - (commentReports[a.id] ?? 0));
+
+  const reportedPosts = posts
+    .filter((p) => (postReports[p.id] ?? 0) > 0)
+    .sort((a, b) => (postReports[b.id] ?? 0) - (postReports[a.id] ?? 0));
+
+  const otherPosts = posts.filter((p) => (postReports[p.id] ?? 0) === 0);
+  const otherComments = comments.filter((c) => (commentReports[c.id] ?? 0) === 0);
+
+  const toHandle = reportedPosts.length + reportedComments.length;
+
+  return (
+    <div className="space-y-8">
+      {error && (
+        <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{error}</p>
+      )}
+
+      {notice && (
+        <p className="text-sm text-green-700 bg-green-50 dark:bg-green-900/20 rounded-lg px-3 py-2">{notice}</p>
+      )}
+
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <ShieldAlert className="h-5 w-5 text-red-500" />
+          À traiter ({toHandle})
+        </h2>
+        {toHandle === 0 ? (
+          <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
+            Aucun contenu signalé pour le moment.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {reportedPosts.map(renderPost)}
+            {reportedComments.map(renderComment)}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Dernières publications de membres ({otherPosts.length})</h2>
+        {otherPosts.length === 0 ? (
+          <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
+            Aucune publication de membre pour le moment.
+          </div>
+        ) : (
+          <div className="space-y-3">{otherPosts.map(renderPost)}</div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Derniers commentaires ({otherComments.length})</h2>
+        {otherComments.length === 0 ? (
+          <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
+            Aucun commentaire pour le moment.
+          </div>
+        ) : (
+          <div className="space-y-3">{otherComments.map(renderComment)}</div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+
+// ── Page principale ───────────────────────────────────────
+function Page() {
+  return <ProLayout><Content /></ProLayout>;
+}
+
+
+function Content() {
+  const { user } = useAuth();
+  const [tab, setTab] = useState<PageTab>("mine");
+  const [pending, setPending] = useState(0);
+
+  const loadPending = useCallback(async () => {
+    const { data: r } = await supabase
+      .from("feed_reports")
+      .select("target_type, target_id");
+
+    const rows = (r ?? []) as { target_type: string; target_id: string }[];
+    const commentIds = Array.from(new Set(rows.filter((x) => x.target_type === "comment").map((x) => x.target_id)));
+    const postIds = Array.from(new Set(rows.filter((x) => x.target_type === "post").map((x) => x.target_id)));
+
+    let total = 0;
+
+    if (commentIds.length > 0) {
+      const { data: c } = await supabase.from("feed_comments").select("id").in("id", commentIds);
+      total += (c ?? []).length;
+    }
+    if (postIds.length > 0) {
+      const { data: p } = await supabase.from("feed_content").select("id").in("id", postIds);
+      total += (p ?? []).length;
+    }
+
+    setPending(total);
+  }, []);
+
+  useEffect(() => { void loadPending(); }, [loadPending]);
+
+  const tabs: { key: PageTab; label: string }[] = [
+    { key: "mine", label: "Mes publications" },
+    { key: "general", label: "Fil général" },
+    { key: "moderation", label: "Modération" },
+  ];
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center gap-3">
+        <Rss className="h-6 w-6 text-primary" />
+        <h1 className="text-2xl font-bold">Feed</h1>
+      </div>
+
+      <div className="flex flex-wrap gap-2 border-b pb-3">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium border transition-all ${
+              tab === t.key
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:border-primary/40"
+            }`}
+          >
+            {t.label}
+            {t.key === "moderation" && pending > 0 && (
+              <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                {pending}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {tab === "mine" && <MyPosts />}
+      {tab === "general" && user && <FeedView userId={user.id} />}
+      {tab === "moderation" && <ModerationPanel onChanged={() => void loadPending()} />}
     </div>
   );
 }

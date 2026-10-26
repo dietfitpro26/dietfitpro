@@ -1,7 +1,13 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { createFileRoute, useNavigate, Outlet } from "@tanstack/react-router";
-import { Search, UserPlus, Bell } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  createFileRoute,
+  Outlet,
+  useLocation,
+  useNavigate,
+} from "@tanstack/react-router";
+import { Search, UserPlus, Bell, RefreshCw, Users, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { PatientQuickPanel } from "@/components/patients/PatientQuickPanel";
 import { ProLayout } from "@/layouts/ProLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
@@ -33,8 +39,17 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
+import {
+  calculateNutritionProfile,
+  isMinor,
+  type ActivityLevel,
+  type Gender,
+  type NutritionGoal,
+} from "@/lib/nutritionCalc";
 
 export const Route = createFileRoute("/pro/patients")({
   head: () => ({ meta: [{ title: "Mes patients — DietFitPro" }] }),
@@ -59,22 +74,59 @@ const GOAL_LABEL: Record<string, string> = {
   perte_de_poids: "Perte de poids",
   prise_de_masse: "Prise de masse",
   maintien: "Maintien",
-  autre: "Autre",
+  equilibre: "Équilibre / santé générale",
 };
 
-function getGoal(p: PatientRow): string {
-  return (p.goal && GOAL_LABEL[p.goal]) || "—";
+const ACTIVITY_LEVELS: { value: ActivityLevel; label: string; hint: string }[] = [
+  { value: "sedentaire", label: "🪑 Sédentaire", hint: "Bureau, peu ou pas de sport" },
+  { value: "actif", label: "🏃 Actif", hint: "Sport 2-3x / semaine" },
+  { value: "tres_actif", label: "🔥 Très actif", hint: "Sport 4-6x / semaine ou métier physique" },
+];
+
+function getGoal(patient: PatientRow): string {
+  return (patient.goal && GOAL_LABEL[patient.goal]) || "Non défini";
+}
+
+function computeAgeFromBirthDate(birthDate: string): number | null {
+  if (!birthDate) return null;
+
+  const birth = new Date(birthDate);
+  if (Number.isNaN(birth.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const hasNotHadBirthdayThisYear =
+    today.getMonth() < birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
+
+  if (hasNotHadBirthdayThisYear) {
+    age -= 1;
+  }
+
+  return age >= 0 ? age : null;
 }
 
 function PatientsPage() {
   return (
     <ProtectedRoute allow={["pro"]}>
       <ProLayout>
-        <PatientsContent />
-        <Outlet />
+        <PatientsRouteContent />
       </ProLayout>
     </ProtectedRoute>
   );
+}
+
+function PatientsRouteContent() {
+  const location = useLocation();
+  const isPatientDetailPage = /^\/pro\/patients\/[^/]+$/.test(
+    location.pathname,
+  );
+
+  if (isPatientDetailPage) {
+    return <Outlet />;
+  }
+
+  return <PatientsContent />;
 }
 
 function PatientsContent() {
@@ -85,206 +137,338 @@ function PatientsContent() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [modalOpen, setModalOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!user) return;
+
     setError(null);
-    const { data, error: err } = await supabase
+
+    const { data, error: patientsError } = await supabase
       .from("patients")
-      .select("id, first_name, last_name, email, goal, is_active, updated_at, user_id")
+      .select(
+        "id, first_name, last_name, email, goal, is_active, updated_at, user_id",
+      )
       .eq("pro_id", user.id)
       .order("updated_at", { ascending: false });
 
-    if (err) {
-      console.error("[patients] load error", err);
-      setError(err.message);
+    if (patientsError) {
+      console.error("[patients] load error", patientsError);
+      setError(patientsError.message);
       setPatients([]);
       return;
     }
 
     const rows = (data ?? []) as PatientRow[];
-    const userIds = rows.map((r) => r.user_id).filter((x): x is string => Boolean(x));
-    if (userIds.length) {
-      const { data: appts } = await supabase
+    const userIds = rows
+      .map((patient) => patient.user_id)
+      .filter((id): id is string => Boolean(id));
+
+    if (userIds.length > 0) {
+      const { data: appointments } = await supabase
         .from("appointments")
         .select("patient_user_id, starts_at")
         .eq("pro_id", user.id)
         .in("patient_user_id", userIds)
         .order("starts_at", { ascending: false });
-      const last = new Map<string, string>();
-      (appts ?? []).forEach((a: { patient_user_id: string; starts_at: string }) => {
-        if (!last.has(a.patient_user_id)) last.set(a.patient_user_id, a.starts_at);
-      });
-      rows.forEach((r) => {
-        if (r.user_id) r.lastAppointment = last.get(r.user_id) ?? null;
+
+      const lastAppointments = new Map<string, string>();
+
+      (appointments ?? []).forEach(
+        (appointment: { patient_user_id: string; starts_at: string }) => {
+          if (!lastAppointments.has(appointment.patient_user_id)) {
+            lastAppointments.set(
+              appointment.patient_user_id,
+              appointment.starts_at,
+            );
+          }
+        },
+      );
+
+      rows.forEach((patient) => {
+        if (patient.user_id) {
+          patient.lastAppointment =
+            lastAppointments.get(patient.user_id) ?? null;
+        }
       });
     }
+
     setPatients(rows);
-  };
+  }, [user]);
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [load]);
 
   const filtered = useMemo(() => {
     if (!patients) return null;
-    const q = search.trim().toLowerCase();
-    return patients.filter((p) => {
-      const matchQ =
-        !q ||
-        `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
-        (p.email ?? "").toLowerCase().includes(q);
-      const active = p.is_active;
-      const matchStatus =
-        status === "all" || (status === "active" ? active : !active);
-      return matchQ && matchStatus;
+
+    const query = search.trim().toLowerCase();
+
+    return patients.filter((patient) => {
+      const matchesSearch =
+        !query ||
+        `${patient.first_name} ${patient.last_name}`
+          .toLowerCase()
+          .includes(query) ||
+        (patient.email ?? "").toLowerCase().includes(query);
+
+      const matchesStatus =
+        status === "all" ||
+        (status === "active" && patient.is_active) ||
+        (status === "inactive" && !patient.is_active);
+
+      return matchesSearch && matchesStatus;
     });
   }, [patients, search, status]);
 
+  async function handleRefresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }
+
+  function openFullProfile(patientId: string) {
+    void navigate({ to: "/pro/patients/$patientId", params: { patientId } });
+  }
+
   return (
-    <div className="flex flex-col">
-      <header className="flex items-center justify-between border-b bg-white px-6 py-4">
-        <h1 className="text-xl font-semibold text-foreground">Mes patients</h1>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" aria-label="Notifications">
-            <Bell className="h-5 w-5" />
-          </Button>
-          <Button
-            className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white"
-            onClick={() => setModalOpen(true)}
-          >
-            <UserPlus className="h-4 w-4" /> Nouveau patient
-          </Button>
+    <div className="min-h-full bg-gradient-to-b from-background to-muted/20">
+      <header className="border-b bg-card/95 px-4 py-5 shadow-sm backdrop-blur sm:px-6">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-sm font-medium text-primary">
+              Espace professionnel
+            </p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight">
+              Mes patients
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Gérez vos patients et accédez rapidement à leur suivi.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="rounded-xl"
+              aria-label="Ouvrir les notifications"
+              onClick={() => void navigate({ to: "/pro/notifications" })}
+            >
+              <Bell className="h-4 w-4" />
+            </Button>
+
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => void handleRefresh()}
+              disabled={refreshing}
+            >
+              <RefreshCw
+                className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")}
+              />
+              Actualiser
+            </Button>
+
+            <Button
+              className="rounded-xl bg-[#6DB33F] text-white hover:bg-[#2D7A1F]"
+              onClick={() => setModalOpen(true)}
+            >
+              <UserPlus className="mr-2 h-4 w-4" />
+              Nouveau patient
+            </Button>
+          </div>
         </div>
       </header>
 
-      <div className="p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher par nom ou email…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Statut" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous</SelectItem>
-              <SelectItem value="active">Actifs</SelectItem>
-              <SelectItem value="inactive">Inactifs</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <main className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
+        <section className="rounded-3xl border bg-card p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-3 lg:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher par nom ou email…"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="h-11 rounded-xl pl-9"
+              />
+            </div>
 
-        {error && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            {error}
+            <Select
+              value={status}
+              onValueChange={(value) => setStatus(value as StatusFilter)}
+            >
+              <SelectTrigger className="h-11 w-full rounded-xl lg:w-48">
+                <SelectValue placeholder="Statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les patients</SelectItem>
+                <SelectItem value="active">Patients actifs</SelectItem>
+                <SelectItem value="inactive">Patients inactifs</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        )}
 
-        <div className="rounded-lg border bg-white overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-14"></TableHead>
-                <TableHead>Nom complet</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Objectif</TableHead>
-                <TableHead>Dernier RDV</TableHead>
-                <TableHead>Statut</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+            <Users className="h-4 w-4" />
+            <span>
               {filtered === null
-                ? Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {Array.from({ length: 6 }).map((__, j) => (
-                        <TableCell key={j}>
+                ? "Chargement des patients…"
+                : `${filtered.length} patient${filtered.length > 1 ? "s" : ""} affiché${filtered.length > 1 ? "s" : ""}`}
+            </span>
+          </div>
+        </section>
+
+        {error ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+            <span>Impossible de charger les patients : {error}</span>
+            <Button variant="outline" size="sm" onClick={() => void load()}>
+              Réessayer
+            </Button>
+          </div>
+        ) : null}
+
+        <section className="overflow-hidden rounded-3xl border bg-card shadow-sm">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-14" />
+                  <TableHead>Nom complet</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Objectif</TableHead>
+                  <TableHead>Dernier rendez-vous</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+
+              <TableBody>
+                {filtered === null ? (
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={index}>
+                      {Array.from({ length: 7 }).map((__, cellIndex) => (
+                        <TableCell key={cellIndex}>
                           <Skeleton className="h-5 w-full" />
                         </TableCell>
                       ))}
                     </TableRow>
                   ))
-                : filtered.length === 0
-                  ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
-                        Aucun patient ne correspond à votre recherche.
-                        <div className="mt-3">
+                ) : filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="py-16 text-center text-muted-foreground"
+                    >
+                      <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
+                        <Users className="h-10 w-10 text-muted-foreground/40" />
+                        <p className="text-sm">
+                          Aucun patient ne correspond à votre recherche.
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-xl"
+                          onClick={() => setModalOpen(true)}
+                        >
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Ajouter un patient
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filtered.map((patient) => {
+                    const initials =
+                      `${patient.first_name[0] ?? ""}${patient.last_name[0] ?? ""}`.toUpperCase();
+
+                    return (
+                      <TableRow
+                        key={patient.id}
+                        className="cursor-pointer transition-colors hover:bg-muted/40"
+                        onClick={() => setSelectedPatientId(patient.id)}
+                      >
+                        <TableCell>
+                          <Avatar className="h-9 w-9">
+                            <AvatarFallback className="bg-[#6DB33F]/10 text-xs font-semibold text-[#2D7A1F]">
+                              {initials || "?"}
+                            </AvatarFallback>
+                          </Avatar>
+                        </TableCell>
+
+                        <TableCell className="font-medium">
+                          {patient.first_name} {patient.last_name}
+                        </TableCell>
+
+                        <TableCell className="text-muted-foreground">
+                          {patient.email ?? "—"}
+                        </TableCell>
+
+                        <TableCell>{getGoal(patient)}</TableCell>
+
+                        <TableCell className="text-muted-foreground">
+                          {patient.lastAppointment
+                            ? new Date(
+                                patient.lastAppointment,
+                              ).toLocaleDateString("fr-FR")
+                            : "—"}
+                        </TableCell>
+
+                        <TableCell>
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium",
+                              patient.is_active
+                                ? "bg-[#6DB33F]/15 text-[#2D7A1F]"
+                                : "bg-muted text-muted-foreground",
+                            )}
+                          >
+                            {patient.is_active ? "Actif" : "Inactif"}
+                          </span>
+                        </TableCell>
+
+                        <TableCell className="text-right">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setModalOpen(true)}
+                            className="rounded-lg"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openFullProfile(patient.id);
+                            }}
                           >
-                            <UserPlus className="h-4 w-4" /> Ajouter un patient
+                            <FileText className="mr-1.5 h-3.5 w-3.5" />
+                            Fiche complète
                           </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                  : filtered.map((p) => {
-                      const active = p.is_active;
-                      const initials = `${p.first_name[0] ?? ""}${p.last_name[0] ?? ""}`.toUpperCase();
-                      return (
-                        <TableRow
-                          key={p.id}
-                          className="cursor-pointer hover:bg-muted/40"
-                          onClick={() =>
-                            navigate({
-                              to: "/pro/patients/$patientId",
-                              params: { patientId: p.id },
-                            })
-                          }
-                        >
-                          <TableCell>
-                            <Avatar className="h-9 w-9">
-                              <AvatarFallback className="bg-[#6DB33F]/10 text-[#2D7A1F] text-xs font-semibold">
-                                {initials || "?"}
-                              </AvatarFallback>
-                            </Avatar>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {p.first_name} {p.last_name}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {p.email ?? "—"}
-                          </TableCell>
-                          <TableCell>{getGoal(p)}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {p.lastAppointment
-                              ? new Date(p.lastAppointment).toLocaleDateString("fr-FR")
-                              : "—"}
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                                active
-                                  ? "bg-[#6DB33F]/15 text-[#2D7A1F]"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              {active ? "Actif" : "Inactif"}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </section>
+      </main>
 
       <NewPatientDialog
         open={modalOpen}
         onOpenChange={setModalOpen}
         onCreated={() => {
           setModalOpen(false);
+          void load();
+        }}
+      />
+
+      <PatientQuickPanel
+        patientId={selectedPatientId}
+        open={Boolean(selectedPatientId)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setSelectedPatientId(null);
+        }}
+        onUpdated={() => {
           void load();
         }}
       />
@@ -298,7 +482,7 @@ function NewPatientDialog({
   onCreated,
 }: {
   open: boolean;
-  onOpenChange: (v: boolean) => void;
+  onOpenChange: (value: boolean) => void;
   onCreated: () => void;
 }) {
   const { user } = useAuth();
@@ -307,30 +491,96 @@ function NewPatientDialog({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [birthDate, setBirthDate] = useState("");
-  const [goal, setGoal] = useState<string>("perte_de_poids");
+  const [gender, setGender] = useState<Gender | "">("");
+  const [weightKg, setWeightKg] = useState("");
+  const [heightCm, setHeightCm] = useState("");
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel | "">("");
+  const [isPregnantOrBreastfeeding, setIsPregnantOrBreastfeeding] = useState(false);
+  const [goal, setGoal] = useState<NutritionGoal>("perte_de_poids");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const reset = () => {
+  // Champs éditables par le Pro : pré-remplis automatiquement par le calcul,
+  // mais ajustables avant validation (contrairement aux abonnés Premium où
+  // le calcul est appliqué automatiquement sans modification possible).
+  const [manualKcal, setManualKcal] = useState("");
+  const [manualProtein, setManualProtein] = useState("");
+  const [manualCarbs, setManualCarbs] = useState("");
+  const [manualFat, setManualFat] = useState("");
+  const [hasEditedManually, setHasEditedManually] = useState(false);
+
+  const age = useMemo(() => computeAgeFromBirthDate(birthDate), [birthDate]);
+  const isMinorPatient = age !== null ? isMinor(age) : false;
+
+  const nutritionSuggestion = useMemo(() => {
+    if (
+      isMinorPatient ||
+      age === null ||
+      !gender ||
+      !weightKg ||
+      !heightCm ||
+      !activityLevel
+    ) {
+      return null;
+    }
+
+    return calculateNutritionProfile({
+      weightKg: Number(weightKg),
+      heightCm: Number(heightCm),
+      age,
+      gender: gender as Gender,
+      activityLevel: activityLevel as ActivityLevel,
+      goal,
+      programStartDate: new Date().toISOString().slice(0, 10),
+      isPregnantOrBreastfeeding,
+    });
+  }, [age, isMinorPatient, gender, weightKg, heightCm, activityLevel, goal, isPregnantOrBreastfeeding]);
+
+  // Dès qu'une nouvelle suggestion est calculée, on pré-remplit les champs
+  // modifiables — sauf si le Pro a déjà commencé à les ajuster à la main.
+  useEffect(() => {
+    if (nutritionSuggestion && !hasEditedManually) {
+      setManualKcal(String(nutritionSuggestion.targetKcal));
+      setManualProtein(String(nutritionSuggestion.targetProteinG));
+      setManualCarbs(String(nutritionSuggestion.targetCarbsG));
+      setManualFat(String(nutritionSuggestion.targetFatG));
+    }
+  }, [nutritionSuggestion, hasEditedManually]);
+
+  function reset() {
     setFirstName("");
     setLastName("");
     setEmail("");
     setPhone("");
     setBirthDate("");
+    setGender("");
+    setWeightKg("");
+    setHeightCm("");
+    setActivityLevel("");
+    setIsPregnantOrBreastfeeding(false);
     setGoal("perte_de_poids");
     setNotes("");
-  };
+    setManualKcal("");
+    setManualProtein("");
+    setManualCarbs("");
+    setManualFat("");
+    setHasEditedManually(false);
+  }
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+
     if (!user) return;
+
     if (!firstName.trim() || !lastName.trim()) {
       toast.error("Prénom et nom obligatoires");
       return;
     }
+
     setSubmitting(true);
 
-    // ── Étape 1 : créer la fiche patient ──────────────────────────
+    const programStartDate = new Date().toISOString().slice(0, 10);
+
     const { data: inserted, error } = await supabase
       .from("patients")
       .insert({
@@ -343,6 +593,21 @@ function NewPatientDialog({
         medical_notes: notes.trim() || null,
         goal,
         is_active: true,
+        age,
+        gender: isMinorPatient ? null : gender || null,
+        weight_kg: weightKg ? Number(weightKg) : null,
+        height_cm: heightCm ? Number(heightCm) : null,
+        activity_level: isMinorPatient ? null : activityLevel || null,
+        is_pregnant_or_breastfeeding: isMinorPatient ? false : isPregnantOrBreastfeeding,
+        program_start_date: isMinorPatient ? null : programStartDate,
+        bmr_kcal: nutritionSuggestion?.bmrKcal ?? null,
+        tdee_kcal: nutritionSuggestion?.tdeeKcal ?? null,
+        // Les valeurs finales enregistrées sont celles ajustées par le Pro
+        // (manualKcal etc.), pas directement la suggestion automatique.
+        target_kcal: manualKcal ? Number(manualKcal) : null,
+        target_protein_g: manualProtein ? Number(manualProtein) : null,
+        target_carbs_g: manualCarbs ? Number(manualCarbs) : null,
+        target_fat_g: manualFat ? Number(manualFat) : null,
       })
       .select("id")
       .single();
@@ -354,32 +619,35 @@ function NewPatientDialog({
       return;
     }
 
-    // ── Étape 2 : envoyer l'invitation si email présent ───────────
     if (email.trim() && inserted?.id) {
-      const { error: inviteError } = await supabase.functions.invoke("invite-patient", {
-        body: {
-          email: email.trim(),
-          patient_id: inserted.id,
-          pro_id: user.id,
-          role: "patient",
+      const { error: inviteError } = await supabase.functions.invoke(
+        "invite-patient",
+        {
+          body: {
+            email: email.trim(),
+            patient_id: inserted.id,
+            pro_id: user.id,
+            role: "patient",
+          },
         },
-      });
+      );
 
       if (inviteError) {
-        // ✅ Lire le body brut HTTP pour avoir le vrai message
         let errorMessage = "Erreur inconnue";
+
         try {
           const raw = await (inviteError as any).context?.text();
-          console.error("[invite] raw response:", raw);
+
           if (raw) {
             const parsed = JSON.parse(raw);
             errorMessage = parsed?.error ?? parsed?.message ?? raw;
           } else {
             errorMessage = inviteError.message || JSON.stringify(inviteError);
           }
-        } catch (_) {
+        } catch {
           errorMessage = inviteError.message || JSON.stringify(inviteError);
         }
+
         console.error("[patients] invite error:", errorMessage);
         toast.warning(`Invitation échouée : ${errorMessage}`);
       } else {
@@ -392,66 +660,313 @@ function NewPatientDialog({
     setSubmitting(false);
     reset();
     onCreated();
-  };
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nouveau patient</DialogTitle>
-          <DialogDescription>Renseignez les informations principales.</DialogDescription>
+          <DialogDescription>
+            Renseignez les informations principales.
+          </DialogDescription>
         </DialogHeader>
+
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="fn">Prénom *</Label>
-              <Input id="fn" value={firstName} onChange={(e) => setFirstName(e.target.value)} required maxLength={100} />
+              <Label htmlFor="patient-first-name">Prénom *</Label>
+              <Input
+                id="patient-first-name"
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+                required
+                maxLength={100}
+              />
             </div>
+
             <div className="space-y-1">
-              <Label htmlFor="ln">Nom *</Label>
-              <Input id="ln" value={lastName} onChange={(e) => setLastName(e.target.value)} required maxLength={100} />
+              <Label htmlFor="patient-last-name">Nom *</Label>
+              <Input
+                id="patient-last-name"
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+                required
+                maxLength={100}
+              />
             </div>
           </div>
+
           <div className="space-y-1">
-            <Label htmlFor="em">Email</Label>
-            <Input id="em" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={255} />
+            <Label htmlFor="patient-email">Email</Label>
+            <Input
+              id="patient-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              maxLength={255}
+            />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="ph">Téléphone</Label>
-              <Input id="ph" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} />
+              <Label htmlFor="patient-phone">Téléphone</Label>
+              <Input
+                id="patient-phone"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                maxLength={30}
+              />
             </div>
+
             <div className="space-y-1">
-              <Label htmlFor="bd">Date de naissance</Label>
-              <Input id="bd" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+              <Label htmlFor="patient-birth-date">Date de naissance</Label>
+              <Input
+                id="patient-birth-date"
+                type="date"
+                value={birthDate}
+                onChange={(event) => setBirthDate(event.target.value)}
+              />
+              {age !== null ? (
+                <p className="text-xs text-muted-foreground">{age} ans</p>
+              ) : null}
             </div>
           </div>
+
+          {isMinorPatient ? (
+            <Alert>
+              <AlertDescription>
+                Patient mineur (moins de 18 ans) : le calcul automatique
+                Black et al. ne s'applique pas. Renseignez ses besoins
+                caloriques manuellement si besoin, avec un suivi adapté.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <>
+              <div className="space-y-1">
+                <Label>Sexe</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setGender("homme")}
+                    className={cn(
+                      "rounded-lg border px-4 py-2 text-center text-sm font-medium transition-all",
+                      gender === "homme"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/50",
+                    )}
+                  >
+                    👨 Homme
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGender("femme")}
+                    className={cn(
+                      "rounded-lg border px-4 py-2 text-center text-sm font-medium transition-all",
+                      gender === "femme"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/50",
+                    )}
+                  >
+                    👩 Femme
+                  </button>
+                </div>
+              </div>
+
+              {gender === "femme" ? (
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-3">
+                  <input
+                    id="patient-pregnant"
+                    type="checkbox"
+                    checked={isPregnantOrBreastfeeding}
+                    onChange={(event) =>
+                      setIsPregnantOrBreastfeeding(event.target.checked)
+                    }
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="patient-pregnant" className="text-sm font-normal">
+                    Patiente enceinte ou allaitante (bonus calorique)
+                  </Label>
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="patient-weight">Poids actuel (kg)</Label>
+                  <Input
+                    id="patient-weight"
+                    type="number"
+                    min="30"
+                    max="300"
+                    step="0.1"
+                    value={weightKg}
+                    onChange={(event) => setWeightKg(event.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="patient-height">Taille (cm)</Label>
+                  <Input
+                    id="patient-height"
+                    type="number"
+                    min="100"
+                    max="250"
+                    step="0.5"
+                    value={heightCm}
+                    onChange={(event) => setHeightCm(event.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label>Niveau d'activité physique</Label>
+                <div className="grid grid-cols-1 gap-2">
+                  {ACTIVITY_LEVELS.map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setActivityLevel(item.value)}
+                      className={cn(
+                        "rounded-lg border px-3 py-2 text-left text-sm transition-all",
+                        activityLevel === item.value
+                          ? "border-primary bg-primary/10 font-medium text-primary"
+                          : "border-border bg-background text-muted-foreground hover:border-primary/50",
+                      )}
+                    >
+                      {item.label}
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        — {item.hint}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
           <div className="space-y-1">
-            <Label htmlFor="goal">Objectif</Label>
-            <Select value={goal} onValueChange={setGoal}>
-              <SelectTrigger id="goal">
+            <Label htmlFor="patient-goal">Objectif</Label>
+            <Select value={goal} onValueChange={(value) => setGoal(value as NutritionGoal)}>
+              <SelectTrigger id="patient-goal">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="perte_de_poids">Perte de poids</SelectItem>
                 <SelectItem value="prise_de_masse">Prise de masse</SelectItem>
                 <SelectItem value="maintien">Maintien</SelectItem>
-                <SelectItem value="autre">Autre</SelectItem>
+                <SelectItem value="equilibre">Équilibre / santé générale</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {!isMinorPatient && nutritionSuggestion ? (
+            <div className="space-y-2 rounded-2xl border bg-muted/40 p-3">
+              <p className="text-xs font-medium text-foreground">
+                Suggestion automatique (Black et al.) — modifiable ci-dessous
+              </p>
+              <p className="text-xs text-muted-foreground">
+                BMR {nutritionSuggestion.bmrKcal} kcal — TDEE{" "}
+                {nutritionSuggestion.tdeeKcal} kcal
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="manual-kcal" className="text-xs">
+                    Calories cibles/jour
+                  </Label>
+                  <Input
+                    id="manual-kcal"
+                    type="number"
+                    value={manualKcal}
+                    onChange={(event) => {
+                      setHasEditedManually(true);
+                      setManualKcal(event.target.value);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="manual-protein" className="text-xs">
+                    Protéines (g)
+                  </Label>
+                  <Input
+                    id="manual-protein"
+                    type="number"
+                    value={manualProtein}
+                    onChange={(event) => {
+                      setHasEditedManually(true);
+                      setManualProtein(event.target.value);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="manual-carbs" className="text-xs">
+                    Glucides (g)
+                  </Label>
+                  <Input
+                    id="manual-carbs"
+                    type="number"
+                    value={manualCarbs}
+                    onChange={(event) => {
+                      setHasEditedManually(true);
+                      setManualCarbs(event.target.value);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="manual-fat" className="text-xs">
+                    Lipides (g)
+                  </Label>
+                  <Input
+                    id="manual-fat"
+                    type="number"
+                    value={manualFat}
+                    onChange={(event) => {
+                      setHasEditedManually(true);
+                      setManualFat(event.target.value);
+                    }}
+                  />
+                </div>
+              </div>
+
+              {hasEditedManually ? (
+                <button
+                  type="button"
+                  className="text-xs text-primary underline"
+                  onClick={() => setHasEditedManually(false)}
+                >
+                  Revenir à la suggestion automatique
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="space-y-1">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={2000} rows={3} />
+            <Label htmlFor="patient-notes">Notes</Label>
+            <Textarea
+              id="patient-notes"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              maxLength={2000}
+              rows={3}
+            />
           </div>
+
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+            >
               Annuler
             </Button>
+
             <Button
               type="submit"
               disabled={submitting}
-              className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white"
+              className="bg-[#6DB33F] text-white hover:bg-[#2D7A1F]"
             >
               {submitting ? "Création…" : "Créer"}
             </Button>

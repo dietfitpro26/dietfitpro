@@ -1,283 +1,244 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
-import { Button } from '../components/ui/button'
-import { Input } from '../components/ui/input'
-import { Label } from '../components/ui/label'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card'
-import { Alert, AlertDescription } from '../components/ui/alert'
-import { Loader2, CheckCircle2 } from 'lucide-react'
-import { useAuth } from '../hooks/useAuth'
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import type { EmailOtpType } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabase";
 
-export const Route = createFileRoute('/bienvenue')({
-  component: BienvenueComponent,
-})
+export const Route = createFileRoute("/bienvenue")({
+  component: Bienvenue,
+});
 
-function BienvenueComponent() {
-  const { user } = useAuth()
-  const navigate = useNavigate()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [step, setStep] = useState(1)
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    birthDate: '',
-    gender: '',
-    height: '',
-    weight: '',
-    goal: '',
-  })
+const LINK_ERROR =
+  "Ce lien d'invitation est expiré ou a déjà été utilisé. Demandez une nouvelle invitation à votre professionnel.";
 
-  // Vérifier que l'utilisateur est connecté
+function Bienvenue() {
+  const navigate = useNavigate();
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const started = useRef(false);
+
   useEffect(() => {
-    if (!user) {
-      navigate({ to: '/login' })
-    }
-  }, [user, navigate])
+    // Un lien d'invitation ne sert qu'une fois : on ne le traite qu'une seule fois.
+    if (started.current) return;
+    started.current = true;
 
-  async function handleNext(e: React.FormEvent) {
-    e.preventDefault()
-    
-    if (step === 1) {
-      if (!formData.firstName || !formData.lastName || !formData.birthDate) {
-        setError('Veuillez remplir tous les champs')
-        return
+    const loadSession = async () => {
+      try {
+        const url = new URL(window.location.href);
+        const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+        const query = url.searchParams;
+
+        const hashError = hash.get("error_description") || hash.get("error");
+        const accessToken = hash.get("access_token");
+        const refreshToken = hash.get("refresh_token");
+        const tokenHash = query.get("token_hash");
+        const otpType = query.get("type");
+        const code = query.get("code");
+
+        const hasLink = Boolean(accessToken || tokenHash || code || hashError);
+
+        if (hashError) {
+          window.history.replaceState({}, "", url.pathname);
+          setError(LINK_ERROR);
+          return;
+        }
+
+        // Le lien d'invitation est prioritaire sur une session déjà ouverte.
+        if (accessToken && refreshToken) {
+          const { error: setError_ } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (setError_) throw setError_;
+        } else if (tokenHash && otpType) {
+          const { error: otpError } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: otpType as EmailOtpType,
+          });
+          if (otpError) throw otpError;
+        } else if (code) {
+          const { error: codeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (codeError) throw codeError;
+        }
+
+        if (hasLink) {
+          window.history.replaceState({}, "", url.pathname);
+        }
+
+        const { data, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError || !data.session?.user?.email) {
+          setError(
+            "Session invalide ou expirée. Demandez une nouvelle invitation à votre professionnel.",
+          );
+          return;
+        }
+
+        setUserEmail(data.session.user.email);
+      } catch (caughtError) {
+        console.error("[bienvenue] Erreur lien d'invitation :", caughtError);
+        setError(LINK_ERROR);
       }
-      setStep(2)
-      setError(null)
-    } else if (step === 2) {
-      if (!formData.height || !formData.weight || !formData.goal) {
-        setError('Veuillez remplir tous les champs')
-        return
-      }
-      setStep(3)
-      setError(null)
+    };
+
+    void loadSession();
+  }, []);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+
+    if (password.length < 8) {
+      setError("Le mot de passe doit contenir au moins 8 caractères.");
+      return;
     }
-  }
 
-<<<<<<< HEAD
-    // Lier le compte patient
-    if (session?.user) {
-      await supabase.rpc("link_patient_account", {
-        p_user_id: session.user.id,
-        p_email: session.user.email ?? "",
-      });
+    if (password !== confirmPassword) {
+      setError("Les mots de passe ne correspondent pas.");
+      return;
+    }
 
-      // Mettre à jour le profil avec le rôle patient
-      await supabase
-        .from("profiles")
-        .update({
-          role: "patient",
-          // ✅ Nouveau : marquer le profil comme complet
-          profile_complete: true,
-        })
-        .eq("id", session.user.id);
-=======
-  async function handleComplete() {
-    if (!user) return
-
-    setLoading(true)
-    setError(null)
+    setLoading(true);
 
     try {
-      // Mettre à jour le profil avec les informations
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          birth_date: formData.birthDate,
-          gender: formData.gender || null,
-          height_cm: formData.height ? parseFloat(formData.height) : null,
-          weight_kg: formData.weight ? parseFloat(formData.weight) : null,
-          goal: formData.goal || null,
-          profile_complete: true, // ← IMPORTANT: marque le profil comme complet
-        })
-        .eq('id', user.id)
+      const { error: updateError } = await supabase.auth.updateUser({ password });
 
-      if (updateError) throw updateError
-
-      // Rėcupėrer le rôle pour rediriger vers le bon dashboard
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile) throw new Error('Profil introuvable')
-
-      // Redirection selon rôle
-      switch (profile.role) {
-        case 'pro':
-          navigate({ to: '/pro/dashboard' })
-          break
-        case 'patient':
-          navigate({ to: '/patient/dashboard' })
-          break
-        case 'subscriber':
-          navigate({ to: '/subscriber/nutrition' })
-          break
+      if (updateError) {
+        throw updateError;
       }
-    } catch (err: any) {
-      console.error('Bienvenue error:', err)
-      setError(err.message || 'Une erreur est survenue')
+
+      setSuccess(true);
+      // Étape suivante : le questionnaire santé (anamnèse), 5 à 7 minutes.
+      window.setTimeout(() => {
+        void navigate({ to: "/patient/anamnese" });
+      }, 1800);
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error ? caughtError.message : "Une erreur est survenue.";
+      setError(message);
     } finally {
-      setLoading(false)
->>>>>>> 99408d3e5828c26f7f68f4143aa8c5d8c6e2d77e
+      setLoading(false);
     }
+  };
+
+  if (success) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <section className="w-full max-w-md rounded-lg bg-white p-8 text-center shadow-md">
+          <h1 className="mb-3 text-2xl font-bold text-green-700">Mot de passe enregistré</h1>
+          <p className="text-gray-600">
+            Dernière étape : quelques questions (5 à 7 minutes) pour préparer votre
+            accompagnement. Vous allez être redirigé.
+          </p>
+        </section>
+      </main>
+    );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/20 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <div className="flex items-center gap-2 mb-2">
-            <CheckCircle2 className="h-6 w-6 text-primary" />
-            <CardTitle>Bienvenue !</CardTitle>
+    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <section className="w-full max-w-md rounded-lg bg-white p-8 shadow-md">
+        <h1 className="mb-2 text-center text-2xl font-bold text-gray-900">
+          Bienvenue sur DietFit Pro
+        </h1>
+        <p className="mb-6 text-center text-sm text-gray-600">
+          Créez votre mot de passe pour activer votre espace patient.
+        </p>
+
+        {userEmail && (
+          <div className="mb-4">
+            <label className="mb-2 block text-sm font-medium text-gray-700" htmlFor="email">
+              Adresse email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={userEmail}
+              disabled
+              className="w-full cursor-not-allowed rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-gray-500"
+            />
           </div>
-          <CardDescription>
-            Complé·´tez votre profil pour accéder à votre espace
-          </CardDescription>
-        </CardHeader>
-        <form>
-          <CardContent className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            {step === 1 && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">Prėnom</Label>
-                  <Input
-                    id="firstName"
-                    value={formData.firstName}
-                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                    disabled={loading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Nom</Label>
-                  <Input
-                    id="lastName"
-                    value={formData.lastName}
-                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                    disabled={loading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="birthDate">Date de naissance</Label>
-                  <Input
-                    id="birthDate"
-                    type="date"
-                    value={formData.birthDate}
-                    onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                    disabled={loading}
-                  />
-                </div>
-              </>
-            )}
-
-<<<<<<< HEAD
-        {step === "form" && (
-          <form onSubmit={handleSubmit}>
-            <p style={{ fontWeight: 600, marginBottom: "1rem", textAlign: "center" }}>Créez votre mot de passe</p>
-            
-            <div style={{ marginBottom: "0.75rem" }}>
-              <label style={{ fontSize: "0.8rem", color: "#666", display: "block", marginBottom: 4 }}>Mot de passe</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="8 caractères minimum" required
-                style={{ width: "100%", padding: "0.5rem 0.75rem", border: "1px solid #ddd", borderRadius: "0.5rem", fontSize: "0.9rem", boxSizing: "border-box" }} />
-            </div>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ fontSize: "0.8rem", color: "#666", display: "block", marginBottom: 4 }}>Confirmer</label>
-              <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)}
-                placeholder="Répétez le mot de passe" required
-                style={{ width: "100%", padding: "0.5rem 0.75rem", border: "1px solid #ddd", borderRadius: "0.5rem", fontSize: "0.9rem", boxSizing: "border-box" }} />
-            </div>
-            {error && <p style={{ color: "#e53e3e", fontSize: "0.85rem", marginBottom: "0.75rem" }}>⚠️ {error}</p>}
-            <button type="submit" disabled={saving}
-              style={{ width: "100%", padding: "0.65rem", background: saving ? "#aaa" : "#6DB33F", color: "white", border: "none", borderRadius: "0.5rem", fontWeight: 600, fontSize: "1rem", cursor: saving ? "not-allowed" : "pointer" }}>
-              {saving ? "Enregistrement…" : "Accéder à mon espace"}
-            </button>
-          </form>
         )}
-=======
-            {step === 2 && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="height">Taille (cm)</Label>
-                  <Input
-                    id="height"
-                    type="number"
-                    placeholder="170"
-                    value={formData.height}
-                    onChange={(e) => setFormData({ ...formData, height: e.target.value })}
-                    disabled={loading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="weight">Poids (kg)</Label>
-                  <Input
-                    id="weight"
-                    type="number"
-                    placeholder="70"
-                    value={formData.weight}
-                    onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
-                    disabled={loading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="goal">Objectif principal</Label>
-                  <Input
-                    id="goal"
-                    placeholder="Perte de poids, Prise de masse, etc."
-                    value={formData.goal}
-                    onChange={(e) => setFormData({ ...formData, goal: e.target.value })}
-                    disabled={loading}
-                  />
-                </div>
-              </>
-            )}
->>>>>>> 99408d3e5828c26f7f68f4143aa8c5d8c6e2d77e
 
-            {step === 3 && (
-              <div className="text-center py-8">
-                <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Profil prêt !</h3>
-                <p className="text-muted-foreground">
-                  Vous allez être redirigé·´e vers votre espace personnel.
-                </p>
-              </div>
-            )}
-          </CardContent>
-          <CardFooter className="flex gap-2">
-            {step > 1 && step < 3 && (
-              <Button
+        {error && (
+          <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+            {error}
+          </div>
+        )}
+
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700" htmlFor="password">
+              Mot de passe
+            </label>
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="new-password"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 pr-11 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Au moins 8 caractères"
+                required
+              />
+              <button
                 type="button"
-                variant="outline"
-                onClick={() => setStep(step - 1)}
-                disabled={loading}
+                onClick={() => setShowPassword((value) => !value)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
               >
-                Retour
-              </Button>
-            )}
-            {step < 3 ? (
-              <Button type="button" onClick={handleNext} className="flex-1" disabled={loading}>
-                {step === 2 ? 'Suivant' : 'Continuer'}
-              </Button>
-            ) : (
-              <Button onClick={handleComplete} className="w-full" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Accé·´der à mon espace
-              </Button>
-            )}
-          </CardFooter>
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label
+              className="mb-2 block text-sm font-medium text-gray-700"
+              htmlFor="confirm-password"
+            >
+              Confirmer le mot de passe
+            </label>
+            <div className="relative">
+              <input
+                id="confirm-password"
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                autoComplete="new-password"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 pr-11 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Répétez votre mot de passe"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((value) => !value)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                aria-label={
+                  showConfirmPassword ? "Masquer la confirmation" : "Afficher la confirmation"
+                }
+              >
+                {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || !userEmail}
+            className="w-full rounded-md bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-400"
+          >
+            {loading ? "Enregistrement..." : "Valider mon mot de passe"}
+          </button>
         </form>
-      </Card>
-    </div>
-  )
+      </section>
+    </main>
+  );
 }

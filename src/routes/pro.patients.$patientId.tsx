@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft, Pencil, TrendingUp, Plus, Save, X,
-  ChevronDown, ChevronUp, Mail, Trash2, AlertTriangle,
+  ChevronDown, ChevronUp, Trash2, AlertTriangle,
   FileText, Upload, ExternalLink, Loader2, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -20,14 +20,23 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { MacroCalculator } from "@/components/MacroCalculator";
 import { Switch } from "@/components/ui/switch";
+import { BodyMetricsChart, MetricKey } from "@/components/BodyMetricsChart";
 
+import { PatientPlanControl } from "@/components/patients/PatientPlanControl";
+import { AutoEvalPatientTab } from "@/components/patients/AutoEvalPatientTab";
+import { NutritionProgramHistory } from "@/components/patients/NutritionProgramHistory";
+import { AnamnesePatientTab } from "@/components/patients/AnamnesePatientTab";
+import { DailyJournal } from "@/components/nutrition/DailyJournal";
+import { PatientAccountBadge, PatientInviteButton } from "@/components/patients/PatientInviteControl";
+import type { AnamneseAnswers } from "@/lib/anamneseSchema";
 export const Route = createFileRoute("/pro/patients/$patientId")({
-  head: () => ({ meta: [{ title: "Fiche patient — DietFitPro" }] }),
+  head: () => ({
+    meta: [{ title: "Fiche patient — DietFitPro" }],
+  }),
   component: PatientDetailPage,
 });
 
@@ -47,6 +56,9 @@ interface Patient {
   medical_notes: string | null;
   allergies: string[] | null;
   goal: string | null;
+  anamnese: AnamneseAnswers | null;
+  anamnese_completed_at: string | null;
+  anamnese_consent_at: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -122,6 +134,13 @@ const ACCESS_FEATURES: {
   { key: "access_ai_coach",           label: "Coach IA",            description: "Utilisation du coach nutritionnel IA",      icon: "🤖" },
 ];
 
+// Regroupement des métriques disponibles pour chacun des 3 blocs de courbes
+// de l'onglet Évolution. On garde exactement la même répartition visuelle
+// que l'ancienne version (3 cartes), seul le rendu du graphique change.
+const WEIGHT_METRICS: MetricKey[] = ["weight_kg", "bmi"];
+const COMPOSITION_METRICS: MetricKey[] = ["body_fat_pct", "muscle_mass_kg", "metabolic_age", "visceral_fat"];
+const MENSURATION_METRICS: MetricKey[] = ["waist_cm", "hip_cm", "arm_cm", "thigh_cm", "chest_cm"];
+
 function calcBmi(weight: number | null, height: number | null): string {
   if (!weight || !height) return "—";
   return (weight / Math.pow(height / 100, 2)).toFixed(1);
@@ -150,9 +169,9 @@ function PatientDetailContent() {
   const [documents, setDocuments]                 = useState<PatientDocument[]>([]);
   const [editOpen, setEditOpen]         = useState(false);
   const [measureOpen, setMeasureOpen]   = useState(false);
-  const [inviting, setInviting]         = useState(false);
   const [deleteOpen, setDeleteOpen]     = useState(false);
   const [deleting, setDeleting]         = useState(false);
+  const [programRefresh, setProgramRefresh] = useState(0);
 
   // ── Accès & Options ──
   const [access, setAccess]               = useState<PatientAccess>(DEFAULT_ACCESS);
@@ -173,12 +192,15 @@ function PatientDetailContent() {
       supabase.from("nutrition_programs")
         .select("id, name, is_active, start_date, end_date, daily_kcal_target")
         .eq("patient_id", patientRow.id).order("start_date", { ascending: false }),
-      supabase.from("sport_programs")
+      supabase.from("patient_sport_programs")
         .select("id, name, is_active, frequency_per_week, duration_min")
-        .eq("patient_id", patientRow.id).order("created_at", { ascending: false }),
+        .eq("patient_id", patientRow.id)
+        .order("created_at", { ascending: false }),
       supabase.from("body_measurements")
         .select("id, measured_at, weight_kg, body_fat_pct, muscle_mass_kg, metabolic_age, visceral_fat, waist_cm, hip_cm, arm_cm, thigh_cm, chest_cm, notes")
-        .eq("patient_id", patientRow.id).order("measured_at", { ascending: true }),
+        .eq("patient_id", patientRow.id)
+        .order("measured_at", { ascending: true })
+        .order("created_at", { ascending: true }),
       userId
         ? supabase.from("appointments")
             .select("id, starts_at, ends_at, status, is_visio")
@@ -202,22 +224,20 @@ function PatientDetailContent() {
     const { data } = await supabase
       .from("subscriber_overrides")
       .select("*")
-      .eq("user_id", patientRow.user_id)
-      .maybeSingle();
+      .eq("user_id", patientRow.user_id);
     setAccessLoading(false);
-    if (data) {
-      setAccess({
-        access_recipes:            data.access_recipes            ?? true,
-        access_sport_programs:     data.access_sport_programs     ?? true,
-        access_nutrition_programs: data.access_nutrition_programs ?? true,
-        access_messaging:          data.access_messaging          ?? true,
-        access_visio:              data.access_visio              ?? false,
-        access_premium_content:    data.access_premium_content    ?? false,
-        access_ai_coach:           data.access_ai_coach           ?? false,
-      });
-    } else {
+    const rows = (data ?? []) as Array<Record<string, unknown>>;
+    if (rows.length === 0) {
       setAccess(DEFAULT_ACCESS);
+      return;
     }
+    const next: PatientAccess = { ...DEFAULT_ACCESS };
+    (Object.keys(DEFAULT_ACCESS) as (keyof PatientAccess)[]).forEach((key) => {
+      const row = rows.find((r) => r.feature_key === key);
+      if (row) next[key] = Boolean(row.enabled);
+      else if (typeof rows[0][key] === "boolean") next[key] = rows[0][key] as boolean;
+    });
+    setAccess(next);
   };
 
   const saveAccess = async () => {
@@ -226,12 +246,16 @@ function PatientDetailContent() {
       return;
     }
     setSavingAccess(true);
+    const keys = Object.keys(access) as (keyof PatientAccess)[];
+    const rows = keys.map((key) => ({
+      user_id: patient.user_id,
+      feature_key: key,
+      enabled: access[key],
+      ...access,
+    }));
     const { error } = await supabase
       .from("subscriber_overrides")
-      .upsert(
-        { user_id: patient.user_id, pro_id: user?.id, ...access, updated_at: new Date().toISOString() },
-        { onConflict: "user_id" }
-      );
+      .upsert(rows, { onConflict: "user_id,feature_key" });
     setSavingAccess(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Droits d'accès mis à jour ✅");
@@ -258,27 +282,12 @@ function PatientDetailContent() {
     return () => { cancelled = true; };
   }, [patientId, user]);
 
-  const handleInvite = async () => {
-    if (!patient?.email) { toast.error("Ce patient n'a pas d'email renseigné."); return; }
-    setInviting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("invite-patient", {
-        body: {
-          email: patient.email, patient_id: patient.id,
-          pro_id: user?.id, redirect_to: `${window.location.origin}/bienvenue`,
-        },
-      });
-      if (error || data?.error) { toast.error(data?.error ?? error?.message ?? "Erreur inconnue"); return; }
-      toast.success(`Invitation envoyée à ${patient.email} ✉️`);
-    } finally { setInviting(false); }
-  };
-
   const handleDelete = async () => {
     setDeleting(true);
     try {
       await supabase.from("body_measurements").delete().eq("patient_id", patientId);
       await supabase.from("nutrition_programs").delete().eq("patient_id", patientId);
-      await supabase.from("sport_programs").delete().eq("patient_id", patientId);
+      await supabase.from("patient_sport_programs").delete().eq("patient_id", patientId);
       await supabase.from("patient_documents").delete().eq("patient_id", patientId);
       if (patient?.user_id) {
         await supabase.from("appointments").delete().eq("patient_user_id", patient.user_id);
@@ -321,7 +330,22 @@ function PatientDetailContent() {
 
   const initials = `${patient.first_name[0] ?? ""}${patient.last_name[0] ?? ""}`.toUpperCase();
   const goal = patient.goal ? (GOAL_LABEL[patient.goal] ?? "—") : "—";
-  const bmi = calcBmi(patient.weight_kg, patient.height_cm);
+  // Poids actuel = dernière mesure enregistrée (sinon poids de la fiche)
+  const latestMeasuredWeight =
+    [...measurements].reverse().find((m) => m.weight_kg != null)?.weight_kg ?? null;
+  const currentWeight = latestMeasuredWeight ?? patient.weight_kg;
+  const bmi = calcBmi(currentWeight, patient.height_cm);
+
+  // Données formatées pour BodyMetricsChart : on injecte height_cm sur chaque
+  // point pour permettre le calcul auto de l'IMC dans le composant.
+  const chartData = measurements.map((m) => ({ ...m, height_cm: patient.height_cm }));
+
+  const hasCompositionData = measurements.some(
+    (m) => m.body_fat_pct || m.muscle_mass_kg || m.metabolic_age || m.visceral_fat
+  );
+  const hasMensurationData = measurements.some(
+    (m) => m.waist_cm || m.hip_cm || m.arm_cm || m.thigh_cm || m.chest_cm
+  );
 
   return (
     <div className="flex flex-col">
@@ -336,21 +360,17 @@ function PatientDetailContent() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold">{patient.first_name} {patient.last_name}</h1>
-            {patient.user_id
-              ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">✅ Compte actif</span>
-              : <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">⏳ Sans compte</span>
-            }
+            <PatientAccountBadge patientId={patient.id} hasAccount={Boolean(patient.user_id)} />
           </div>
           <p className="text-sm text-muted-foreground">Objectif : {goal}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {!patient.user_id && patient.email && (
-            <Button variant="outline" onClick={handleInvite} disabled={inviting}
-              className="border-amber-300 text-amber-700 hover:bg-amber-50">
-              <Mail className="h-4 w-4 mr-1" />
-              {inviting ? "Envoi…" : "Envoyer l'invitation"}
-            </Button>
-          )}
+          <PatientInviteButton
+            patientId={patient.id}
+            email={patient.email}
+            hasAccount={Boolean(patient.user_id)}
+            onSent={() => void loadPatient()}
+          />
           <Button variant="outline" onClick={() => setMeasureOpen(true)}>
             <Plus className="h-4 w-4 mr-1" /> Ajouter une mesure
           </Button>
@@ -378,24 +398,29 @@ function PatientDetailContent() {
           <TabsList className="mb-4 flex-wrap">
             <TabsTrigger value="evolution">📈 Évolution</TabsTrigger>
             <TabsTrigger value="info">Infos générales</TabsTrigger>
+            <TabsTrigger value="anamnese">📋 Dossier santé</TabsTrigger>
+            <TabsTrigger value="journal">📓 Journal</TabsTrigger>
             <TabsTrigger value="programs">Programmes</TabsTrigger>
             <TabsTrigger value="measurements">Mesures</TabsTrigger>
             <TabsTrigger value="appointments">Historique RDV</TabsTrigger>
             <TabsTrigger value="access">
               <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Accès & Options
             </TabsTrigger>
+            <TabsTrigger value="autoeval">
+              🎯 Auto-évaluation
+            </TabsTrigger>
           </TabsList>
 
           {/* ── ÉVOLUTION ── */}
           <TabsContent value="evolution" className="mt-2 space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <KpiCard label="Poids actuel" value={patient.weight_kg ? `${patient.weight_kg} kg` : "—"} />
+              <KpiCard label="Poids actuel" value={currentWeight ? `${currentWeight} kg` : "—"} />
               <KpiCard label="Poids cible" value={patient.target_weight_kg ? `${patient.target_weight_kg} kg` : "—"} color="green" />
               <KpiCard label="IMC" value={bmi} />
               <KpiCard
                 label={patient.goal === "prise_de_masse" ? "À gagner" : "À perdre"}
-                value={patient.weight_kg && patient.target_weight_kg
-                  ? `${Math.abs(patient.weight_kg - patient.target_weight_kg).toFixed(1)} kg` : "—"}
+                value={currentWeight && patient.target_weight_kg
+                  ? `${Math.abs(currentWeight - patient.target_weight_kg).toFixed(1)} kg` : "—"}
                 color="orange"
               />
             </div>
@@ -413,68 +438,36 @@ function PatientDetailContent() {
                 <Card>
                   <CardHeader className="pb-2"><CardTitle className="text-base">⚖️ Poids & IMC</CardTitle></CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <LineChart data={measurements.map((m) => ({
-                        date: new Date(m.measured_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }),
-                        Poids: m.weight_kg,
-                        IMC: m.weight_kg && patient.height_cm ? parseFloat(calcBmi(m.weight_kg, patient.height_cm)) : null,
-                      }))}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                        <YAxis yAxisId="left" tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
-                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
-                        <Tooltip /><Legend />
-                        <Line yAxisId="left" type="monotone" dataKey="Poids" stroke="#6DB33F" strokeWidth={2} dot={{ r: 4 }} unit=" kg" />
-                        <Line yAxisId="right" type="monotone" dataKey="IMC" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
-                        {patient.target_weight_kg && (
-                          <Line yAxisId="left" type="monotone" dataKey={() => patient.target_weight_kg} stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="5 5" dot={false} name="Objectif" unit=" kg" />
-                        )}
-                      </LineChart>
-                    </ResponsiveContainer>
+                    <BodyMetricsChart
+                      data={chartData}
+                      availableMetrics={WEIGHT_METRICS}
+                      height={220}
+                    />
                   </CardContent>
                 </Card>
-                {measurements.some((m) => m.body_fat_pct || m.muscle_mass_kg || m.metabolic_age || m.visceral_fat) && (
+
+                {hasCompositionData && (
                   <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-base">💪 Composition corporelle</CardTitle></CardHeader>
                     <CardContent>
-                      <ResponsiveContainer width="100%" height={220}>
-                        <LineChart data={measurements.map((m) => ({
-                          date: new Date(m.measured_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }),
-                          "% Graisse": m.body_fat_pct, "Masse musc. (kg)": m.muscle_mass_kg,
-                          "Âge métabo.": m.metabolic_age, "Graisse visc.": m.visceral_fat,
-                        }))}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                          <YAxis tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
-                          <Tooltip /><Legend />
-                          <Line type="monotone" dataKey="% Graisse" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="Masse musc. (kg)" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="Âge métabo." stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="Graisse visc." stroke="#ec4899" strokeWidth={2} dot={{ r: 3 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
+                      <BodyMetricsChart
+                        data={chartData}
+                        availableMetrics={COMPOSITION_METRICS}
+                        height={220}
+                      />
                     </CardContent>
                   </Card>
                 )}
-                {measurements.some((m) => m.waist_cm || m.hip_cm || m.arm_cm || m.thigh_cm) && (
+
+                {hasMensurationData && (
                   <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-base">📏 Mensurations (cm)</CardTitle></CardHeader>
                     <CardContent>
-                      <ResponsiveContainer width="100%" height={200}>
-                        <LineChart data={measurements.map((m) => ({
-                          date: new Date(m.measured_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }),
-                          "Taille": m.waist_cm, "Hanches": m.hip_cm, "Bras": m.arm_cm, "Cuisse": m.thigh_cm,
-                        }))}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                          <YAxis tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
-                          <Tooltip /><Legend />
-                          <Line type="monotone" dataKey="Taille" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="Hanches" stroke="#ec4899" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="Bras" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="Cuisse" stroke="#14b8a6" strokeWidth={2} dot={{ r: 3 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
+                      <BodyMetricsChart
+                        data={chartData}
+                        availableMetrics={MENSURATION_METRICS}
+                        height={200}
+                      />
                     </CardContent>
                   </Card>
                 )}
@@ -493,7 +486,7 @@ function PatientDetailContent() {
                 <InfoRow label="Date de naissance" value={patient.birth_date ? new Date(patient.birth_date).toLocaleDateString("fr-FR") : "—"} />
                 <InfoRow label="Genre" value={patient.gender ?? "—"} />
                 <InfoRow label="Taille" value={patient.height_cm ? `${patient.height_cm} cm` : "—"} />
-                <InfoRow label="Poids actuel" value={patient.weight_kg ? `${patient.weight_kg} kg` : "—"} />
+                <InfoRow label="Poids actuel" value={currentWeight ? `${currentWeight} kg` : "—"} />
                 <InfoRow label="Poids cible" value={patient.target_weight_kg ? `${patient.target_weight_kg} kg` : "—"} />
                 <InfoRow label="IMC" value={bmi} />
                 <InfoRow label="Objectif" value={goal} />
@@ -502,6 +495,34 @@ function PatientDetailContent() {
                 <InfoRow label="Notes médicales" value={patient.medical_notes ?? "—"} full />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* ── DOSSIER SANTÉ (ANAMNÈSE) ── */}
+          <TabsContent value="anamnese" className="mt-4">
+            <AnamnesePatientTab
+              patientId={patient.id}
+              gender={patient.gender}
+              anamnese={patient.anamnese}
+              completedAt={patient.anamnese_completed_at}
+              consentAt={patient.anamnese_consent_at}
+              onSaved={loadPatient}
+            />
+          </TabsContent>
+
+          {/* ── JOURNAL ALIMENTAIRE ── */}
+          <TabsContent value="journal" className="mt-4">
+            {patient.user_id ? (
+              <DailyJournal
+                userId={patient.user_id}
+                retentionDays={270}
+                readOnly
+                title="Journal alimentaire du patient"
+              />
+            ) : (
+              <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
+                Ce patient n'a pas encore de compte : il pourra tenir son journal après son invitation.
+              </div>
+            )}
           </TabsContent>
 
           {/* ── PROGRAMMES ── */}
@@ -520,7 +541,7 @@ function PatientDetailContent() {
 
     {/* Calculateur de macros */}
     <MacroCalculator
-      weight_kg={patient.weight_kg}
+      weight_kg={currentWeight}
       height_cm={patient.height_cm}
       age={patient.birth_date
         ? Math.floor((Date.now() - new Date(patient.birth_date).getTime()) / 31557600000)
@@ -529,51 +550,82 @@ function PatientDetailContent() {
         ? patient.gender
         : null}
       onValidate={async (result) => {
+        if (!user) return;
+
+        const mealsPayload = {
+          phase:          result.phase,
+          mb:             result.mb,
+          tdee:           result.tdee,
+          matin: {
+            pain_cereales_g: result.feculent_matin_pain_g,
+            proteines:       true,
+            lipides_crus_g:  10,
+          },
+          midi: {
+            feculent_nom:    result.feculent_label,
+            feculent_cru_g:  result.feculent_midi_cru_g,
+            feculent_cuit_g: result.feculent_midi_cru_g * 2,
+            legumes:         "à volonté",
+            proteines:       true,
+            lipides_crus_g:  10,
+          },
+          soir: {
+            feculent_nom:    result.feculent_label,
+            feculent_cru_g:  result.feculent_soir_cru_g,
+            feculent_cuit_g: result.feculent_soir_cru_g * 2,
+            legumes:         "à volonté",
+            proteines:       true,
+            lipides_crus_g:  10,
+          },
+        };
+
+        const programName = `Programme Phase ${result.phase}`;
+
         const { error } = await supabase
           .from("nutrition_programs")
           .upsert({
-            patient_id:       patientId,
-            pro_id:           user?.id,
-            name:             `Programme Phase ${result.phase}`,
+            patient_id:        patientId,
+            pro_id:            user.id,
+            name:              programName,
             daily_kcal_target: result.target_kcal,
-            daily_protein_g:  result.protein_g,
-            daily_carbs_g:    result.carbs_g,
-            daily_fat_g:      result.fat_g,
-            is_active:        true,
-            start_date:       new Date().toISOString().split("T")[0],
-            meals: {
-              phase:          result.phase,
-              mb:             result.mb,
-              tdee:           result.tdee,
-              matin: {
-                pain_cereales_g: result.feculent_matin_pain_g,
-                proteines:       true,
-                lipides_crus_g:  10,
-              },
-              midi: {
-                feculent_cru_g:  result.feculent_midi_cru_g,
-                feculent_cuit_g: result.feculent_midi_cru_g * 2,
-                legumes:         "à volonté",
-                proteines:       true,
-                lipides_crus_g:  10,
-              },
-              soir: {
-                feculent_cru_g:  result.feculent_soir_cru_g,
-                feculent_cuit_g: result.feculent_soir_cru_g * 2,
-                legumes:         "à volonté",
-                proteines:       true,
-                lipides_crus_g:  10,
-              },
-            },
+            daily_protein_g:   result.protein_g,
+            daily_carbs_g:     result.carbs_g,
+            daily_fat_g:       result.fat_g,
+            is_active:         true,
+            start_date:        new Date().toISOString().split("T")[0],
+            meals:             mealsPayload,
           }, { onConflict: "patient_id" });
 
         if (error) {
           toast.error("Erreur : " + error.message);
+          return;
+        }
+
+        const { error: histError } = await supabase
+          .from("nutrition_program_history")
+          .insert({
+            patient_id:        patientId,
+            pro_id:            user.id,
+            name:              programName,
+            phase:             result.phase,
+            daily_kcal_target: result.target_kcal,
+            daily_protein_g:   result.protein_g,
+            daily_carbs_g:     result.carbs_g,
+            daily_fat_g:       result.fat_g,
+            meals:             mealsPayload,
+          });
+
+        if (histError) {
+          toast.error("Programme enregistré, mais l'historique n'a pas été sauvegardé : " + histError.message);
         } else {
           toast.success("✅ Programme nutrition enregistré !");
         }
+
+        setProgramRefresh((n) => n + 1);
       }}
     />
+
+    <NutritionProgramHistory patientId={patientId} refreshKey={programRefresh} />
 
     <PdfList
       documents={documents.filter((d) => d.category === "nutrition")}
@@ -688,6 +740,10 @@ function PatientDetailContent() {
                 )}
               </CardHeader>
               <CardContent className="space-y-2">
+              <PatientPlanControl
+  patientUserId={patient.user_id}
+  patientName={`${patient.first_name} ${patient.last_name}`}
+/>
                 {accessLoading ? (
                   Array.from({ length: 7 }).map((_, i) => (
                     <Skeleton key={i} className="h-14 w-full rounded-lg" />
@@ -728,6 +784,15 @@ function PatientDetailContent() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* ── AUTO-ÉVALUATION ── */}
+          <TabsContent value="autoeval" className="mt-4">
+            <AutoEvalPatientTab
+              userId={patient.user_id}
+              patientLabel={`${patient.first_name} ${patient.last_name}`}
+              proId={user?.id ?? ""}
+            />
           </TabsContent>
 
         </Tabs>
@@ -1013,6 +1078,7 @@ function AddMeasureDialog({ open, onOpenChange, patient, proId, onSaved }: {
     setSaving(true);
     const { error } = await supabase.from("body_measurements").insert({
       patient_id: patient.id, user_id: patient.user_id ?? null,
+      created_by: proId,
       measured_at: date,
       weight_kg: weight ? Number(weight) : null,
       body_fat_pct: fat ? Number(fat) : null,

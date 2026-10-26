@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 
-
 export interface MacroResult {
   mb: number;
   tdee: number;
@@ -18,9 +17,9 @@ export interface MacroResult {
   feculent_midi_cru_g: number;
   feculent_soir_cru_g: number;
   feculent_matin_pain_g: number;
+  feculent_label: string;
   phase: 1 | 2 | 3;
 }
-
 
 interface Props {
   weight_kg: number | null;
@@ -30,7 +29,6 @@ interface Props {
   onValidate: (result: MacroResult) => void;
 }
 
-
 const NAP_OPTIONS = [
   { value: "1.40", label: "Sédentaire (bureau, peu de marche)" },
   { value: "1.55", label: "Légèrement actif (marche ~30min/j)" },
@@ -39,13 +37,11 @@ const NAP_OPTIONS = [
   { value: "2.00", label: "Extrêmement actif (athlète)" },
 ];
 
-
 const PHASE_OPTIONS = [
   { value: "1", label: "Phase 1 — Déficit léger (-150 kcal)", deficit: 150 },
   { value: "2", label: "Phase 2 — Déficit modéré (-400 kcal)", deficit: 400 },
   { value: "3", label: "Phase 3 — Déficit important (-700 kcal)", deficit: 700 },
 ];
-
 
 const FECULENT_OPTIONS = [
   { value: "riz", label: "Riz", kcal: 350, glucides: 78 },
@@ -56,8 +52,14 @@ const FECULENT_OPTIONS = [
   { value: "flocons", label: "Flocons avoine", kcal: 370, glucides: 66 },
 ];
 
+const MIN_KCAL_FEMME = 1200;
+const MIN_KCAL_HOMME = 1500;
 
-function calcMB(
+/**
+ * Formule de Black et al. (1996), résultat en kJ/jour.
+ * Homme : 1,083 — Femme : 0,963 (le code part de 1,083, donc on multiplie par 0,963 / 1,083).
+ */
+function calcMBkJ(
   weight: number,
   height: number,
   age: number,
@@ -70,10 +72,10 @@ function calcMB(
     Math.pow(age, -0.13) *
     1000;
 
+  const adjusted = gender === "femme" ? base * (0.963 / 1.083) : base;
 
-  return Math.round(gender === "femme" ? base * 0.963 : base);
+  return Math.round(adjusted) / 10;
 }
-
 
 export function MacroCalculator({
   weight_kg,
@@ -90,7 +92,6 @@ export function MacroCalculator({
   const [phase, setPhase] = useState<"1" | "2" | "3">("1");
   const [feculent, setFeculent] = useState("riz");
 
-
   const [mb, setMb] = useState<number | null>(null);
   const [tdee, setTdee] = useState<number | null>(null);
   const [targetKcal, setTargetKcal] = useState("");
@@ -101,12 +102,12 @@ export function MacroCalculator({
   const [fSoirCru, setFSoirCru] = useState("");
   const [painG, setPainG] = useState("");
   const [calculated, setCalculated] = useState(false);
-
+  const [warning, setWarning] = useState<string | null>(null);
 
   useEffect(() => {
     setCalculated(false);
+    setWarning(null);
   }, [weight, height, ageVal, sex, nap, phase, feculent]);
-
 
   function handleCalculate() {
     const w = parseFloat(weight.replace(",", "."));
@@ -114,30 +115,36 @@ export function MacroCalculator({
     const a = parseFloat(ageVal.replace(",", "."));
     if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(a)) return;
 
-
     const deficit = PHASE_OPTIONS.find((p) => p.value === phase)!.deficit;
     const napVal = parseFloat(nap);
-    const mbVal = calcMB(w, h, a, sex) / 10;
-    const tdeeVal = Math.round((mbVal * napVal) / 4.185);
-    const kcal = tdeeVal - deficit;
 
+    const mbKj = calcMBkJ(w, h, a, sex);
+    const mbKcal = Math.round(mbKj / 4.185);
+    const tdeeVal = Math.round((mbKj * napVal) / 4.185);
+
+    const minKcal = sex === "femme" ? MIN_KCAL_FEMME : MIN_KCAL_HOMME;
+    const rawKcal = tdeeVal - deficit;
+    const kcal = Math.max(minKcal, rawKcal);
+
+    setWarning(
+      rawKcal < minKcal
+        ? `Le déficit demandé donnerait ${rawKcal} kcal. L'objectif a été remonté à ${minKcal} kcal (minimum de sécurité). Ajustez si besoin.`
+        : null,
+    );
 
     const proteinKcal = kcal * 0.2;
     const fatKcal = kcal * 0.2;
     const carbsKcal = kcal * 0.6;
 
-
     const prot = Math.round(proteinKcal / 4);
     const fat = Math.round(fatKcal / 9);
     const carbs = Math.max(0, Math.round(carbsKcal / 4));
-
 
     const fecMidi = phase === "1" ? 80 : phase === "2" ? 50 : 0;
     const fecSoir = phase === "1" ? 40 : phase === "2" ? 25 : 0;
     const pain = sex === "femme" ? 30 : 50;
 
-
-    setMb(mbVal);
+    setMb(mbKcal);
     setTdee(tdeeVal);
     setTargetKcal(kcal.toString());
     setProteinG(prot.toString());
@@ -149,10 +156,10 @@ export function MacroCalculator({
     setCalculated(true);
   }
 
-
   function handleValidate() {
     if (!calculated) return;
 
+    const selected = FECULENT_OPTIONS.find((f) => f.value === feculent)!;
 
     onValidate({
       mb: mb!,
@@ -164,13 +171,12 @@ export function MacroCalculator({
       feculent_midi_cru_g: parseInt(fMidiCru, 10),
       feculent_soir_cru_g: parseInt(fSoirCru, 10),
       feculent_matin_pain_g: parseInt(painG, 10),
+      feculent_label: selected.label,
       phase: parseInt(phase, 10) as 1 | 2 | 3,
     });
   }
 
-
   const fecSelected = FECULENT_OPTIONS.find((f) => f.value === feculent)!;
-
 
   return (
     <Card className="border-2 border-primary/20">
@@ -180,13 +186,11 @@ export function MacroCalculator({
         </CardTitle>
       </CardHeader>
 
-
       <CardContent className="space-y-6">
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
             Données patient
           </p>
-
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="space-y-1">
@@ -199,7 +203,6 @@ export function MacroCalculator({
               />
             </div>
 
-
             <div className="space-y-1">
               <Label>Taille (cm) *</Label>
               <Input
@@ -209,7 +212,6 @@ export function MacroCalculator({
               />
             </div>
 
-
             <div className="space-y-1">
               <Label>Âge *</Label>
               <Input
@@ -218,7 +220,6 @@ export function MacroCalculator({
                 onChange={(e) => setAge(e.target.value)}
               />
             </div>
-
 
             <div className="space-y-1">
               <Label>Sexe *</Label>
@@ -238,12 +239,10 @@ export function MacroCalculator({
           </div>
         </div>
 
-
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
             Paramètres
           </p>
-
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
@@ -261,7 +260,6 @@ export function MacroCalculator({
                 </SelectContent>
               </Select>
             </div>
-
 
             <div className="space-y-1">
               <Label>Phase de déficit</Label>
@@ -282,7 +280,6 @@ export function MacroCalculator({
               </Select>
             </div>
 
-
             <div className="space-y-1">
               <Label>Féculent principal</Label>
               <Select value={feculent} onValueChange={setFeculent}>
@@ -301,25 +298,27 @@ export function MacroCalculator({
           </div>
         </div>
 
-
         <Button onClick={handleCalculate} className="w-full">
           ⚡ Calculer les macros
         </Button>
-
 
         {calculated && (
           <>
             <Separator />
 
+            {warning ? (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                ⚠️ {warning}
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-muted/40 rounded-lg p-3 text-center">
                 <p className="text-xs text-muted-foreground">Métabolisme de base</p>
                 <p className="text-lg font-bold text-primary">
-                  {mb} <span className="text-xs font-normal">MJ</span>
+                  {mb} <span className="text-xs font-normal">kcal</span>
                 </p>
               </div>
-
 
               <div className="bg-muted/40 rounded-lg p-3 text-center">
                 <p className="text-xs text-muted-foreground">TDEE (dépense totale)</p>
@@ -327,7 +326,6 @@ export function MacroCalculator({
                   {tdee} <span className="text-xs font-normal">kcal</span>
                 </p>
               </div>
-
 
               <div className="bg-muted/40 rounded-lg p-3 text-center">
                 <p className="text-xs text-muted-foreground">Objectif calorique</p>
@@ -337,11 +335,9 @@ export function MacroCalculator({
               </div>
             </div>
 
-
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Macros journaliers — modifiables
             </p>
-
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="space-y-1">
@@ -352,7 +348,6 @@ export function MacroCalculator({
                   onChange={(e) => setTargetKcal(e.target.value)}
                 />
               </div>
-
 
               <div className="space-y-1">
                 <Label>🥩 Protéines (g)</Label>
@@ -366,7 +361,6 @@ export function MacroCalculator({
                 </p>
               </div>
 
-
               <div className="space-y-1">
                 <Label>🫒 Lipides (g)</Label>
                 <Input
@@ -376,7 +370,6 @@ export function MacroCalculator({
                 />
                 <p className="text-xs text-muted-foreground">20% des kcal</p>
               </div>
-
 
               <div className="space-y-1">
                 <Label>🌾 Glucides (g)</Label>
@@ -388,14 +381,11 @@ export function MacroCalculator({
               </div>
             </div>
 
-
             <Separator />
-
 
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Féculents par repas ({fecSelected.label} — cru × 2 = cuit)
             </p>
-
 
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1">
@@ -407,7 +397,6 @@ export function MacroCalculator({
                 />
                 <p className="text-xs text-muted-foreground">{painG}g cru</p>
               </div>
-
 
               <div className="space-y-1">
                 <Label>☀️ Midi — {fecSelected.label}</Label>
@@ -421,7 +410,6 @@ export function MacroCalculator({
                   {fMidiCru ? ` · ${Math.round((+fMidiCru * fecSelected.kcal) / 100)} kcal` : ""}
                 </p>
               </div>
-
 
               <div className="space-y-1">
                 <Label>🌙 Soir — {fecSelected.label}</Label>
@@ -437,10 +425,9 @@ export function MacroCalculator({
               </div>
             </div>
 
-
             <div className="bg-muted/30 rounded-lg p-4 space-y-2 text-sm">
               <p className="font-semibold">📋 Résumé du plan alimentaire</p>
-              <p>🌅 <strong>Matin :</strong> {painG}g pain céréales + protéine (yaourt/œuf) + 10g lipides crus</p>
+              <p>🌅 <strong>Matin :</strong> {painG}g pain céréales + protéine (yaourt/œuf) + 10g de beurre OU 10g de confiture</p>
               <p>
                 ☀️ <strong>Midi :</strong> Protéines + légumes à volonté +{" "}
                 {fMidiCru ? `${fMidiCru}g cru (${+fMidiCru * 2}g cuit)` : "sans féculent"}{" "}
@@ -452,10 +439,9 @@ export function MacroCalculator({
                 {fecSelected.label} + 10g lipides crus
               </p>
               <p className="text-muted-foreground text-xs mt-2">
-                💧 Lipides : huile d'olive ou colza de préférence — jamais chauffés
+                💧 Lipides midi et soir : huile d'olive ou colza de préférence — jamais chauffés
               </p>
             </div>
-
 
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm">
               <p className="font-semibold text-primary mb-1">⚖️ Bilan calorique estimé</p>
@@ -470,7 +456,6 @@ export function MacroCalculator({
                 </Badge>
               </div>
             </div>
-
 
             <Button onClick={handleValidate} className="w-full" size="lg">
               ✅ Valider et enregistrer ce programme
