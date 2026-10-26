@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as MentionsLegalesRouteImport } from './routes/mentions-legales'
@@ -55,6 +56,11 @@ import { Route as ProPatientsPatientIdRouteImport } from './routes/pro.patients.
 import { Route as ProNutritionProgramIdRouteImport } from './routes/pro.nutrition.$programId'
 import { Route as ProConsultationsIdRouteImport } from './routes/pro.consultations.$id'
 
+const UnauthorizedRoute = UnauthorizedRouteImport.update({
+  id: '/unauthorized',
+  path: '/unauthorized',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
@@ -292,6 +298,7 @@ export interface FileRoutesByFullPath {
   '/mentions-legales': typeof MentionsLegalesRoute
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
+  '/unauthorized': typeof UnauthorizedRoute
   '/groups/$groupId': typeof GroupsGroupIdRoute
   '/groups/join': typeof GroupsJoinRoute
   '/patient/agenda': typeof PatientAgendaRoute
@@ -339,6 +346,7 @@ export interface FileRoutesByTo {
   '/mentions-legales': typeof MentionsLegalesRoute
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
+  '/unauthorized': typeof UnauthorizedRoute
   '/groups/$groupId': typeof GroupsGroupIdRoute
   '/groups/join': typeof GroupsJoinRoute
   '/patient/agenda': typeof PatientAgendaRoute
@@ -387,6 +395,7 @@ export interface FileRoutesById {
   '/mentions-legales': typeof MentionsLegalesRoute
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
+  '/unauthorized': typeof UnauthorizedRoute
   '/groups/$groupId': typeof GroupsGroupIdRoute
   '/groups/join': typeof GroupsJoinRoute
   '/patient/agenda': typeof PatientAgendaRoute
@@ -436,6 +445,7 @@ export interface FileRouteTypes {
     | '/mentions-legales'
     | '/progress'
     | '/register'
+    | '/unauthorized'
     | '/groups/$groupId'
     | '/groups/join'
     | '/patient/agenda'
@@ -483,6 +493,7 @@ export interface FileRouteTypes {
     | '/mentions-legales'
     | '/progress'
     | '/register'
+    | '/unauthorized'
     | '/groups/$groupId'
     | '/groups/join'
     | '/patient/agenda'
@@ -530,6 +541,7 @@ export interface FileRouteTypes {
     | '/mentions-legales'
     | '/progress'
     | '/register'
+    | '/unauthorized'
     | '/groups/$groupId'
     | '/groups/join'
     | '/patient/agenda'
@@ -578,6 +590,7 @@ export interface RootRouteChildren {
   MentionsLegalesRoute: typeof MentionsLegalesRoute
   ProgressRoute: typeof ProgressRoute
   RegisterRoute: typeof RegisterRoute
+  UnauthorizedRoute: typeof UnauthorizedRoute
   GroupsGroupIdRoute: typeof GroupsGroupIdRoute
   GroupsJoinRoute: typeof GroupsJoinRoute
   PatientAgendaRoute: typeof PatientAgendaRoute
@@ -612,6 +625,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/unauthorized': {
+      id: '/unauthorized'
+      path: '/unauthorized'
+      fullPath: '/unauthorized'
+      preLoaderRoute: typeof UnauthorizedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/register': {
       id: '/register'
       path: '/register'
@@ -1000,6 +1020,7 @@ const rootRouteChildren: RootRouteChildren = {
   MentionsLegalesRoute: MentionsLegalesRoute,
   ProgressRoute: ProgressRoute,
   RegisterRoute: RegisterRoute,
+  UnauthorizedRoute: UnauthorizedRoute,
   GroupsGroupIdRoute: GroupsGroupIdRoute,
   GroupsJoinRoute: GroupsJoinRoute,
   PatientAgendaRoute: PatientAgendaRoute,
