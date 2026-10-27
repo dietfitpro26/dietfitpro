@@ -80,21 +80,21 @@ function Content() {
         ) : (
           <ul className="space-y-3">
             {items.map((notification) => {
-              // Conversion en string pour rester compatible avec
-              // le type NotificationType actuellement déclaré.
               const isCustomProgram =
                 String(notification.type) ===
                 "custom_program_purchase";
 
               const isUnread = !notification.read_at;
+              const isHighlighted =
+                isCustomProgram && isUnread;
 
               const inner = (
                 <Card
                   className={cn(
                     "transition-colors",
-                    isCustomProgram
+                    isHighlighted
                       ? "border-amber-300 border-l-4 border-l-amber-500 bg-amber-50 hover:bg-amber-100/70"
-                      : "hover:bg-muted/40",
+                      : "bg-white hover:bg-muted/40",
                     !isCustomProgram &&
                       isUnread &&
                       "border-l-4 border-l-[#6DB33F]",
@@ -104,7 +104,7 @@ function Content() {
                     <div
                       className={cn(
                         "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-                        isCustomProgram
+                        isHighlighted
                           ? "bg-amber-200/70 text-amber-900"
                           : isUnread
                             ? "bg-[#6DB33F]/15 text-[#2D7A1F]"
@@ -121,13 +121,25 @@ function Content() {
                     <div className="min-w-0 flex-1">
                       {isCustomProgram && (
                         <div className="mb-2 flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-amber-200 px-2.5 py-1 text-xs font-semibold text-amber-950">
+                          <span
+                            className={cn(
+                              "rounded-full px-2.5 py-1 text-xs font-semibold",
+                              isHighlighted
+                                ? "bg-amber-200 text-amber-950"
+                                : "bg-muted text-muted-foreground",
+                            )}
+                          >
                             Programme personnalisé acheté
                           </span>
 
-                          {isUnread && (
+                          {isUnread ? (
                             <span className="text-xs font-semibold text-amber-900">
                               Nouveau
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                              <CheckCheck className="h-3.5 w-3.5" />
+                              Lu
                             </span>
                           )}
                         </div>
@@ -137,8 +149,9 @@ function Content() {
                         <p
                           className={cn(
                             "break-words text-sm",
-                            isCustomProgram &&
-                              "text-amber-950",
+                            isHighlighted
+                              ? "text-amber-950"
+                              : "text-foreground",
                             isUnread
                               ? "font-semibold"
                               : "font-medium",
@@ -159,7 +172,7 @@ function Content() {
                         <p
                           className={cn(
                             "mt-1 break-words text-sm",
-                            isCustomProgram
+                            isHighlighted
                               ? "text-amber-900"
                               : "text-muted-foreground",
                           )}
@@ -170,17 +183,20 @@ function Content() {
 
                       {isCustomProgram && (
                         <div className="mt-3 space-y-2">
-                          <p className="text-sm font-medium text-amber-950">
-                            Préparation du programme à vérifier.
-                          </p>
+                          {isUnread && (
+                            <p className="text-sm font-medium text-amber-950">
+                              Préparation du programme à vérifier.
+                            </p>
+                          )}
 
-                          <p className="text-xs text-amber-900">
-                            Marquer cette notification comme lue
-                            ne signifie pas que le programme a
-                            été préparé ou envoyé.
-                          </p>
-
-                          <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-950 underline underline-offset-4">
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 text-sm font-semibold underline underline-offset-4",
+                              isHighlighted
+                                ? "text-amber-950"
+                                : "text-[#2D7A1F]",
+                            )}
+                          >
                             Ouvrir les abonnés
                             <ArrowRight className="h-4 w-4" />
                           </span>
