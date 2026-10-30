@@ -41,6 +41,11 @@ type FreshProfileRow = {
   plan: Profile["plan"] | null;
 };
 
+type BillingRow = {
+  status: string | null;
+  managed_by_pro: boolean | null;
+};
+
 const ACCESS_KEYS: AccessKey[] = [
   "access_recipes",
   "access_sport_programs",
@@ -75,12 +80,6 @@ const PREMIUM_RIGHTS: AccessRights = {
   sport_session_limit: null,
 };
 
-/*
- * Le patient conserve toujours role = "patient".
- * Son niveau d'accès dépend de profiles.plan :
- * - basic : droits Basic
- * - premium : droits Premium
- */
 const PATIENT_BASIC_RIGHTS: AccessRights = {
   plan_label: "basic",
   access_recipes: false,
@@ -117,6 +116,18 @@ const PRO_RIGHTS: AccessRights = {
   sport_session_limit: null,
 };
 
+const SUSPENDED_RIGHTS: AccessRights = {
+  plan_label: "basic",
+  access_recipes: false,
+  access_sport_programs: false,
+  access_nutrition_programs: false,
+  access_messaging: false,
+  access_visio: false,
+  access_ai_coach: false,
+  access_premium_content: false,
+  sport_session_limit: null,
+};
+
 function isAccessKey(value: string): value is AccessKey {
   return ACCESS_KEYS.includes(value as AccessKey);
 }
@@ -148,6 +159,22 @@ function applyBooleanOverride(
   }
 }
 
+function isBillingActive(billing: BillingRow | null): boolean {
+  if (!billing) {
+    return false;
+  }
+
+  if (billing.managed_by_pro === true) {
+    return true;
+  }
+
+  return (
+    billing.status === "active" ||
+    billing.status === "trialing" ||
+    billing.status === "past_due"
+  );
+}
+
 export function useAccessRights() {
   const { user, profile, loading: authLoading } = useAuth();
 
@@ -165,10 +192,6 @@ export function useAccessRights() {
       return;
     }
 
-    /*
-     * Ces deux constantes ne peuvent plus être null.
-     * Elles résolvent les erreurs TypeScript dans loadRights().
-     */
     const currentUser = user;
     const currentProfile = profile;
 
@@ -210,6 +233,33 @@ export function useAccessRights() {
         }
       }
 
+      if (effectiveRole === "subscriber") {
+        const { data: billing, error: billingError } = await supabase
+          .from("subscriber_billing")
+          .select("status, managed_by_pro")
+          .eq("user_id", currentUser.id)
+          .maybeSingle();
+
+        if (billingError) {
+          console.error(
+            "[useAccessRights] erreur chargement abonnement :",
+            billingError
+          );
+        }
+
+        const activeBilling = isBillingActive(
+          (billing ?? null) as BillingRow | null
+        );
+
+        if (!cancelled) {
+          if (!activeBilling) {
+            setRights(SUSPENDED_RIGHTS);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       const base = getBaseRights(effectiveRole, effectivePlan);
 
       const { data: overrides, error: overridesError } = await supabase
@@ -239,47 +289,25 @@ export function useAccessRights() {
         );
       } else if (overrides && overrides.length > 0) {
         for (const row of overrides as OverrideRow[]) {
-          applyBooleanOverride(
-            base,
-            "access_recipes",
-            row.access_recipes
-          );
-
+          applyBooleanOverride(base, "access_recipes", row.access_recipes);
           applyBooleanOverride(
             base,
             "access_sport_programs",
             row.access_sport_programs
           );
-
           applyBooleanOverride(
             base,
             "access_nutrition_programs",
             row.access_nutrition_programs
           );
-
-          applyBooleanOverride(
-            base,
-            "access_messaging",
-            row.access_messaging
-          );
-
-          applyBooleanOverride(
-            base,
-            "access_visio",
-            row.access_visio
-          );
-
+          applyBooleanOverride(base, "access_messaging", row.access_messaging);
+          applyBooleanOverride(base, "access_visio", row.access_visio);
           applyBooleanOverride(
             base,
             "access_premium_content",
             row.access_premium_content
           );
-
-          applyBooleanOverride(
-            base,
-            "access_ai_coach",
-            row.access_ai_coach
-          );
+          applyBooleanOverride(base, "access_ai_coach", row.access_ai_coach);
 
           if (row.feature_key && isAccessKey(row.feature_key)) {
             applyBooleanOverride(base, row.feature_key, row.enabled);

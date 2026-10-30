@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  useNavigate,
+  useRouterState,
+  Outlet,
+} from "@tanstack/react-router";
 import { Bell, Plus, Search, Trash2, ChevronDown, ChevronUp, Copy, X } from "lucide-react";
 import { toast } from "sonner";
 import { ProLayout } from "@/layouts/ProLayout";
@@ -66,6 +71,18 @@ const OBJECTIVE_COLOR: Record<string, string> = {
 };
 
 function Page() {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+
+  const isProgramDetail = /^\/pro\/nutrition\/[^/]+\/?$/.test(pathname);
+
+  // La page de détail possède déjà sa protection et son ProLayout.
+  // Ne pas afficher la liste ni un deuxième layout autour de cette page.
+  if (isProgramDetail) {
+    return <Outlet />;
+  }
+
   return (
     <ProtectedRoute allow={["pro"]}>
       <ProLayout><Content /></ProLayout>
@@ -332,7 +349,7 @@ function Content() {
                     <TableHead>Nom</TableHead><TableHead>Patient</TableHead>
                     <TableHead>Calories/j</TableHead><TableHead>Durée</TableHead>
                     <TableHead>Statut</TableHead><TableHead>Créé le</TableHead>
-                    <TableHead className="w-12"></TableHead>
+                    <TableHead className="w-40 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -349,9 +366,37 @@ function Content() {
                           <TableCell><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${r.is_active ? "bg-[#6DB33F]/15 text-[#2D7A1F]" : "bg-muted text-muted-foreground"}`}>{r.is_active ? "Actif" : "Inactif"}</span></TableCell>
                           <TableCell className="text-muted-foreground">{new Date(r.created_at).toLocaleDateString("fr-FR")}</TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); setDeleteId(r.id); setDeleteName(r.name); }}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                aria-label={`Ouvrir le programme ${r.name}`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void navigate({
+                                    to: "/pro/nutrition/$programId",
+                                    params: { programId: r.id },
+                                  });
+                                }}
+                              >
+                                Ouvrir
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                aria-label={`Supprimer le programme ${r.name}`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setDeleteId(r.id);
+                                  setDeleteName(r.name);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

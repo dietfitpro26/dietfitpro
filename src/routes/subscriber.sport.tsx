@@ -12,7 +12,9 @@ import {
 import { SubscriberLayout } from "@/layouts/SubscriberLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAccessRights } from "@/hooks/useAccessRights";
+import { useAccessState } from "@/hooks/useAccessState";
 import { useAuth } from "@/hooks/useAuth";
+import { SuspendedAccountScreen } from "@/components/billing/SuspendedAccountScreen";
 import { supabase } from "@/lib/supabase";
 import {
   Card,
@@ -30,10 +32,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+
 export const Route = createFileRoute("/subscriber/sport")({
   head: () => ({ meta: [{ title: "Sport — DietFitPro" }] }),
   component: SubscriberSportPage,
 });
+
 
 function SubscriberSportPage() {
   return (
@@ -44,6 +48,7 @@ function SubscriberSportPage() {
     </ProtectedRoute>
   );
 }
+
 
 type Program = {
   id: string;
@@ -57,6 +62,7 @@ type Program = {
   is_active: boolean;
 };
 
+
 type Exercise = {
   id: string;
   program_id: string;
@@ -69,10 +75,12 @@ type Exercise = {
   notes: string | null;
 };
 
+
 type ScheduleItem = {
   day: string;
   programId: string | null;
 };
+
 
 type SubscriberDocument = {
   id: string;
@@ -80,6 +88,7 @@ type SubscriberDocument = {
   file_url: string;
   file_name: string | null;
 };
+
 
 const DAYS = [
   "Lundi",
@@ -91,17 +100,21 @@ const DAYS = [
   "Dimanche",
 ];
 
+
 const NO_PROGRAM_VALUE = "__no_program__";
+
 
 const LEVEL_LABEL: Record<string, string> = {
   beginner: "Débutant",
   intermediate: "Intermédiaire",
 };
 
+
 const LOCATION_LABEL: Record<string, string> = {
   home: "Maison",
   gym: "Salle",
 };
+
 
 const EXERCISE_TYPE_LABEL: Record<string, string> = {
   warmup: "Échauffement",
@@ -111,31 +124,40 @@ const EXERCISE_TYPE_LABEL: Record<string, string> = {
   cooldown: "Retour au calme",
 };
 
+
 function SportContent() {
   const { profile, user } = useAuth();
   const { rights, loading: accessLoading } = useAccessRights();
+  const { state: accessState } = useAccessState();
+
 
   const firstName = profile?.full_name?.split(" ")[0] ?? "vous";
   const userId = user?.id ?? null;
   const hasAccess = rights?.access_sport_programs ?? false;
 
+
   const sportLimit = rights?.sport_session_limit ?? null;
+
 
   const isBasicLimited =
     typeof sportLimit === "number" && sportLimit > 0;
+
 
   const isPremiumLike =
     Boolean(rights) &&
     !isBasicLimited &&
     Boolean(rights?.access_sport_programs);
 
+
   const [loading, setLoading] = useState(true);
   const [savingDay, setSavingDay] = useState<string | null>(null);
+
 
   const [programs, setPrograms] = useState<Program[]>([]);
   const [exercisesByProgram, setExercisesByProgram] = useState<
     Record<string, Exercise[]>
   >({});
+
 
   const [schedule, setSchedule] = useState<ScheduleItem[]>(
     DAYS.map((day) => ({
@@ -144,7 +166,9 @@ function SportContent() {
     }))
   );
 
+
   const [docs, setDocs] = useState<SubscriberDocument[]>([]);
+
 
   useEffect(() => {
     if (!userId || !hasAccess) {
@@ -161,14 +185,18 @@ function SportContent() {
       return;
     }
 
+
     let cancelled = false;
+
 
     async function loadSportData() {
       setLoading(true);
 
+
       const requestedTiers: Array<"basic" | "premium"> = isPremiumLike
         ? ["basic", "premium"]
         : ["basic"];
+
 
       try {
         const [
@@ -188,11 +216,13 @@ function SportContent() {
             .order("level", { ascending: true })
             .order("name", { ascending: true }),
 
+
           supabase
             .from("user_sport_schedule")
             .select("day_of_week, program_id")
             .eq("user_id", userId)
             .eq("is_active", true),
+
 
           supabase
             .from("subscriber_documents")
@@ -202,9 +232,11 @@ function SportContent() {
             .order("created_at", { ascending: false }),
         ]);
 
+
         if (programsResponse.error) {
           throw programsResponse.error;
         }
+
 
         if (scheduleResponse.error) {
           console.error(
@@ -213,6 +245,7 @@ function SportContent() {
           );
         }
 
+
         if (documentsResponse.error) {
           console.error(
             "Erreur chargement documents Sport :",
@@ -220,20 +253,25 @@ function SportContent() {
           );
         }
 
+
         const loadedPrograms = (programsResponse.data ?? []) as Program[];
+
 
         if (!cancelled) {
           setPrograms(loadedPrograms);
 
+
           setDocs(
             (documentsResponse.data ?? []) as SubscriberDocument[]
           );
+
 
           setSchedule(
             DAYS.map((day) => {
               const scheduled = scheduleResponse.data?.find(
                 (item) => item.day_of_week === day
               );
+
 
               return {
                 day,
@@ -243,6 +281,7 @@ function SportContent() {
           );
         }
 
+
         if (loadedPrograms.length === 0) {
           if (!cancelled) {
             setExercisesByProgram({});
@@ -250,7 +289,9 @@ function SportContent() {
           return;
         }
 
+
         const programIds = loadedPrograms.map((program) => program.id);
+
 
         const { data: exercisesData, error: exercisesError } =
           await supabase
@@ -262,38 +303,47 @@ function SportContent() {
             .order("program_id", { ascending: true })
             .order("order_index", { ascending: true });
 
+
         if (exercisesError) {
           console.error(
             "Erreur chargement exercices Sport :",
             exercisesError
           );
 
+
           if (!cancelled) {
             setExercisesByProgram({});
           }
 
+
           return;
         }
+
 
         if (!cancelled) {
           const groupedExercises: Record<string, Exercise[]> = {};
 
+
           for (const exercise of exercisesData ?? []) {
             const typedExercise = exercise as Exercise;
+
 
             if (!groupedExercises[typedExercise.program_id]) {
               groupedExercises[typedExercise.program_id] = [];
             }
+
 
             groupedExercises[typedExercise.program_id].push(
               typedExercise
             );
           }
 
+
           setExercisesByProgram(groupedExercises);
         }
       } catch (error) {
         console.error("Erreur chargement bibliothèque Sport :", error);
+
 
         if (!cancelled) {
           setPrograms([]);
@@ -306,20 +356,25 @@ function SportContent() {
       }
     }
 
+
     void loadSportData();
+
 
     return () => {
       cancelled = true;
     };
   }, [userId, hasAccess, isPremiumLike]);
 
+
   const displayedPrograms = useMemo(() => {
     if (isPremiumLike) {
       return programs;
     }
 
+
     return programs.filter((program) => program.tier === "basic");
   }, [isPremiumLike, programs]);
+
 
   const basicPrograms = useMemo(
     () =>
@@ -329,6 +384,7 @@ function SportContent() {
     [displayedPrograms]
   );
 
+
   const premiumPrograms = useMemo(
     () =>
       displayedPrograms.filter(
@@ -337,9 +393,11 @@ function SportContent() {
     [displayedPrograms]
   );
 
+
   const plannedDays = schedule.filter(
     (item) => item.programId !== null
   ).length;
+
 
   const updateDayProgram = async (
     day: string,
@@ -349,10 +407,13 @@ function SportContent() {
       return;
     }
 
+
     const programId =
       selectedValue === NO_PROGRAM_VALUE ? null : selectedValue;
 
+
     const previousSchedule = schedule;
+
 
     setSchedule((current) =>
       current.map((item) =>
@@ -365,7 +426,9 @@ function SportContent() {
       )
     );
 
+
     setSavingDay(day);
+
 
     try {
       if (!programId) {
@@ -375,12 +438,15 @@ function SportContent() {
           .eq("user_id", userId)
           .eq("day_of_week", day);
 
+
         if (error) {
           throw error;
         }
 
+
         return;
       }
+
 
       const { error } = await supabase
         .from("user_sport_schedule")
@@ -396,13 +462,16 @@ function SportContent() {
           }
         );
 
+
       if (error) {
         throw error;
       }
     } catch (error) {
       console.error("Erreur sauvegarde planning Sport :", error);
 
+
       setSchedule(previousSchedule);
+
 
       alert(
         "Impossible d'enregistrer votre planning. Vérifiez votre connexion puis réessayez."
@@ -412,20 +481,25 @@ function SportContent() {
     }
   };
 
+
   const handleOpenPdf = async (filePath: string) => {
     const { data, error } = await supabase.storage
       .from("message-attachments")
       .createSignedUrl(filePath, 3600);
 
+
     if (error || !data?.signedUrl) {
       console.error("Erreur ouverture PDF :", error);
+
 
       alert("Impossible d'ouvrir le document, réessayez.");
       return;
     }
 
+
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
+
 
   if (accessLoading || loading) {
     return (
@@ -433,11 +507,13 @@ function SportContent() {
         <div className="mx-auto max-w-6xl space-y-4">
           <div className="h-32 animate-pulse rounded-3xl bg-muted" />
 
+
           <div className="grid gap-4 md:grid-cols-3">
             <div className="h-40 animate-pulse rounded-3xl bg-muted" />
             <div className="h-40 animate-pulse rounded-3xl bg-muted" />
             <div className="h-40 animate-pulse rounded-3xl bg-muted" />
           </div>
+
 
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="h-64 animate-pulse rounded-3xl bg-muted" />
@@ -448,6 +524,12 @@ function SportContent() {
     );
   }
 
+
+  if (accessState === "suspended") {
+    return <SuspendedAccountScreen />;
+  }
+
+
   if (!hasAccess) {
     return (
       <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
@@ -457,6 +539,7 @@ function SportContent() {
             description="Retrouvez ici vos séances, votre planning et vos documents sportifs."
           />
 
+
           <Card className="rounded-3xl border shadow-sm">
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -464,8 +547,10 @@ function SportContent() {
                   <Lock className="h-5 w-5" />
                 </div>
 
+
                 <div>
                   <CardTitle>Module Sport verrouillé</CardTitle>
+
 
                   <CardDescription>
                     Cette page est visible, mais votre accès au module Sport
@@ -474,6 +559,7 @@ function SportContent() {
                 </div>
               </div>
             </CardHeader>
+
 
             <CardContent>
               <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
@@ -487,6 +573,7 @@ function SportContent() {
     );
   }
 
+
   return (
     <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
       <div className="mx-auto max-w-6xl space-y-6">
@@ -498,6 +585,7 @@ function SportContent() {
               : "Vos 3 programmes Basic, votre planning et vos documents sportifs."
           }
         />
+
 
         <div className="grid gap-4 md:grid-cols-3">
           <InfoCard
@@ -513,6 +601,7 @@ function SportContent() {
             }
           />
 
+
           <InfoCard
             icon={<Clock3 className="h-5 w-5" />}
             title="Ton planning"
@@ -522,6 +611,7 @@ function SportContent() {
             subtitle="Programme choisi par jour"
           />
 
+
           <InfoCard
             icon={<FileText className="h-5 w-5" />}
             title="Documents"
@@ -529,6 +619,7 @@ function SportContent() {
             subtitle="Documents liés au sport"
           />
         </div>
+
 
         {!isPremiumLike ? (
           <Card className="rounded-3xl border border-primary/20 bg-primary/5 shadow-sm">
@@ -538,10 +629,12 @@ function SportContent() {
                   <Sparkles className="h-5 w-5" />
                 </div>
 
+
                 <div>
                   <CardTitle className="text-base">
                     Passez à Premium
                   </CardTitle>
+
 
                   <CardDescription>
                     Débloquez 6 programmes supplémentaires : maison
@@ -553,11 +646,13 @@ function SportContent() {
           </Card>
         ) : null}
 
+
         <section className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold">
               Ton planning de la semaine
             </h2>
+
 
             <p className="mt-1 text-sm text-muted-foreground">
               Choisis le programme que tu souhaites réaliser chaque jour. Tu
@@ -565,11 +660,13 @@ function SportContent() {
             </p>
           </div>
 
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {DAYS.map((day) => {
               const daySchedule = schedule.find(
                 (item) => item.day === day
               );
+
 
               const selectedProgram = daySchedule?.programId
                 ? displayedPrograms.find(
@@ -577,10 +674,12 @@ function SportContent() {
                   ) ?? null
                 : null;
 
+
               return (
                 <Card key={day} className="rounded-3xl border shadow-sm">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">{day}</CardTitle>
+
 
                     <CardDescription>
                       {selectedProgram
@@ -588,6 +687,7 @@ function SportContent() {
                         : "Jour de repos ou programme non défini"}
                     </CardDescription>
                   </CardHeader>
+
 
                   <CardContent>
                     <Select
@@ -603,10 +703,12 @@ function SportContent() {
                         <SelectValue placeholder="Sélectionner un programme" />
                       </SelectTrigger>
 
+
                       <SelectContent>
                         <SelectItem value={NO_PROGRAM_VALUE}>
                           Aucun programme / repos
                         </SelectItem>
+
 
                         {displayedPrograms.map((program) => (
                           <SelectItem key={program.id} value={program.id}>
@@ -618,6 +720,7 @@ function SportContent() {
                         ))}
                       </SelectContent>
                     </Select>
+
 
                     {savingDay === day ? (
                       <p className="mt-2 text-xs text-muted-foreground">
@@ -631,6 +734,7 @@ function SportContent() {
           </div>
         </section>
 
+
         <section className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold">
@@ -639,11 +743,13 @@ function SportContent() {
                 : "Bibliothèque Basic"}
             </h2>
 
+
             <p className="mt-1 text-sm text-muted-foreground">
               Consulte le détail des programmes accessibles et ajoute-les à ton
               planning.
             </p>
           </div>
+
 
           {basicPrograms.length > 0 ? (
             <>
@@ -652,6 +758,7 @@ function SportContent() {
                   Programmes Basic
                 </h3>
               ) : null}
+
 
               <div className="grid gap-4 lg:grid-cols-2">
                 {basicPrograms.map((program) => (
@@ -665,11 +772,13 @@ function SportContent() {
             </>
           ) : null}
 
+
           {isPremiumLike && premiumPrograms.length > 0 ? (
             <>
               <h3 className="pt-2 text-base font-medium">
                 Programmes Premium
               </h3>
+
 
               <div className="grid gap-4 lg:grid-cols-2">
                 {premiumPrograms.map((program) => (
@@ -684,6 +793,7 @@ function SportContent() {
             </>
           ) : null}
 
+
           {displayedPrograms.length === 0 ? (
             <Card className="rounded-3xl border shadow-sm">
               <CardContent className="p-5 text-sm text-muted-foreground">
@@ -693,7 +803,9 @@ function SportContent() {
           ) : null}
         </section>
 
+
         <DocumentsCard docs={docs} onOpen={handleOpenPdf} />
+
 
         <Card className="rounded-3xl border shadow-sm">
           <CardHeader>
@@ -701,10 +813,12 @@ function SportContent() {
               Conseil de sécurité
             </CardTitle>
 
+
             <CardDescription>
               Pour une pratique progressive et adaptée.
             </CardDescription>
           </CardHeader>
+
 
           <CardContent>
             <p className="text-sm text-muted-foreground">
@@ -721,6 +835,7 @@ function SportContent() {
   );
 }
 
+
 function PageHeader({
   firstName,
   description,
@@ -736,8 +851,10 @@ function PageHeader({
             <Dumbbell className="h-6 w-6" />
           </div>
 
+
           <div>
             <CardTitle className="text-xl sm:text-2xl">Sport</CardTitle>
+
 
             <CardDescription className="mt-1 text-sm sm:text-base">
               Bonjour {firstName}, {description}
@@ -748,6 +865,7 @@ function PageHeader({
     </Card>
   );
 }
+
 
 function InfoCard({
   icon,
@@ -767,9 +885,12 @@ function InfoCard({
           {icon}
         </div>
 
+
         <div className="text-sm text-muted-foreground">{title}</div>
 
+
         <div className="mt-1 text-lg font-semibold">{value}</div>
+
 
         <div className="mt-1 text-xs text-muted-foreground">
           {subtitle}
@@ -778,6 +899,7 @@ function InfoCard({
     </Card>
   );
 }
+
 
 function ProgramCard({
   program,
@@ -795,11 +917,13 @@ function ProgramCard({
           <div>
             <CardTitle className="text-base">{program.name}</CardTitle>
 
+
             <CardDescription className="mt-1">
               {program.description ??
                 "Programme de renforcement progressif."}
             </CardDescription>
           </div>
+
 
           <span
             className={`rounded-full px-3 py-1 text-xs font-medium ${
@@ -812,24 +936,29 @@ function ProgramCard({
           </span>
         </div>
 
+
         <div className="flex flex-wrap gap-2 pt-2">
           <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
             {LOCATION_LABEL[program.location] ?? program.location}
           </span>
 
+
           <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
             {LEVEL_LABEL[program.level] ?? program.level}
           </span>
 
+
           <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
             {program.duration_min} min
           </span>
+
 
           <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
             {program.frequency_per_week}x / semaine
           </span>
         </div>
       </CardHeader>
+
 
       <CardContent>
         {exercises.length > 0 ? (
@@ -845,10 +974,12 @@ function ProgramCard({
                       {exercise.order_index}. {exercise.name}
                     </p>
 
+
                     <p className="mt-1 text-xs text-muted-foreground">
                       {EXERCISE_TYPE_LABEL[exercise.type] ?? exercise.type}
                     </p>
                   </div>
+
 
                   {exercise.reps ? (
                     <span className="shrink-0 rounded-full bg-background px-2 py-1 text-xs text-muted-foreground">
@@ -858,11 +989,13 @@ function ProgramCard({
                   ) : null}
                 </div>
 
+
                 {exercise.rest_sec ? (
                   <p className="mt-2 text-xs text-muted-foreground">
                     Repos : {exercise.rest_sec} sec
                   </p>
                 ) : null}
+
 
                 {exercise.notes ? (
                   <p className="mt-2 text-xs text-muted-foreground">
@@ -882,6 +1015,7 @@ function ProgramCard({
   );
 }
 
+
 function DocumentsCard({
   docs,
   onOpen,
@@ -896,16 +1030,19 @@ function DocumentsCard({
           <div>
             <CardTitle className="text-base">Documents</CardTitle>
 
+
             <CardDescription>
               Fiches et documents PDF liés à votre suivi sportif.
             </CardDescription>
           </div>
+
 
           <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
             PDF
           </span>
         </div>
       </CardHeader>
+
 
       <CardContent>
         {docs.length > 0 ? (
@@ -920,6 +1057,7 @@ function DocumentsCard({
                     {doc.title ?? doc.file_name ?? "Document sport"}
                   </div>
                 </div>
+
 
                 <Button
                   size="sm"

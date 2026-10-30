@@ -552,32 +552,7 @@ function PatientDetailContent() {
       onValidate={async (result) => {
         if (!user) return;
 
-        const mealsPayload = {
-          phase:          result.phase,
-          mb:             result.mb,
-          tdee:           result.tdee,
-          matin: {
-            pain_cereales_g: result.feculent_matin_pain_g,
-            proteines:       true,
-            lipides_crus_g:  10,
-          },
-          midi: {
-            feculent_nom:    result.feculent_label,
-            feculent_cru_g:  result.feculent_midi_cru_g,
-            feculent_cuit_g: result.feculent_midi_cru_g * 2,
-            legumes:         "à volonté",
-            proteines:       true,
-            lipides_crus_g:  10,
-          },
-          soir: {
-            feculent_nom:    result.feculent_label,
-            feculent_cru_g:  result.feculent_soir_cru_g,
-            feculent_cuit_g: result.feculent_soir_cru_g * 2,
-            legumes:         "à volonté",
-            proteines:       true,
-            lipides_crus_g:  10,
-          },
-        };
+        const mealsPayload = result.meals;
 
         const programName = `Programme Phase ${result.phase}`;
 
