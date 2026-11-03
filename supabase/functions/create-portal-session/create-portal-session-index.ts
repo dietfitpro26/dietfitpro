@@ -19,7 +19,7 @@ async function stripeCall(
   path: string,
   method: "GET" | "POST",
   params?: Record<string, FormValue>,
-): Promise<any> {
+): Promise<{ url: string }> {
   const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
   if (!stripeKey) throw new Error("STRIPE_SECRET_KEY manquante.");
 

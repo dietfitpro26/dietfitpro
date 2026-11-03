@@ -32,7 +32,9 @@ export function SubscriptionOfferCard() {
   const neverSubscribed = !billing?.stripe_subscription_id;
   const isManaged = state === "managed";
   const planName = currentPlan === "premium" ? "Premium" : "Basic";
-
+  const cancellationDate = billing?.cancel_at ?? (
+  billing?.cancel_at_period_end ? billing.current_period_end : null
+);
 
   const run = async (key: string, action: () => Promise<void>) => {
     setBusy(key);
@@ -50,11 +52,11 @@ export function SubscriptionOfferCard() {
     summary = `Votre formule ${planName} est gérée par votre professionnel.`;
   } else if (state === "trial") {
     summary = `Essai gratuit en cours jusqu'au ${longDate(billing?.trial_end ?? null)}. Le premier prélèvement aura lieu ensuite.`;
-  } else if (state === "active") {
-    summary = billing?.cancel_at_period_end
-      ? `Abonnement ${planName} actif. Résiliation prévue le ${longDate(billing?.current_period_end ?? null)}.`
-      : `Abonnement ${planName} actif. Prochain renouvellement le ${longDate(billing?.current_period_end ?? null)}.`;
-  } else if (state === "past_due") {
+ } else if (state === "active") {
+  summary = cancellationDate
+    ? `Abonnement ${planName} actif. Résiliation prévue le ${longDate(cancellationDate)}.`
+    : `Abonnement ${planName} actif. Prochain renouvellement le ${longDate(billing?.current_period_end ?? null)}.`;
+} else if (state === "past_due") {
     summary = "Votre dernier paiement n'a pas abouti. Mettez à jour votre moyen de paiement.";
   } else if (state === "suspended") {
     summary = "Votre abonnement est suspendu. Vos données sont conservées jusqu'à sa réactivation.";

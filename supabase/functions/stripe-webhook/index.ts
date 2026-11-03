@@ -1,6 +1,5 @@
-// @ts-nocheck 
-// import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
+// deno-lint-ignore-file no-explicit-any -- Stripe payloads are dynamically shaped and validated by Stripe's signature.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // IMPORTANT : cette fonction doit être déployée avec "Verify JWT" désactivé,
 // car c'est Stripe (et non un utilisateur connecté) qui l'appelle.
 // La sécurité repose sur la vérification de la signature Stripe ci-dessous.
@@ -51,7 +50,7 @@ async function verifySignature(payload: string, header: string | null, secret: s
   return signatures.some((signature) => safeEqual(signature, expected));
 }
 
-async function stripeGet(path: string): Promise<any | null> {
+async function stripeGet(path: string): Promise<Record<string, unknown> | null> {
   const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
   if (!stripeKey) return null;
 
@@ -104,7 +103,6 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
   }
 }
 
-// deno-lint-ignore no-explicit-any
 type Admin = any;
 
 async function onCheckoutCompleted(admin: Admin, session: any) {
@@ -177,6 +175,7 @@ async function onSubscription(admin: Admin, eventSubscription: any, deleted: boo
     p_trial_end: toIso(subscription.trial_end),
     p_current_period_end: toIso(subscription.current_period_end ?? item?.current_period_end),
     p_cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
+    p_cancel_at: toIso(subscription.cancel_at),
   });
 
   if (error) throw new Error(`apply_stripe_subscription : ${error.message}`);
