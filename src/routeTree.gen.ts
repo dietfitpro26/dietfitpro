@@ -23,6 +23,7 @@ import { Route as GroupsIndexRouteImport } from './routes/groups.index'
 import { Route as SubscriberSportRouteImport } from './routes/subscriber.sport'
 import { Route as SubscriberProfileRouteImport } from './routes/subscriber.profile'
 import { Route as SubscriberNutritionRouteImport } from './routes/subscriber.nutrition'
+import { Route as SubscriberAccountRouteImport } from './routes/subscriber.account'
 import { Route as ProSubscribersRouteImport } from './routes/pro.subscribers'
 import { Route as ProSportRouteImport } from './routes/pro.sport'
 import { Route as ProSettingsRouteImport } from './routes/pro.settings'
@@ -123,6 +124,11 @@ const SubscriberProfileRoute = SubscriberProfileRouteImport.update({
 const SubscriberNutritionRoute = SubscriberNutritionRouteImport.update({
   id: '/subscriber/nutrition',
   path: '/subscriber/nutrition',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubscriberAccountRoute = SubscriberAccountRouteImport.update({
+  id: '/subscriber/account',
+  path: '/subscriber/account',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProSubscribersRoute = ProSubscribersRouteImport.update({
@@ -318,6 +324,7 @@ export interface FileRoutesByFullPath {
   '/pro/settings': typeof ProSettingsRoute
   '/pro/sport': typeof ProSportRouteWithChildren
   '/pro/subscribers': typeof ProSubscribersRoute
+  '/subscriber/account': typeof SubscriberAccountRoute
   '/subscriber/nutrition': typeof SubscriberNutritionRoute
   '/subscriber/profile': typeof SubscriberProfileRoute
   '/subscriber/sport': typeof SubscriberSportRoute
@@ -365,6 +372,7 @@ export interface FileRoutesByTo {
   '/pro/settings': typeof ProSettingsRoute
   '/pro/sport': typeof ProSportRouteWithChildren
   '/pro/subscribers': typeof ProSubscribersRoute
+  '/subscriber/account': typeof SubscriberAccountRoute
   '/subscriber/nutrition': typeof SubscriberNutritionRoute
   '/subscriber/profile': typeof SubscriberProfileRoute
   '/subscriber/sport': typeof SubscriberSportRoute
@@ -413,6 +421,7 @@ export interface FileRoutesById {
   '/pro/settings': typeof ProSettingsRoute
   '/pro/sport': typeof ProSportRouteWithChildren
   '/pro/subscribers': typeof ProSubscribersRoute
+  '/subscriber/account': typeof SubscriberAccountRoute
   '/subscriber/nutrition': typeof SubscriberNutritionRoute
   '/subscriber/profile': typeof SubscriberProfileRoute
   '/subscriber/sport': typeof SubscriberSportRoute
@@ -462,6 +471,7 @@ export interface FileRouteTypes {
     | '/pro/settings'
     | '/pro/sport'
     | '/pro/subscribers'
+    | '/subscriber/account'
     | '/subscriber/nutrition'
     | '/subscriber/profile'
     | '/subscriber/sport'
@@ -509,6 +519,7 @@ export interface FileRouteTypes {
     | '/pro/settings'
     | '/pro/sport'
     | '/pro/subscribers'
+    | '/subscriber/account'
     | '/subscriber/nutrition'
     | '/subscriber/profile'
     | '/subscriber/sport'
@@ -556,6 +567,7 @@ export interface FileRouteTypes {
     | '/pro/settings'
     | '/pro/sport'
     | '/pro/subscribers'
+    | '/subscriber/account'
     | '/subscriber/nutrition'
     | '/subscriber/profile'
     | '/subscriber/sport'
@@ -604,6 +616,7 @@ export interface RootRouteChildren {
   ProSettingsRoute: typeof ProSettingsRoute
   ProSportRoute: typeof ProSportRouteWithChildren
   ProSubscribersRoute: typeof ProSubscribersRoute
+  SubscriberAccountRoute: typeof SubscriberAccountRoute
   SubscriberNutritionRoute: typeof SubscriberNutritionRoute
   SubscriberProfileRoute: typeof SubscriberProfileRoute
   SubscriberSportRoute: typeof SubscriberSportRoute
@@ -708,6 +721,13 @@ declare module '@tanstack/react-router' {
       path: '/subscriber/nutrition'
       fullPath: '/subscriber/nutrition'
       preLoaderRoute: typeof SubscriberNutritionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subscriber/account': {
+      id: '/subscriber/account'
+      path: '/subscriber/account'
+      fullPath: '/subscriber/account'
+      preLoaderRoute: typeof SubscriberAccountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pro/subscribers': {
@@ -1026,6 +1046,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProSettingsRoute: ProSettingsRoute,
   ProSportRoute: ProSportRouteWithChildren,
   ProSubscribersRoute: ProSubscribersRoute,
+  SubscriberAccountRoute: SubscriberAccountRoute,
   SubscriberNutritionRoute: SubscriberNutritionRoute,
   SubscriberProfileRoute: SubscriberProfileRoute,
   SubscriberSportRoute: SubscriberSportRoute,
