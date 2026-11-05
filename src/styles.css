@@ -1,18 +1,19 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import "@fontsource-variable/plus-jakarta-sans";
 
 @custom-variant dark (&:is(.dark *));
 
 /*
- * DietFitPro Design System
- * Couleurs : #1A1A1A (sidebar) / #6DB33F (vert pomme accent) / #2D7A1F (hover)
- * Typo : Inter
- * Border radius : 8px boutons, 12px cards
+ * DietFitPro Design System v2
+ * Noir #141414 / Vert pomme #6DB33F (accent) / Vert profond #357F1E (boutons)
+ * Typo : Plus Jakarta Sans
+ * Radius : 12px boutons et champs, cartes plus arrondies
  */
 
 @theme inline {
-  --font-sans: "Inter", system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans Variable", "Inter", system-ui, sans-serif;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -43,6 +44,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-brand: var(--brand);
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -66,29 +68,33 @@
 }
 
 :root {
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.21 0 0);
+  /* Fond blanc cassé chaud, cartes blanches */
+  --background: oklch(0.984 0.004 106);
+  --foreground: oklch(0.191 0 90);
 
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0 0);
+  --card-foreground: oklch(0.191 0 90);
 
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0 0);
+  --popover-foreground: oklch(0.191 0 90);
 
-  /* #6DB33F - vert pomme DietFitPro */
-  --primary: oklch(0.69 0.18 132);
+  /* Vert profond #357F1E : boutons et liens, bon contraste avec le blanc */
+  --primary: oklch(0.53 0.149 139);
   --primary-foreground: oklch(1 0 0);
 
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.21 0 0);
+  /* Vert pomme du logo #6DB33F : accents et détails */
+  --brand: oklch(0.696 0.165 135);
 
-  --muted: oklch(0.96 0 0);
-  --muted-foreground: oklch(0.5 0 0);
+  --secondary: oklch(0.96 0.007 107);
+  --secondary-foreground: oklch(0.191 0 90);
 
-  --accent: oklch(0.95 0.04 132);
-  --accent-foreground: oklch(0.48 0.15 138);
+  --muted: oklch(0.96 0.007 107);
+  --muted-foreground: oklch(0.473 0.008 107);
+
+  --accent: oklch(0.955 0.025 132);
+  --accent-foreground: oklch(0.417 0.094 149);
 
   --destructive: oklch(0.58 0.22 27);
   --destructive-foreground: oklch(1 0 0);
@@ -99,19 +105,19 @@
   --warning: oklch(0.77 0.17 65);
   --warning-foreground: oklch(0.21 0 0);
 
-  --border: oklch(0.92 0 0);
-  --input: oklch(0.92 0 0);
-  --ring: oklch(0.69 0.18 132);
+  --border: oklch(0.923 0.008 107);
+  --input: oklch(0.923 0.008 107);
+  --ring: oklch(0.53 0.149 139);
 
-  /* Sidebar pro : fond noir #1A1A1A */
-  --sidebar: oklch(0.21 0 0);
+  /* Sidebar pro : noir du logo */
+  --sidebar: oklch(0.191 0 90);
   --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.69 0.18 132);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.28 0 0);
+  --sidebar-primary: oklch(0.696 0.165 135);
+  --sidebar-primary-foreground: oklch(0.191 0 90);
+  --sidebar-accent: oklch(0.26 0 90);
   --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.3 0 0);
-  --sidebar-ring: oklch(0.69 0.18 132);
+  --sidebar-border: oklch(0.3 0 90);
+  --sidebar-ring: oklch(0.696 0.165 135);
 
   /* Repas */
   --meal-breakfast: oklch(0.96 0.07 100);
@@ -127,18 +133,19 @@
 }
 
 .dark {
-  --background: oklch(0.18 0 0);
+  --background: oklch(0.187 0.009 129);
   --foreground: oklch(0.97 0 0);
-  --card: oklch(0.22 0 0);
+  --card: oklch(0.23 0.01 133);
   --card-foreground: oklch(0.97 0 0);
-  --popover: oklch(0.22 0 0);
+  --popover: oklch(0.23 0.01 133);
   --popover-foreground: oklch(0.97 0 0);
-  --primary: oklch(0.69 0.18 132);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.27 0 0);
+  --primary: oklch(0.696 0.165 135);
+  --primary-foreground: oklch(0.191 0 90);
+  --brand: oklch(0.696 0.165 135);
+  --secondary: oklch(0.27 0.01 133);
   --secondary-foreground: oklch(0.97 0 0);
-  --muted: oklch(0.27 0 0);
-  --muted-foreground: oklch(0.7 0 0);
+  --muted: oklch(0.27 0.01 133);
+  --muted-foreground: oklch(0.72 0 0);
   --accent: oklch(0.3 0.05 132);
   --accent-foreground: oklch(0.97 0 0);
   --destructive: oklch(0.7 0.19 22);
@@ -149,16 +156,16 @@
   --warning-foreground: oklch(0.21 0 0);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.69 0.18 132);
+  --ring: oklch(0.696 0.165 135);
 
   --sidebar: oklch(0.16 0 0);
   --sidebar-foreground: oklch(0.97 0 0);
-  --sidebar-primary: oklch(0.69 0.18 132);
-  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-primary: oklch(0.696 0.165 135);
+  --sidebar-primary-foreground: oklch(0.191 0 90);
   --sidebar-accent: oklch(0.25 0 0);
   --sidebar-accent-foreground: oklch(0.97 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.69 0.18 132);
+  --sidebar-ring: oklch(0.696 0.165 135);
 }
 
 @layer base {
@@ -168,11 +175,28 @@
 
   html {
     font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
   }
 
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  /* Titres larges et marqués, dans l'esprit du logo */
+  h1,
+  h2,
+  h3 {
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  /* Focus bien visible au clavier */
+  :focus-visible {
+    outline: 3px solid color-mix(in oklab, var(--color-ring) 45%, transparent);
+    outline-offset: 2px;
   }
 }
