@@ -21,11 +21,13 @@ import { useConversations } from "@/hooks/useMessages";
 import { cn } from "@/lib/utils";
 
 
+
 type Tab = {
   to: string;
   label: string;
   icon: React.ElementType;
 };
+
 
 
 const TABS: Tab[] = [
@@ -36,6 +38,7 @@ const TABS: Tab[] = [
   { to: "/patient/messages", label: "Messages", icon: MessageSquare },
   { to: "/patient/feed", label: "Feed", icon: Rss },
 ];
+
 
 
 export function PatientLayout({
@@ -52,10 +55,12 @@ export function PatientLayout({
   const { totalUnread: unread } = useConversations();
 
 
+
   const handleSignOut = async () => {
     await signOut();
     void navigate({ to: "/login" });
   };
+
 
 
   return (
@@ -63,60 +68,79 @@ export function PatientLayout({
       <UpcomingConsultationReminder />
 
 
-      <header className="sticky top-0 z-30 border-b bg-background">
-        <div className="flex h-14 items-center justify-between px-4">
+
+      <header className="sticky top-0 z-30 border-b bg-background/95 shadow-sm backdrop-blur">
+        <div className="flex h-16 items-center justify-between px-4 sm:px-6">
           <Logo />
 
 
-          <div className="flex items-center gap-2 sm:gap-3 text-sm">
-            {firstName && (
-              <span className="hidden font-medium sm:inline">{firstName}</span>
-            )}
 
-
-            <span className="flex items-center gap-1 text-[#6DB33F] font-semibold">
+          <div className="flex items-center gap-2 text-sm sm:gap-3">
+            <span
+              className="flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 font-bold text-orange-600"
+              title={`${streak} jours consécutifs`}
+            >
               <Flame className="h-4 w-4" /> {streak}
             </span>
+
+
+
+            {firstName && (
+              <span className="hidden rounded-full bg-accent px-3 py-1.5 font-semibold text-accent-foreground sm:inline-flex">
+                {firstName}
+              </span>
+            )}
+
 
 
             <MessagesBell to="/patient/messages" />
 
 
+
             <NotificationBell to="/patient/notifications" />
+
 
 
             <Link
               to="/patient/profil"
-              className="flex h-9 w-9 items-center justify-center rounded-xl border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="flex h-10 w-10 items-center justify-center rounded-full border bg-background text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-primary"
               title="Profil"
               aria-label="Profil"
             >
-              <User className="h-4 w-4" />
+              <User className="h-5 w-5" />
             </Link>
 
 
+
             <button
+              type="button"
               onClick={handleSignOut}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="flex h-10 w-10 items-center justify-center rounded-full border bg-background text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-primary"
               title="Se déconnecter"
               aria-label="Se déconnecter"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-5 w-5" />
             </button>
           </div>
         </div>
       </header>
 
 
-      <main className="flex-1 pb-20">{children}</main>
+
+      <main className="flex-1 pb-28">{children}</main>
 
 
-      <nav className="fixed bottom-0 inset-x-0 z-40 border-t bg-background">
-        <div className="grid h-16 grid-cols-6">
+
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur">
+        <div
+          className="mx-auto grid h-[4.75rem] w-full max-w-6xl grid-cols-6"
+          aria-label="Navigation principale"
+        >
           {TABS.map((tab) => {
             const active = pathname === tab.to || pathname.startsWith(tab.to + "/");
             const Icon = tab.icon;
             const isMessages = tab.to === "/patient/messages";
+
 
 
             return (
@@ -124,26 +148,36 @@ export function PatientLayout({
                 key={tab.to}
                 to={tab.to}
                 className={cn(
-                  "relative flex flex-col items-center justify-center gap-1 px-1 text-[10px] sm:text-[11px]",
-                  active ? "text-[#6DB33F]" : "text-muted-foreground",
+                  "flex flex-col items-center justify-center gap-1 px-0.5 text-[11px] transition-colors sm:text-sm",
+                  active
+                    ? "font-bold text-primary"
+                    : "font-medium text-muted-foreground hover:text-foreground",
                 )}
+                aria-current={active ? "page" : undefined}
               >
-                <div className="relative">
+                <span
+                  className={cn(
+                    "relative flex h-8 w-11 items-center justify-center rounded-full transition-colors sm:w-14",
+                    active ? "bg-primary text-primary-foreground" : "bg-transparent",
+                  )}
+                >
                   <Icon className="h-5 w-5" />
                   {isMessages && unread > 0 && (
-                    <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-[#6DB33F] text-white text-[10px] font-semibold flex items-center justify-center">
+                    <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white ring-2 ring-background">
                       {unread > 99 ? "99+" : unread}
                     </span>
                   )}
-                </div>
+                </span>
 
 
-                <span className="truncate">{tab.label}</span>
+
+                <span className="max-w-full truncate">{tab.label}</span>
               </Link>
             );
           })}
         </div>
       </nav>
+
 
 
       <WeeklyCheckinDialog />

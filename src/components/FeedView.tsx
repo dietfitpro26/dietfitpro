@@ -5,6 +5,7 @@ import { FeedAttachment } from "@/components/FeedAttachment";
 import { getFeedStoragePath } from "@/lib/feedStorage";
 import { Heart, Bookmark, MessageCircle, Send, Share2, Flag, Trash2, Lock, Check, Users, Paperclip, X, Loader2, FileText, Lightbulb, ChefHat, Trophy, Video } from "lucide-react";
 
+
 type FeedType = "article" | "tip" | "recipe" | "challenge" | "video";
 type FeedFilter = "all" | "community" | FeedType;
 type FeedPost = {
@@ -16,20 +17,22 @@ type FeedPost = {
 type FeedComment = { id: string; content_id: string; user_id: string; body: string; created_at: string };
 type Interaction = { liked: boolean; saved: boolean };
 const TYPES: Record<FeedType, { label: string; icon: ReactNode }> = {
-  article: { label: "Article", icon: <FileText className="h-3 w-3" /> },
-  tip: { label: "Conseil", icon: <Lightbulb className="h-3 w-3" /> },
-  recipe: { label: "Recette", icon: <ChefHat className="h-3 w-3" /> },
-  challenge: { label: "Défi", icon: <Trophy className="h-3 w-3" /> },
-  video: { label: "Vidéo", icon: <Video className="h-3 w-3" /> },
+  article: { label: "Article", icon: <FileText className="h-3.5 w-3.5" /> },
+  tip: { label: "Conseil", icon: <Lightbulb className="h-3.5 w-3.5" /> },
+  recipe: { label: "Recette", icon: <ChefHat className="h-3.5 w-3.5" /> },
+  challenge: { label: "Défi", icon: <Trophy className="h-3.5 w-3.5" /> },
+  video: { label: "Vidéo", icon: <Video className="h-3.5 w-3.5" /> },
 };
 const BADGES: Record<string, string> = { coach: "Coach", premium: "Premium", basic: "Basic", patient: "Patient" };
-const INPUT = "w-full min-w-0 rounded-lg border bg-background px-3 py-2 text-sm";
-const ACTION = "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs disabled:opacity-50 hover:bg-muted";
-const PRIMARY = "inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50";
+const INPUT = "w-full min-w-0 rounded-xl border-2 border-border bg-background px-4 py-3 text-base outline-none transition-colors focus:border-primary";
+const ACTION = "inline-flex items-center gap-1.5 rounded-full border bg-background px-3.5 py-2 text-xs font-semibold transition-colors hover:bg-accent disabled:opacity-50";
+const PRIMARY = "inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground shadow-md shadow-primary/20 transition-colors hover:bg-primary/90 disabled:opacity-50";
+const CHIP = "inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-bold text-accent-foreground";
+
 
 export function TierBadge({ badge }: { badge?: string }) {
   if (!badge || !BADGES[badge]) return null;
-  return <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">{BADGES[badge]}</span>;
+  return <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">{BADGES[badge]}</span>;
 }
 function dateLabel(value: string) {
   return new Date(value).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -50,8 +53,8 @@ export function PseudoForm({ userId, intro, onDone }: { userId: string; intro: s
     } catch { setError("Enregistrement impossible. Réessayez."); }
     finally { setBusy(false); }
   };
-  return <div className="space-y-2 rounded-lg border p-3">
-    <p className="text-xs text-muted-foreground">{intro}</p>
+  return <div className="space-y-3 rounded-2xl border-2 border-primary/25 bg-accent p-4">
+    <p className="text-sm">{intro}</p>
     <div className="flex gap-2"><input aria-label="Pseudo" className={INPUT} value={text} maxLength={20} onChange={e => setText(e.target.value)} placeholder="Mon pseudo" />
       <button type="button" className={PRIMARY} disabled={busy || !text.trim()} onClick={() => void submit()}>Valider</button></div>
     {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
@@ -100,10 +103,10 @@ function Composer({ userId, pseudo, allowed, groupId, onChanged }: { userId: str
       setError(inserted ? "Publication enregistrée, mais actualisation impossible. Rechargez la page." : "Publication impossible. Vérifiez le fichier et vos droits, puis réessayez.");
     } finally { setBusy(false); }
   };
-  if (!allowed) return <div className="flex gap-2 rounded-xl border border-dashed p-4 text-xs text-muted-foreground"><Lock className="h-4 w-4 shrink-0" />Publication indisponible avec vos droits actuels. La participation est réservée aux membres Premium autorisés.</div>;
+  if (!allowed) return <div className="flex gap-3 rounded-2xl border-2 border-dashed p-4 text-sm text-muted-foreground"><Lock className="h-5 w-5 shrink-0" />Publication indisponible avec vos droits actuels. La participation est réservée aux membres Premium autorisés.</div>;
   if (!pseudo) return <PseudoForm userId={userId} intro="Choisissez un pseudo pour publier et commenter. N'utilisez pas votre nom réel." onDone={onChanged} />;
-  return <div className="space-y-3 rounded-xl border bg-card p-4">
-    <p className="text-xs text-muted-foreground">Vous publiez en tant que <strong>{pseudo}</strong>{groupId ? " dans ce groupe" : ""}</p>
+  return <div className="space-y-3 rounded-3xl border bg-card p-5 shadow-sm">
+    <p className="text-sm text-muted-foreground">Vous publiez en tant que <strong className="text-foreground">{pseudo}</strong>{groupId ? " dans ce groupe" : ""}</p>
     <textarea aria-label="Votre publication" className={INPUT} rows={3} maxLength={1000} value={text} disabled={busy} onChange={e => setText(e.target.value)} placeholder="Partagez un encouragement, une victoire, une astuce…" />
     <input ref={input} type="file" className="hidden" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.pdf" onChange={e => {
       const selected = e.target.files?.[0]; if (!selected) return;
@@ -113,8 +116,8 @@ function Composer({ userId, pseudo, allowed, groupId, onChanged }: { userId: str
       }
       setError(null); setFile(selected);
     }} />
-    {file && <div className="space-y-2 rounded-lg bg-muted/40 p-2">
-      {preview && <img src={preview} alt="Aperçu du fichier sélectionné" className="max-h-64 w-full rounded-lg object-contain" />}
+    {file && <div className="space-y-2 rounded-2xl bg-muted/40 p-3">
+      {preview && <img src={preview} alt="Aperçu du fichier sélectionné" className="max-h-64 w-full rounded-xl object-contain" />}
       <div className="flex items-center justify-between gap-2"><span className="truncate text-xs">{file.name}</span><button type="button" className={ACTION} disabled={busy} onClick={clearFile}><X className="h-4 w-4" />Retirer</button></div>
     </div>}
     <p className="text-xs text-muted-foreground">Ne partagez pas d'informations médicales personnelles, d'analyses ni d'ordonnances. Le stockage est en cours de sécurisation : les fichiers restent actuellement accessibles par leur lien public.</p>
@@ -192,29 +195,29 @@ function PostCard({ post, userId, initial, likeCount, comments, pseudos, badges,
     }
     await window.navigator.clipboard.writeText(url); setCopied(true);
   };
-  return <article id={`post-${post.id}`} className="scroll-mt-20 overflow-hidden rounded-xl border bg-card">
+  return <article id={`post-${post.id}`} className="scroll-mt-20 overflow-hidden rounded-3xl border bg-card shadow-sm">
     <FeedAttachment reference={post.image_url} alt={memberPost ? "Photo partagée" : post.title} imageClassName="w-full max-h-96 object-contain" />
-    <div className="space-y-3 p-4">
+    <div className="space-y-3 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex flex-wrap items-center gap-2 text-xs font-medium">
-          {memberPost ? <><Users className="h-3 w-3" />{post.group_id ? "" : "Communauté · "}{post.author_id ? pseudos[post.author_id] ?? "Membre" : "Membre"}<TierBadge badge={post.author_id ? badges[post.author_id] : undefined} /></> : <>{TYPES[post.type]?.icon}{TYPES[post.type]?.label ?? "Publication"}</>}
+        <span className="inline-flex flex-wrap items-center gap-2 text-sm font-semibold">
+          {memberPost ? <><Users className="h-4 w-4 text-primary" />{post.group_id ? "" : "Communauté · "}{post.author_id ? pseudos[post.author_id] ?? "Membre" : "Membre"}<TierBadge badge={post.author_id ? badges[post.author_id] : undefined} /></> : <span className={CHIP}>{TYPES[post.type]?.icon}{TYPES[post.type]?.label ?? "Publication"}</span>}
         </span><span className="text-xs text-muted-foreground">{dateLabel(post.published_at ?? post.created_at)}</span>
       </div>
-      {!memberPost && <h3 className="font-semibold">{post.title}</h3>}
-      {post.body && <p className="whitespace-pre-line break-words text-sm">{post.body}</p>}
+      {!memberPost && <h3 className="text-lg font-extrabold">{post.title}</h3>}
+      {post.body && <p className="whitespace-pre-line break-words text-base">{post.body}</p>}
       <FeedAttachment reference={post.video_url} kind="video" />
-      {!!post.tags?.length && <div className="flex flex-wrap gap-1">{post.tags.map(tag => <span key={tag} className="rounded-full bg-muted px-2 py-1 text-xs">#{tag}</span>)}</div>}
+      {!!post.tags?.length && <div className="flex flex-wrap gap-1.5">{post.tags.map(tag => <span key={tag} className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">#{tag}</span>)}</div>}
       <div className="flex flex-wrap gap-2 border-t pt-3">
-        <button type="button" className={`${ACTION} ${liked ? "text-red-500" : ""}`} aria-pressed={liked} disabled={busy} onClick={() => void act(() => interaction("liked"))}><Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} />{count || "J'aime"}</button>
+        <button type="button" className={`${ACTION} ${liked ? "border-red-200 bg-red-50 text-red-500" : ""}`} aria-pressed={liked} disabled={busy} onClick={() => void act(() => interaction("liked"))}><Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} />{count || "J'aime"}</button>
         <button type="button" className={ACTION} onClick={() => setExpanded(v => !v)} aria-expanded={expanded}><MessageCircle className="h-4 w-4" />Commentaires ({comments.length})</button>
         <button type="button" className={ACTION} disabled={busy} onClick={() => void act(share)}>{copied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}{copied ? "Lien copié" : "Partager"}</button>
         {memberPost && <button type="button" className={ACTION} disabled={busy} onClick={() => void act(mine ? removePost : () => report("post", post.id))}>{mine ? <Trash2 className="h-4 w-4" /> : <Flag className="h-4 w-4" />}{mine ? "Supprimer" : "Signaler"}</button>}
-        <button type="button" className={ACTION} disabled={busy} aria-pressed={saved} onClick={() => void act(() => interaction("saved"))}><Bookmark className={`h-4 w-4 ${saved ? "fill-current" : ""}`} />{saved ? "Enregistré" : "Enregistrer"}</button>
+        <button type="button" className={`${ACTION} ${saved ? "border-primary/40 bg-accent text-primary" : ""}`} disabled={busy} aria-pressed={saved} onClick={() => void act(() => interaction("saved"))}><Bookmark className={`h-4 w-4 ${saved ? "fill-current" : ""}`} />{saved ? "Enregistré" : "Enregistrer"}</button>
       </div>
       {expanded && <div className="space-y-3">
         {!comments.length && <p className="text-xs text-muted-foreground">Aucun commentaire pour le moment.</p>}
-        {comments.map(c => <div key={c.id} className="space-y-2 rounded-lg bg-muted/40 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2"><span className="inline-flex flex-wrap items-center gap-2 text-xs">{pseudos[c.user_id] ?? "Membre"}<TierBadge badge={badges[c.user_id]} />{dateLabel(c.created_at)}</span>
+        {comments.map(c => <div key={c.id} className="space-y-2 rounded-2xl bg-muted/40 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2"><span className="inline-flex flex-wrap items-center gap-2 text-xs font-semibold">{pseudos[c.user_id] ?? "Membre"}<TierBadge badge={badges[c.user_id]} /><span className="font-normal text-muted-foreground">{dateLabel(c.created_at)}</span></span>
             <button type="button" className={ACTION} disabled={busy} onClick={() => void act(c.user_id === userId ? () => removeComment(c.id) : () => report("comment", c.id))}>{c.user_id === userId ? "Supprimer" : "Signaler"}</button></div>
           <p className="whitespace-pre-line break-words text-sm">{c.body}</p>
         </div>)}
@@ -290,13 +293,23 @@ export function FeedView({ userId, groupId }: { userId: string; groupId?: string
   }, [loading, posts]);
   const visible = groupId || filter === "all" ? posts : filter === "community" ? posts.filter(p => p.source === "member") : posts.filter(p => p.source === "coach" && p.type === filter);
   return <div className="mx-auto max-w-2xl space-y-5 p-4">
-    {!groupId && <div className="flex flex-wrap items-center justify-between gap-2"><h1 className="text-xl font-bold">Feed</h1>{allowed && <Link to="/groups" className={ACTION}><Users className="h-4 w-4" />Mes groupes</Link>}<span className="text-xs text-muted-foreground">{posts.length} publication{posts.length > 1 ? "s" : ""}</span></div>}
-    {error && <div role="alert" className="space-y-2 rounded-lg border p-3"><p className="text-sm text-red-600">{error}</p><button type="button" className={ACTION} onClick={() => void load()}>Recharger</button></div>}
+    {!groupId && <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-[#1F5A2E] p-6 text-white shadow-lg">
+      <div className="pointer-events-none absolute -right-14 -top-14 h-52 w-52 rounded-full bg-white/10" />
+      <div className="relative flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-wider text-white/80">Communauté</p>
+          <h1 className="text-3xl font-extrabold sm:text-4xl">Feed</h1>
+          <p className="mt-1 text-white/90">{posts.length} publication{posts.length > 1 ? "s" : ""}</p>
+        </div>
+        {allowed && <Link to="/groups" className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-primary shadow-md hover:bg-white/90"><Users className="h-4 w-4" />Mes groupes</Link>}
+      </div>
+    </section>}
+    {error && <div role="alert" className="space-y-2 rounded-2xl border border-destructive/40 p-4"><p className="text-sm text-red-600">{error}</p><button type="button" className={ACTION} onClick={() => void load()}>Recharger</button></div>}
     {!loading && !error && <Composer key={`${userId}-${groupId ?? "general"}`} userId={userId} pseudo={pseudos[userId] ?? null} allowed={allowed} groupId={groupId} onChanged={load} />}
     {!groupId && <div className="flex flex-wrap gap-2">{(["all", "community", ...Object.keys(TYPES)] as FeedFilter[]).map(value => {
       if (value !== "all" && value !== "community" && !posts.some(p => p.source === "coach" && p.type === value)) return null;
-      return <button type="button" key={value} className={`${ACTION} ${filter === value ? "border-primary text-primary" : ""}`} onClick={() => setFilter(value)}>{value === "all" ? "Tout" : value === "community" ? `Communauté (${posts.filter(p => p.source === "member").length})` : TYPES[value].label}</button>;
+      return <button type="button" key={value} className={`${ACTION} ${filter === value ? "border-primary bg-accent text-primary" : ""}`} onClick={() => setFilter(value)}>{value === "all" ? "Tout" : value === "community" ? `Communauté (${posts.filter(p => p.source === "member").length})` : TYPES[value].label}</button>;
     })}</div>}
-    {loading ? <div role="status" className="flex items-center justify-center gap-2 p-8"><Loader2 className="h-5 w-5 animate-spin" />Chargement du fil…</div> : !visible.length && !error ? <div className="rounded-xl border p-8 text-center text-sm text-muted-foreground">Aucune publication pour l'instant.</div> : visible.map(post => <PostCard key={`${userId}-${post.id}`} post={post} userId={userId} initial={interactions[post.id] ?? { liked: false, saved: false }} likeCount={counts[post.id] ?? 0} comments={comments.filter(c => c.content_id === post.id)} pseudos={pseudos} badges={badges} allowed={allowed} onChanged={load} />)}
+    {loading ? <div role="status" className="flex items-center justify-center gap-2 p-8 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />Chargement du fil…</div> : !visible.length && !error ? <div className="rounded-3xl border-2 border-dashed p-10 text-center text-sm text-muted-foreground">Aucune publication pour l'instant.</div> : visible.map(post => <PostCard key={`${userId}-${post.id}`} post={post} userId={userId} initial={interactions[post.id] ?? { liked: false, saved: false }} likeCount={counts[post.id] ?? 0} comments={comments.filter(c => c.content_id === post.id)} pseudos={pseudos} badges={badges} allowed={allowed} onChanged={load} />)}
   </div>;
 }

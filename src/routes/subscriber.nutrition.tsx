@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Beef,
-  CheckCircle,
   Droplets,
   Flame,
   Lock,
   Sparkles,
+  Star,
   Utensils,
   Wheat,
 } from "lucide-react";
@@ -53,10 +53,12 @@ import {
 
 
 
+
 export const Route = createFileRoute("/subscriber/nutrition")({
   head: () => ({ meta: [{ title: "Nutrition — DietFitPro" }] }),
   component: SubscriberNutritionPage,
 });
+
 
 
 
@@ -71,6 +73,7 @@ function SubscriberNutritionPage() {
     </ProtectedRoute>
   );
 }
+
 
 
 
@@ -93,8 +96,10 @@ interface ProfileRow {
 
 
 
+
 const GOALS: NutritionGoal[] = ["perte_de_poids", "prise_de_masse", "maintien", "equilibre"];
 const ACTIVITIES: ActivityLevel[] = ["sedentaire", "actif", "tres_actif"];
+
 
 
 
@@ -108,6 +113,7 @@ function asGoal(value: unknown): NutritionGoal | null {
 
 
 
+
 function asActivity(value: unknown): ActivityLevel | null {
   return ACTIVITIES.includes(value as ActivityLevel) ? (value as ActivityLevel) : null;
 }
@@ -116,9 +122,11 @@ function asActivity(value: unknown): ActivityLevel | null {
 
 
 
+
 function asGender(value: unknown): Gender | null {
   return value === "homme" || value === "femme" ? value : null;
 }
+
 
 
 
@@ -133,6 +141,7 @@ type CalcState =
 
 
 
+
 function computeTargets(prof: ProfileRow, goal: NutritionGoal | null): CalcState {
   if (typeof prof.age === "number" && isMinor(prof.age)) return { status: "minor" };
 
@@ -140,8 +149,10 @@ function computeTargets(prof: ProfileRow, goal: NutritionGoal | null): CalcState
 
 
 
+
   const gender = asGender(prof.gender);
   const activity = asActivity(prof.activity_level);
+
 
 
 
@@ -162,6 +173,7 @@ function computeTargets(prof: ProfileRow, goal: NutritionGoal | null): CalcState
 
 
 
+
   const result = calculateNutritionProfile({
     weightKg: prof.weight_kg,
     heightCm: prof.height_cm,
@@ -177,8 +189,10 @@ function computeTargets(prof: ProfileRow, goal: NutritionGoal | null): CalcState
 
 
 
+
   return { status: "ok", result };
 }
+
 
 
 
@@ -187,6 +201,7 @@ function computeTargets(prof: ProfileRow, goal: NutritionGoal | null): CalcState
 function NutritionContent() {
   const { user } = useAuth();
   const { state: accessState } = useAccessState();
+
 
 
 
@@ -202,6 +217,7 @@ function NutritionContent() {
 
 
 
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -210,8 +226,10 @@ function NutritionContent() {
 
 
 
+
     void (async () => {
       setLoading(true);
+
 
 
 
@@ -236,7 +254,9 @@ function NutritionContent() {
 
 
 
+
       if (cancelled) return;
+
 
 
 
@@ -244,6 +264,7 @@ function NutritionContent() {
 
       if (profRes.error) setLoadError(profRes.error.message);
       if (choiceRes.error) console.error("Erreur lecture choix nutrition :", choiceRes.error);
+
 
 
 
@@ -258,6 +279,7 @@ function NutritionContent() {
 
 
 
+
     return () => {
       cancelled = true;
     };
@@ -267,9 +289,11 @@ function NutritionContent() {
 
 
 
+
   const isPremium = prof?.plan === "premium";
   const firstName = prof?.full_name?.split(" ")[0] ?? "vous";
   const profileGoal = asGoal(prof?.goal);
+
 
 
 
@@ -286,10 +310,12 @@ function NutritionContent() {
 
 
 
+
   const calc: CalcState = useMemo(() => {
     if (!prof) return { status: "incomplete" };
     return computeTargets(prof, activePlan.goal ?? profileGoal);
   }, [prof, activePlan, profileGoal]);
+
 
 
 
@@ -309,6 +335,7 @@ function NutritionContent() {
 
 
 
+
   const choosePlan = async (plan: NutritionPlan) => {
     if (!user) return;
     if (plan.tier === "premium" && !isPremium) return;
@@ -317,9 +344,11 @@ function NutritionContent() {
 
 
 
+
     const previous = choice;
     setChoice(plan.id);
     setSavingId(plan.id);
+
 
 
 
@@ -336,7 +365,9 @@ function NutritionContent() {
 
 
 
+
     setSavingId(null);
+
 
 
 
@@ -352,8 +383,10 @@ function NutritionContent() {
 
 
 
+
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
 
 
 
@@ -363,7 +396,7 @@ function NutritionContent() {
     return (
       <div className="p-4 sm:p-6">
         <div className="mx-auto max-w-5xl space-y-4">
-          <div className="h-32 animate-pulse rounded-3xl bg-muted" />
+          <div className="h-40 animate-pulse rounded-3xl bg-muted" />
           <div className="grid gap-4 md:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="h-32 animate-pulse rounded-3xl bg-muted" />
@@ -379,6 +412,7 @@ function NutritionContent() {
 
 
 
+
   if (accessState === "suspended") {
     return <SuspendedAccountScreen />;
   }
@@ -387,42 +421,49 @@ function NutritionContent() {
 
 
 
+
   return (
-    <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
+    <div className="min-h-full p-4 sm:p-6">
       <div className="mx-auto max-w-5xl space-y-6">
-        {/* 1. En-tête */}
-        <Card className="rounded-3xl border shadow-sm">
-          <CardHeader className="space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <Utensils className="h-6 w-6" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl sm:text-2xl">Nutrition</CardTitle>
-                  <CardDescription className="mt-1 text-sm sm:text-base">
-                    Bonjour {firstName}, retrouvez ici vos objectifs et votre plan alimentaire.
-                  </CardDescription>
+        {/* 1. En-tête vert */}
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-[#1F5A2E] p-6 text-white shadow-lg sm:p-8">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10" />
+          <div className="pointer-events-none absolute -bottom-20 right-24 h-48 w-48 rounded-full bg-brand/30 blur-2xl" />
+
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20">
+                <Utensils className="h-7 w-7" />
+              </div>
+              <div>
+                <p className="mb-1 text-sm font-bold uppercase tracking-wider text-white/80">
+                  Votre plan alimentaire
+                </p>
+                <h1 className="text-3xl font-extrabold sm:text-4xl">Nutrition</h1>
+                <p className="mt-2 max-w-xl text-base text-white/90 sm:text-lg">
+                  Bonjour {firstName}, retrouvez ici vos objectifs et votre plan alimentaire.
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-sm font-bold text-white">
+                    {isPremium ? <Star className="h-4 w-4 fill-current" /> : null}
+                    {isPremium ? "Premium" : "Basic"}
+                  </span>
+                  <span className="inline-flex items-center rounded-full bg-white/20 px-3 py-1.5 text-sm font-semibold text-white">
+                    {activePlan.name}
+                  </span>
+                  {calc.status === "ok" ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-sm font-semibold text-white">
+                      <Flame className="h-4 w-4" />
+                      {calc.result.targetKcal} kcal / jour
+                    </span>
+                  ) : null}
                 </div>
               </div>
-
-
-
-
-
-              {isPremium ? (
-                <div className="flex items-center gap-2 rounded-full bg-[#6DB33F]/10 px-3 py-1 text-xs font-medium text-[#2D7A1F]">
-                  <CheckCircle className="h-4 w-4" />
-                  Premium
-                </div>
-              ) : (
-                <div className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-                  Basic
-                </div>
-              )}
             </div>
-          </CardHeader>
-        </Card>
+          </div>
+        </section>
+
 
 
 
@@ -436,6 +477,7 @@ function NutritionContent() {
             </CardHeader>
           </Card>
         ) : null}
+
 
 
 
@@ -457,17 +499,18 @@ function NutritionContent() {
 
 
 
+
         {calc.status === "incomplete" ? (
-          <Card className="rounded-3xl border shadow-sm">
+          <Card className="rounded-3xl border-2 border-primary/25 bg-accent shadow-sm">
             <CardHeader>
-              <CardTitle className="text-base">Complétez votre profil</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-xl">Complétez votre profil</CardTitle>
+              <CardDescription className="text-base">
                 Il nous manque des informations (âge, poids, taille, sexe, activité ou objectif)
                 pour calculer vos besoins.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild className="rounded-2xl bg-[#6DB33F] text-white hover:bg-[#2D7A1F]">
+              <Button asChild className="h-12 rounded-full px-6 text-base font-bold">
                 <Link to="/subscriber/profile">Compléter mon profil</Link>
               </Button>
             </CardContent>
@@ -478,10 +521,11 @@ function NutritionContent() {
 
 
 
+
         {/* 2. Objectifs du jour */}
         {calc.status === "ok" ? (
           <>
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
               <InfoCard
                 icon={<Flame className="h-5 w-5" />}
                 title="Objectif kcal / jour"
@@ -512,6 +556,7 @@ function NutritionContent() {
 
 
 
+
             {calc.result.warnings.map((warning) => (
               <div
                 key={warning}
@@ -525,23 +570,25 @@ function NutritionContent() {
 
 
 
+
             {/* 3. Programme proposé */}
             <section className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-2">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  <p className="text-sm font-bold uppercase tracking-wider text-primary">
                     Votre programme du jour
                   </p>
-                  <h2 className="text-lg font-semibold">{activePlan.name}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">{activePlan.tagline}</p>
+                  <h2 className="text-2xl">{activePlan.name}</h2>
+                  <p className="mt-1 text-muted-foreground">{activePlan.tagline}</p>
                 </div>
                 <a
                   href="#programmes"
-                  className="text-sm font-medium text-[#2D7A1F] underline-offset-4 hover:underline"
+                  className="text-sm font-bold text-primary underline-offset-4 hover:underline"
                 >
                   Changer de programme ↓
                 </a>
               </div>
+
 
 
 
@@ -552,6 +599,7 @@ function NutritionContent() {
                   <MealCard key={meal.slot} meal={meal} />
                 ))}
               </div>
+
 
 
 
@@ -573,11 +621,13 @@ function NutritionContent() {
 
 
 
+
               {isPremium ? (
                 <div className="rounded-2xl border border-dashed bg-muted/20 px-4 py-3 text-center text-xs text-muted-foreground">
                   📷 Journal par photo : prochainement
                 </div>
               ) : null}
+
 
 
 
@@ -592,8 +642,10 @@ function NutritionContent() {
 
 
 
+
         {/* Documents de votre diététicien (Premium) */}
         {user ? <SubscriberDocuments userId={user.id} isPremium={isPremium} /> : null}
+
 
 
 
@@ -602,8 +654,8 @@ function NutritionContent() {
         {/* 4. Gamme de programmes (Basic puis Premium) */}
         <section id="programmes" className="scroll-mt-20 space-y-4">
           <div>
-            <h2 className="text-lg font-semibold">Changer de programme</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <h2 className="text-2xl">Changer de programme</h2>
+            <p className="mt-1 text-muted-foreground">
               {isPremium
                 ? "Des menus personnalisés selon votre objectif : choisissez parmi 12 programmes (3 Basic + 9 Premium)."
                 : "Choisissez l'un de vos 3 programmes Basic."}
@@ -614,7 +666,8 @@ function NutritionContent() {
 
 
 
-          <h3 className="text-base font-medium">Programmes Basic</h3>
+
+          <h3 className="text-lg font-extrabold">Programmes Basic</h3>
           <div className="grid gap-4 md:grid-cols-3">
             {BASIC_PLANS.map((plan) => (
               <PlanCard
@@ -633,32 +686,43 @@ function NutritionContent() {
 
 
 
-          <h3 className="pt-2 text-base font-medium">Programmes Premium</h3>
+
+          <h3 className="pt-2 text-lg font-extrabold">Programmes Premium</h3>
+
 
 
 
 
 
           {!isPremium ? (
-            <Card className="rounded-3xl border border-primary/20 bg-primary/5 shadow-sm">
+            <Card className="rounded-3xl border-2 border-primary/25 bg-accent shadow-sm">
               <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <Sparkles className="h-5 w-5" />
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+                    <Sparkles className="h-6 w-6" />
                   </div>
-                  <div>
-                    <CardTitle className="text-base">Passez à Premium</CardTitle>
-                    <CardDescription>
-                      Des menus personnalisés en fonction de votre objectif : 9 programmes
-                      supplémentaires (méditerranéen, végétarien, sans gluten, sportif…), un
-                      historique de journal sur 3 mois, et les PDF de votre diététicien. Journal
-                      par photo : prochainement.
-                    </CardDescription>
+                  <div className="space-y-3">
+                    <div>
+                      <CardTitle className="text-xl">Passez à Premium</CardTitle>
+                      <CardDescription className="mt-1 text-base">
+                        Des menus personnalisés en fonction de votre objectif : 9 programmes
+                        supplémentaires (méditerranéen, végétarien, sans gluten, sportif…), un
+                        historique de journal sur 3 mois, et les PDF de votre diététicien. Journal
+                        par photo : prochainement.
+                      </CardDescription>
+                    </div>
+                    <Button asChild className="h-11 rounded-full px-6 font-bold">
+                      <Link to="/subscriber/profile">
+                        <Star className="mr-2 h-4 w-4" />
+                        Découvrir le Premium
+                      </Link>
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
             </Card>
           ) : null}
+
 
 
 
@@ -682,8 +746,10 @@ function NutritionContent() {
 
 
 
+
           {isPremium ? <CustomProgramCard /> : null}
         </section>
+
 
 
 
@@ -697,6 +763,7 @@ function NutritionContent() {
     </div>
   );
 }
+
 
 
 
@@ -720,16 +787,17 @@ function PlanCard({
   return (
     <Card
       className={cn(
-        "rounded-3xl border shadow-sm",
-        active && "border-[#6DB33F] bg-[#6DB33F]/5",
-        locked && "opacity-70",
+        "rounded-3xl border shadow-sm transition-all",
+        active && "border-2 border-primary bg-accent ring-4 ring-primary/10",
+        locked && "border-dashed opacity-80",
+        !active && !locked && "hover:-translate-y-0.5 hover:shadow-md",
       )}
     >
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-base">{plan.name}</CardTitle>
+          <CardTitle className="text-lg font-extrabold">{plan.name}</CardTitle>
           {recommended && !active ? (
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+            <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-bold text-accent-foreground">
               Conseillé
             </span>
           ) : null}
@@ -743,10 +811,7 @@ function PlanCard({
           variant={active ? "default" : "outline"}
           disabled={locked || saving || active}
           onClick={onChoose}
-          className={cn(
-            "w-full rounded-xl",
-            active && "bg-[#6DB33F] text-white hover:bg-[#2D7A1F]",
-          )}
+          className="h-10 w-full rounded-full font-bold"
         >
           {locked
             ? "Réservé à Premium"
@@ -765,13 +830,14 @@ function PlanCard({
 
 
 
+
 function MealCard({ meal }: { meal: ComputedMeal }) {
   return (
     <Card className="rounded-3xl border shadow-sm">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
-          <CardTitle className="text-base">{SLOT_LABEL[meal.slot]}</CardTitle>
-          <span className="shrink-0 rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+          <CardTitle className="text-lg font-extrabold">{SLOT_LABEL[meal.slot]}</CardTitle>
+          <span className="shrink-0 rounded-full bg-accent px-3 py-1 text-xs font-bold text-accent-foreground">
             ≈ {meal.kcal} kcal
           </span>
         </div>
@@ -782,11 +848,11 @@ function MealCard({ meal }: { meal: ComputedMeal }) {
       <CardContent>
         <ul className="space-y-2 text-sm">
           {meal.lines.map((line) => (
-            <li key={line.label + (line.options ?? "")} className="rounded-xl bg-muted/30 px-3 py-2">
+            <li key={line.label + (line.options ?? "")} className="rounded-xl bg-muted/40 px-3 py-2.5">
               <div className="flex items-start justify-between gap-3">
-                <span className="font-medium">{line.label}</span>
+                <span className="font-semibold">{line.label}</span>
                 {line.quantity ? (
-                  <span className="shrink-0 text-muted-foreground">{line.quantity}</span>
+                  <span className="shrink-0 font-medium text-muted-foreground">{line.quantity}</span>
                 ) : null}
               </div>
               {line.options ? (
@@ -799,6 +865,7 @@ function MealCard({ meal }: { meal: ComputedMeal }) {
     </Card>
   );
 }
+
 
 
 
@@ -818,11 +885,11 @@ function InfoCard({
   return (
     <Card className="rounded-3xl border shadow-sm">
       <CardContent className="p-5">
-        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
           {icon}
         </div>
-        <div className="text-sm text-muted-foreground">{title}</div>
-        <div className="mt-1 text-lg font-semibold">{value}</div>
+        <div className="text-sm font-medium text-muted-foreground">{title}</div>
+        <div className="mt-1 text-2xl font-extrabold">{value}</div>
         <div className="mt-1 text-xs text-muted-foreground">{subtitle}</div>
       </CardContent>
     </Card>
