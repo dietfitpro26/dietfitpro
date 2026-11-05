@@ -5,7 +5,6 @@ import { fr } from "date-fns/locale";
 import {
   Video,
   Calendar as CalendarIcon,
-  Target,
   Dumbbell,
   Utensils,
   ChevronRight,
@@ -14,11 +13,10 @@ import {
   Activity,
   FolderOpen,
   ArrowRight,
-  Plus,
   Ruler,
   MessageCircle,
   Bell,
-  Crown,
+  Star,
 } from "lucide-react";
 import { PatientLayout } from "@/layouts/PatientLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -384,89 +382,67 @@ function DashboardContent() {
 
 
   return (
-    <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
+    <div className="min-h-full p-4 sm:p-6">
       <div className="mx-auto max-w-6xl space-y-6">
-        <section className="overflow-hidden rounded-3xl border bg-card shadow-sm">
-          <div className="bg-gradient-to-br from-primary/10 via-card to-card p-5 sm:p-7">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-primary">
+        {/* En-tête vert, identique à l'accueil abonné */}
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-[#1F5A2E] p-6 text-white shadow-lg sm:p-8">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10" />
+          <div className="pointer-events-none absolute -bottom-20 right-24 h-48 w-48 rounded-full bg-brand/30 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-white/5" />
+
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-4">
+              <div>
+                <p className="mb-1 text-sm font-bold uppercase tracking-wider text-white/80">
                   Votre accompagnement
                 </p>
-
-
-
-                <div>
-                  <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                    Bonjour {firstName}
-                  </h1>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Retrouvez ici les informations importantes de votre suivi.
-                  </p>
-                </div>
-
-
-
-                <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
-                    <Activity className="h-4 w-4" />
-                    Espace patient actif
-                  </span>
-
-
-
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold",
-                      patientPlan === "premium"
-                        ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-                        : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
-                    )}
-                  >
-                    <Crown
-                      className={cn(
-                        "h-4 w-4",
-                        patientPlan === "premium"
-                          ? "text-amber-600"
-                          : "text-slate-500",
-                      )}
-                    />
-                    Formule {patientPlan === "premium" ? "Premium" : "Basic"}
-                  </span>
-
-
-
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground">
-                    <FolderOpen className="h-4 w-4" />
-                    {documentsCount} document
-                    {documentsCount > 1 ? "s" : ""}
-                  </span>
-
-
-
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground">
-                    <CalendarIcon className="h-4 w-4" />
-                    {completedCount} consultation
-                    {completedCount > 1 ? "s" : ""} terminée
-                    {completedCount > 1 ? "s" : ""}
-                  </span>
-                </div>
-              </div>
-
-
-
-              <div className="rounded-2xl border border-primary/10 bg-background/70 px-4 py-3 text-sm backdrop-blur">
-                <p className="font-medium text-foreground">
-                  {upcoming?.scheduled_at
-                    ? "Prochain rendez-vous programmé"
-                    : "Suivi prêt à continuer"}
-                </p>
-                <p className="mt-1 text-muted-foreground">
-                  {upcoming?.scheduled_at
-                    ? nextConsultationLabel
-                    : "Consultez vos programmes et vos prochaines actions."}
+                <h1 className="text-3xl font-extrabold sm:text-4xl">
+                  Bonjour {firstName}
+                </h1>
+                <p className="mt-2 max-w-xl text-base text-white/90 sm:text-lg">
+                  Retrouvez ici les informations importantes de votre suivi.
                 </p>
               </div>
+
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-sm font-semibold text-white">
+                  <Activity className="h-4 w-4" />
+                  Espace patient actif
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-sm font-bold text-white">
+                  {patientPlan === "premium" ? (
+                    <Star className="h-4 w-4 fill-current" />
+                  ) : null}
+                  Formule {patientPlan === "premium" ? "Premium" : "Basic"}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-sm font-semibold text-white">
+                  <FolderOpen className="h-4 w-4" />
+                  {documentsCount} document
+                  {documentsCount > 1 ? "s" : ""}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-sm font-semibold text-white">
+                  <CalendarIcon className="h-4 w-4" />
+                  {completedCount} consultation
+                  {completedCount > 1 ? "s" : ""} terminée
+                  {completedCount > 1 ? "s" : ""}
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/20 bg-white/15 px-5 py-4 text-sm backdrop-blur">
+              <p className="font-bold text-white">
+                {upcoming?.scheduled_at
+                  ? "Prochain rendez-vous programmé"
+                  : "Suivi prêt à continuer"}
+              </p>
+              <p className="mt-1 text-white/90">
+                {upcoming?.scheduled_at
+                  ? nextConsultationLabel
+                  : "Consultez vos programmes et vos prochaines actions."}
+              </p>
             </div>
           </div>
         </section>
@@ -542,13 +518,13 @@ function DashboardContent() {
 
 
 
-        <Card className="rounded-3xl border-primary/20 bg-primary/5 shadow-sm">
-          <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <Card className="rounded-3xl border-2 border-primary/25 bg-accent shadow-sm">
+          <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">
+              <p className="text-sm font-bold uppercase tracking-wider text-primary">
                 Votre prochain rendez-vous
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground">
                 Consultez vos disponibilités et gérez vos consultations depuis
                 votre espace patient.
               </p>
@@ -557,10 +533,10 @@ function DashboardContent() {
 
 
             <Button
-              className="shrink-0 rounded-2xl"
+              className="h-12 shrink-0 rounded-full px-6 text-base font-bold shadow-lg shadow-primary/25"
               onClick={() => navigate({ to: "/patient/consultations" })}
             >
-              <CalendarIcon className="h-4 w-4" />
+              <CalendarIcon className="h-5 w-5" />
               Voir mes consultations
             </Button>
           </CardContent>
@@ -571,7 +547,7 @@ function DashboardContent() {
         <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <Card className="rounded-3xl shadow-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">
+              <CardTitle className="text-xl">
                 Prochaine consultation
               </CardTitle>
             </CardHeader>
@@ -595,7 +571,7 @@ function DashboardContent() {
 
                   <Button
                     variant="outline"
-                    className="mt-4 rounded-2xl"
+                    className="mt-4 rounded-full"
                     onClick={() =>
                       navigate({ to: "/patient/consultations" })
                     }
@@ -605,9 +581,9 @@ function DashboardContent() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="rounded-2xl bg-primary/5 p-4">
+                  <div className="rounded-2xl bg-accent p-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
                         <Video className="h-5 w-5" />
                       </div>
 
@@ -653,7 +629,7 @@ function DashboardContent() {
 
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Button
-                      className="rounded-2xl"
+                      className="rounded-full"
                       onClick={() => {
                         if (upcoming.room_url) {
                           window.open(
@@ -674,7 +650,7 @@ function DashboardContent() {
 
                     <Button
                       variant="outline"
-                      className="rounded-2xl"
+                      className="rounded-full"
                       onClick={() =>
                         navigate({ to: "/patient/consultations" })
                       }
@@ -686,7 +662,7 @@ function DashboardContent() {
 
                     <Button
                       variant="destructive"
-                      className="rounded-2xl"
+                      className="rounded-full"
                       onClick={handleCancelUpcoming}
                       disabled={!canCancelUpcoming || cancelling}
                     >
@@ -704,7 +680,7 @@ function DashboardContent() {
 
           <Card className="rounded-3xl shadow-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Accès rapides</CardTitle>
+              <CardTitle className="text-xl">Accès rapides</CardTitle>
             </CardHeader>
 
 
@@ -764,7 +740,7 @@ function DashboardContent() {
 
         <Card className="rounded-3xl shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">
+            <CardTitle className="text-xl">
               Historique des consultations
             </CardTitle>
           </CardHeader>
@@ -838,7 +814,7 @@ function DocumentCard({
   return (
     <Card className="rounded-3xl shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
+        <CardTitle className="flex items-center gap-2 text-xl">
           {icon}
           {title}
         </CardTitle>
@@ -847,10 +823,10 @@ function DocumentCard({
 
         <Link
           to={to}
-          className="flex items-center gap-0.5 text-xs text-primary hover:underline"
+          className="flex items-center gap-0.5 text-sm font-semibold text-primary hover:underline"
         >
           Voir tout
-          <ChevronRight className="h-3 w-3" />
+          <ChevronRight className="h-4 w-4" />
         </Link>
       </CardHeader>
 
@@ -936,15 +912,15 @@ function MetricCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border p-4",
-        highlight ? "border-primary/20 bg-primary/5" : "bg-card",
+        "rounded-2xl border p-5",
+        highlight ? "border-primary/30 bg-accent" : "bg-card",
       )}
     >
-      <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
+      <div className="mb-1 flex items-center gap-2 text-sm font-medium text-muted-foreground">
         {icon}
         <span>{label}</span>
       </div>
-      <div className={cn("text-xl font-bold", highlight && "text-primary")}>
+      <div className={cn("text-2xl font-extrabold", highlight && "text-primary")}>
         {value}
       </div>
       <div className="mt-1 text-xs text-muted-foreground">{hint}</div>
@@ -965,14 +941,14 @@ function QuickCard({
 }) {
   return (
     <Link to={to} className="block">
-      <div className="flex items-center justify-between rounded-2xl border bg-muted/30 p-4 transition-colors hover:bg-muted/50">
+      <div className="flex items-center justify-between rounded-2xl border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <Icon className="h-5 w-5" />
           </div>
-          <span className="text-sm font-medium">{label}</span>
+          <span className="text-sm font-semibold">{label}</span>
         </div>
-        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+        <ArrowRight className="h-4 w-4 text-primary" />
       </div>
     </Link>
   );
@@ -1007,12 +983,10 @@ function PaymentBadge({ status }: { status: PayStatus }) {
       className={cn(
         "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
         status === "paid" && "bg-primary/10 text-primary",
-        status === "pending" &&
-          "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+        status === "pending" && "bg-amber-100 text-amber-800",
         (status === "refunded" || status === "partial_refund") &&
-          "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
-        status === "failed" &&
-          "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+          "bg-slate-100 text-slate-700",
+        status === "failed" && "bg-destructive/10 text-destructive",
       )}
     >
       {label[status]}

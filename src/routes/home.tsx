@@ -23,47 +23,55 @@ import {
   Sparkles,
   UserRound,
   Rss,
+  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
 
 export const Route = createFileRoute("/home")({
   head: () => ({ meta: [{ title: "Accueil — DietFitPro" }] }),
   component: SubscriberHomePage,
 });
 
+
 function getBMIInfo(bmi: number | null) {
   if (!bmi) return null;
+
 
   if (bmi < 18.5) {
     return {
       label: "Repère inférieur",
-      color: "text-blue-500",
-      bg: "bg-blue-50 dark:bg-blue-900/20",
+      color: "text-blue-600",
+      bg: "bg-blue-50",
     };
   }
+
 
   if (bmi < 25) {
     return {
       label: "Repère général",
-      color: "text-green-600",
-      bg: "bg-green-50 dark:bg-green-900/20",
+      color: "text-green-700",
+      bg: "bg-green-50",
     };
   }
+
 
   if (bmi < 30) {
     return {
       label: "Repère supérieur",
-      color: "text-orange-500",
-      bg: "bg-orange-50 dark:bg-orange-900/20",
+      color: "text-orange-600",
+      bg: "bg-orange-50",
     };
   }
 
+
   return {
     label: "À interpréter avec un professionnel",
-    color: "text-red-500",
-    bg: "bg-red-50 dark:bg-red-900/20",
+    color: "text-red-600",
+    bg: "bg-red-50",
   };
 }
+
 
 function calcBMI(weight: number | null, height: number | null): number | null {
   if (!weight || !height || height <= 0) return null;
@@ -71,24 +79,36 @@ function calcBMI(weight: number | null, height: number | null): number | null {
   return Math.round((weight / (h * h)) * 10) / 10;
 }
 
-const GOAL_LABELS: Record<string, { label: string; icon: ReactNode }> = {
-  weight_loss: {
-    label: "Perte de poids",
-    icon: <TrendingDown className="h-4 w-4" />,
-  },
-  muscle_gain: {
-    label: "Prise de masse",
-    icon: <Dumbbell className="h-4 w-4" />,
-  },
-  maintenance: {
-    label: "Maintien",
-    icon: <Scale className="h-4 w-4" />,
-  },
-  general_health: {
-    label: "Santé générale",
-    icon: <Heart className="h-4 w-4" />,
-  },
+
+const WEIGHT_LOSS = {
+  label: "Perte de poids",
+  icon: <TrendingDown className="h-4 w-4" />,
 };
+const MUSCLE_GAIN = {
+  label: "Prise de masse",
+  icon: <Dumbbell className="h-4 w-4" />,
+};
+const MAINTENANCE = {
+  label: "Maintien",
+  icon: <Scale className="h-4 w-4" />,
+};
+const GENERAL_HEALTH = {
+  label: "Santé générale",
+  icon: <Heart className="h-4 w-4" />,
+};
+
+// Les deux séries de noms existent : anciens comptes et inscription actuelle.
+const GOAL_LABELS: Record<string, { label: string; icon: ReactNode }> = {
+  weight_loss: WEIGHT_LOSS,
+  muscle_gain: MUSCLE_GAIN,
+  maintenance: MAINTENANCE,
+  general_health: GENERAL_HEALTH,
+  perte_de_poids: WEIGHT_LOSS,
+  prise_de_masse: MUSCLE_GAIN,
+  maintien: MAINTENANCE,
+  equilibre: GENERAL_HEALTH,
+};
+
 
 function formatPlanLabel(plan: string | null | undefined) {
   if (!plan) return "Basic";
@@ -96,6 +116,7 @@ function formatPlanLabel(plan: string | null | undefined) {
   if (plan === "patient") return "Patient";
   return "Basic";
 }
+
 
 function SubscriberHomePage() {
   return (
@@ -107,9 +128,11 @@ function SubscriberHomePage() {
   );
 }
 
+
 function HomeContent() {
   const { user, profile } = useAuth();
   const { rights, loading } = useAccessRights();
+
 
   const firstName = profile?.full_name?.split(" ")[0] ?? "vous";
   const weightKg = profile?.weight_kg ?? null;
@@ -117,36 +140,44 @@ function HomeContent() {
   const dailyKcalTarget = profile?.daily_kcal_target ?? null;
   const heightCm = profile?.height_cm ?? null;
 
+
   const currentBmi = calcBMI(weightKg, heightCm);
   const bmiInfo = getBMIInfo(currentBmi);
   const goalInfo = profile?.goal ? GOAL_LABELS[profile.goal] : null;
   const hasWeightGoal = weightKg != null && targetWeightKg != null;
+
 
   const weightDiff = useMemo(() => {
     if (!hasWeightGoal) return null;
     return Math.round((weightKg - targetWeightKg) * 10) / 10;
   }, [hasWeightGoal, weightKg, targetWeightKg]);
 
+
   const displayedPlan = rights?.plan_label ?? "basic";
   const sportLimit = rights?.sport_session_limit ?? null;
   const isBasic = displayedPlan === "basic";
+  const isPremium = displayedPlan === "premium";
+
 
   if (loading || !rights) {
     return (
       <div className="space-y-4 p-4 sm:p-6">
-        <div className="h-32 animate-pulse rounded-3xl bg-muted" />
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="h-28 animate-pulse rounded-3xl bg-muted" />
-          <div className="h-28 animate-pulse rounded-3xl bg-muted" />
-          <div className="h-28 animate-pulse rounded-3xl bg-muted" />
-        </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="h-52 animate-pulse rounded-3xl bg-muted" />
-          <div className="h-52 animate-pulse rounded-3xl bg-muted" />
+        <div className="mx-auto max-w-5xl space-y-4">
+          <div className="h-44 animate-pulse rounded-3xl bg-muted" />
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="h-28 animate-pulse rounded-3xl bg-muted" />
+            <div className="h-28 animate-pulse rounded-3xl bg-muted" />
+            <div className="h-28 animate-pulse rounded-3xl bg-muted" />
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="h-52 animate-pulse rounded-3xl bg-muted" />
+            <div className="h-52 animate-pulse rounded-3xl bg-muted" />
+          </div>
         </div>
       </div>
     );
   }
+
 
   const primaryAction = !profile?.goal
     ? {
@@ -171,87 +202,112 @@ function HomeContent() {
           label: "Ouvrir mon programme",
         };
 
+
+  const subline =
+    weightDiff !== null && weightDiff !== 0
+      ? `Plus que ${Math.abs(weightDiff)} kg ${weightDiff > 0 ? "à perdre" : "à prendre"} pour atteindre votre objectif.`
+      : weightDiff === 0
+        ? "Objectif de poids atteint : bravo, continuez ainsi."
+        : "Bienvenue sur votre espace DietFitPro.";
+
+
   return (
-    <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
+    <div className="min-h-full p-4 sm:p-6">
       <div className="mx-auto max-w-5xl space-y-6">
-        <section className="overflow-hidden rounded-3xl border bg-card shadow-sm">
-          <div className="bg-gradient-to-br from-primary/10 via-card to-card p-5 sm:p-7">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-              <div className="space-y-3">
-                <div>
-                  <p className="mb-1 text-sm font-medium text-primary">Votre espace personnel</p>
-                  <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                    Bonjour {firstName}
-                  </h1>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Bienvenue sur votre espace DietFitPro.
-                  </p>
-                </div>
+        {/* En-tête vert */}
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-[#1F5A2E] p-6 text-white shadow-lg sm:p-8">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10" />
+          <div className="pointer-events-none absolute -bottom-20 right-24 h-48 w-48 rounded-full bg-brand/30 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-white/5" />
 
-                <div className="flex flex-wrap gap-2">
-                  {goalInfo ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
-                      {goalInfo.icon}
-                      {goalInfo.label}
-                    </span>
-                  ) : null}
-
-                  {currentBmi != null && bmiInfo ? (
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ${bmiInfo.bg} ${bmiInfo.color}`}
-                      title="L'IMC est un indicateur général qui doit être interprété dans son contexte."
-                    >
-                      IMC {currentBmi} · {bmiInfo.label}
-                    </span>
-                  ) : null}
-
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground">
-                    Plan {formatPlanLabel(displayedPlan)}
-                  </span>
-
-                  {isBasic && sportLimit ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-700 dark:text-amber-300">
-                      <Bike className="h-4 w-4" />
-                      {sportLimit} séances incluses
-                    </span>
-                  ) : null}
-                </div>
+          <div className="relative flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-4">
+              <div>
+                <p className="mb-1 text-sm font-bold uppercase tracking-wider text-white/80">
+                  Votre espace personnel
+                </p>
+                <h1 className="text-3xl font-extrabold sm:text-4xl">Bonjour {firstName}</h1>
+                <p className="mt-2 max-w-xl text-base text-white/90 sm:text-lg">{subline}</p>
               </div>
 
-              <Link
-                to="/subscriber/profile"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border bg-background/80 px-4 py-2 text-sm font-medium transition-colors hover:bg-background"
-              >
-                <UserRound className="h-4 w-4" />
-                Mon profil
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                {goalInfo ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-sm font-semibold text-white">
+                    {goalInfo.icon}
+                    {goalInfo.label}
+                  </span>
+                ) : null}
+
+                {currentBmi != null && bmiInfo ? (
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${bmiInfo.bg} ${bmiInfo.color}`}
+                    title="L'IMC est un indicateur général qui doit être interprété dans son contexte."
+                  >
+                    IMC {currentBmi} · {bmiInfo.label}
+                  </span>
+                ) : null}
+
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold ${
+                    isPremium ? "bg-white text-primary" : "bg-white/20 text-white"
+                  }`}
+                >
+                  {isPremium ? <Star className="h-4 w-4 fill-current" /> : null}
+                  Plan {formatPlanLabel(displayedPlan)}
+                </span>
+
+                {isBasic && sportLimit ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-300 px-3 py-1.5 text-sm font-semibold text-amber-950">
+                    <Bike className="h-4 w-4" />
+                    {sportLimit} séances incluses
+                  </span>
+                ) : null}
+              </div>
             </div>
+
+            <Link
+              to="/subscriber/profile"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-primary shadow-md transition-colors hover:bg-white/90"
+            >
+              <UserRound className="h-4 w-4" />
+              Mon profil
+            </Link>
           </div>
         </section>
 
+
         {user ? <LevelBadgesCard userId={user.id} /> : null}
 
-        <section className="rounded-3xl border border-primary/15 bg-primary/[0.04] p-5 shadow-sm sm:p-6">
+
+        {/* Prochaine étape */}
+        <section className="rounded-3xl border-2 border-primary/25 bg-accent p-6 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-medium text-primary">Prochaine étape</p>
-              <h2 className="mt-1 text-xl font-semibold">{primaryAction.title}</h2>
-              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{primaryAction.text}</p>
+              <p className="text-sm font-bold uppercase tracking-wider text-primary">
+                Prochaine étape
+              </p>
+              <h2 className="mt-1 text-2xl">{primaryAction.title}</h2>
+              <p className="mt-1 max-w-2xl text-muted-foreground">{primaryAction.text}</p>
             </div>
-            <Button asChild className="w-full rounded-2xl sm:w-auto">
+            <Button
+              asChild
+              className="h-12 w-full rounded-full px-6 text-base font-bold shadow-lg shadow-primary/25 sm:w-auto"
+            >
               <Link to={primaryAction.to}>
                 {primaryAction.label}
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
           </div>
         </section>
 
+
+        {/* Objectifs */}
         {(weightKg != null || targetWeightKg != null || dailyKcalTarget != null || currentBmi != null) && (
-          <section className="rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
-            <div className="mb-4 flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              <h2 className="font-semibold">Mes objectifs</h2>
+          <section className="rounded-3xl border bg-card p-6 shadow-sm">
+            <div className="mb-5 flex items-center gap-2">
+              <Target className="h-6 w-6 text-primary" />
+              <h2 className="text-xl">Mes objectifs</h2>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -274,44 +330,28 @@ function HomeContent() {
               ) : null}
             </div>
 
-            {weightDiff !== null ? (
-              <div className="mt-4 flex items-start gap-2 rounded-2xl bg-muted/40 px-4 py-3">
-                <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  {weightDiff === 0 ? (
-                    <>
-                      Votre objectif de poids est atteint. Continuez à suivre votre progression.
-                    </>
-                  ) : (
-                    <>
-                      Il vous reste{" "}
-                      <span className="font-semibold text-foreground">{Math.abs(weightDiff)} kg</span>{" "}
-                      {weightDiff > 0 ? "à perdre" : "à prendre"} pour atteindre votre objectif.
-                    </>
-                  )}
-                </p>
-              </div>
-            ) : null}
-
-            <p className="mt-4 text-xs text-muted-foreground">
+            <p className="mt-5 text-xs text-muted-foreground">
               Ces indicateurs sont des repères généraux. Contactez votre professionnel de santé pour les interpréter dans votre contexte.
             </p>
           </section>
         )}
 
+
+        {/* Modules principaux */}
         <section className="grid gap-4 lg:grid-cols-2">
           <PrimaryModuleCard
             title="Nutrition"
             description={
               rights.access_nutrition_programs
                 ? "Accédez à votre programme nutritionnel."
-                : "Disponible dans Premium."
+                : "Les programmes nutrition complets sont disponibles dans Premium."
             }
-            icon={<BarChart2 className="h-5 w-5" />}
+            icon={<BarChart2 className="h-6 w-6" />}
             to={rights.access_nutrition_programs ? "/subscriber/nutrition" : undefined}
             active={rights.access_nutrition_programs}
             badge={rights.access_nutrition_programs ? "Disponible" : "Disponible dans Premium"}
           />
+
 
           <PrimaryModuleCard
             title="Sport"
@@ -320,9 +360,9 @@ function HomeContent() {
                 ? sportLimit
                   ? `Accès à ${sportLimit} séances incluses dans votre offre.`
                   : "Retrouvez l’ensemble de votre espace sport."
-                : "Disponible dans Premium."
+                : "Les programmes sport sont disponibles dans Premium."
             }
-            icon={<Bike className="h-5 w-5" />}
+            icon={<Bike className="h-6 w-6" />}
             to={rights.access_sport_programs ? "/subscriber/sport" : undefined}
             active={rights.access_sport_programs}
             badge={
@@ -335,49 +375,45 @@ function HomeContent() {
           />
         </section>
 
+
         <section>
           <PrimaryModuleCard
-            title="Feed"
-            description="Conseils, recettes et défis de votre coach. Aimez, partagez et échangez avec la communauté."
-            icon={<Rss className="h-5 w-5" />}
+            title="Feed & communauté"
+            description="Conseils, recettes et défis. Aimez, partagez et échangez avec la communauté pour rester motivé."
+            icon={<Rss className="h-6 w-6" />}
             to="/feed"
             active
             badge="Disponible pour tous"
           />
         </section>
 
-        <section className="grid gap-4 sm:grid-cols-3">
-          <SecondaryModuleCard
-            icon={<UtensilsCrossed className="h-5 w-5" />}
-            title="Recettes"
-            text="Une bibliothèque de recettes arrive prochainement."
-            active={false}
-            locked
-            lockedLabel="Bientôt disponible"
-          />
 
-          <SecondaryModuleCard
-            icon={<Sparkles className="h-5 w-5" />}
-            title="Coach IA"
-            text="Votre assistant intelligent arrive prochainement."
-            active={false}
-            locked
-            lockedLabel="Bientôt disponible"
-          />
-
-          <SecondaryModuleCard
-            icon={<Video className="h-5 w-5" />}
-            title="Visio"
-            text="La réservation de consultations vidéo arrive prochainement."
-            active={false}
-            locked
-            lockedLabel="Bientôt disponible"
-          />
+        {/* Bientôt */}
+        <section className="space-y-3">
+          <h2 className="text-xl">Bientôt sur DietFitPro</h2>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <SoonCard
+              icon={<UtensilsCrossed className="h-5 w-5" />}
+              title="Recettes"
+              text="Une bibliothèque de recettes arrive prochainement."
+            />
+            <SoonCard
+              icon={<Sparkles className="h-5 w-5" />}
+              title="Coach IA"
+              text="Votre assistant intelligent arrive prochainement."
+            />
+            <SoonCard
+              icon={<Video className="h-5 w-5" />}
+              title="Visio"
+              text="La réservation de consultations vidéo arrive prochainement."
+            />
+          </div>
         </section>
       </div>
     </div>
   );
 }
+
 
 function MetricCard({
   label,
@@ -394,21 +430,22 @@ function MetricCard({
 }) {
   return (
     <div
-      className={`rounded-2xl border p-4 ${
-        highlight ? "border-primary/20 bg-primary/5" : "bg-muted/30"
+      className={`rounded-2xl border p-5 ${
+        highlight ? "border-primary/30 bg-accent" : "bg-muted/40"
       }`}
     >
-      <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
+      <div className="mb-1 flex items-center gap-2 text-sm font-medium text-muted-foreground">
         {icon}
         <span>{label}</span>
       </div>
-      <div className={`text-xl font-bold ${highlight ? "text-primary" : ""}`}>
+      <div className={`text-2xl font-extrabold ${highlight ? "text-primary" : ""}`}>
         {value}
       </div>
       <div className="mt-1 text-xs text-muted-foreground">{hint}</div>
     </div>
   );
 }
+
 
 function PrimaryModuleCard({
   title,
@@ -427,45 +464,54 @@ function PrimaryModuleCard({
 }) {
   const content = (
     <div
-      className={`rounded-3xl border p-5 shadow-sm transition-all ${
+      className={`h-full rounded-3xl border p-6 shadow-sm transition-all ${
         active
-          ? "bg-card hover:-translate-y-0.5 hover:shadow-md"
-          : "bg-muted/30 opacity-80"
+          ? "bg-card hover:-translate-y-1 hover:shadow-xl"
+          : "border-dashed bg-muted/40"
       }`}
     >
       <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <div
-            className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
-              active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+            className={`flex h-14 w-14 items-center justify-center rounded-2xl ${
+              active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
             }`}
           >
             {icon}
           </div>
           <div>
-            <h3 className="font-semibold">{title}</h3>
-            <p className="text-xs text-muted-foreground">{badge}</p>
+            <h3 className="text-xl font-extrabold">{title}</h3>
+            <p className="text-sm font-medium text-muted-foreground">{badge}</p>
           </div>
         </div>
 
         {!active ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
             <Lock className="h-3 w-3" />
-            Restreint
+            Premium
           </span>
         ) : null}
       </div>
 
-      <p className="mb-4 text-sm text-muted-foreground">{description}</p>
+      <p className="mb-5 text-base text-muted-foreground">{description}</p>
 
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">
-          {active ? "Ouvrir le module" : "Accès indisponible"}
-        </span>
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-      </div>
+      {active ? (
+        <div className="flex items-center justify-between">
+          <span className="text-base font-bold text-primary">Ouvrir</span>
+          <ChevronRight className="h-5 w-5 text-primary" />
+        </div>
+      ) : (
+        <Link
+          to="/subscriber/profile"
+          className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 transition-opacity hover:opacity-90"
+        >
+          <Star className="h-4 w-4" />
+          Découvrir le Premium
+        </Link>
+      )}
     </div>
   );
+
 
   if (active && to) {
     return (
@@ -475,58 +521,32 @@ function PrimaryModuleCard({
     );
   }
 
+
   return content;
 }
 
-function SecondaryModuleCard({
+
+function SoonCard({
   icon,
   title,
   text,
-  active,
-  locked = false,
-  lockedLabel = "Option Premium",
 }: {
   icon: ReactNode;
   title: string;
   text: string;
-  active: boolean;
-  locked?: boolean;
-  lockedLabel?: string;
 }) {
-  const isLocked = locked || !active;
-
   return (
-    <div
-      className={`rounded-3xl border p-4 shadow-sm transition-all ${
-        isLocked
-          ? "bg-muted/25 opacity-60 grayscale"
-          : "bg-card hover:-translate-y-0.5 hover:shadow-md"
-      }`}
-    >
+    <div className="rounded-3xl border border-dashed bg-muted/30 p-5">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className={isLocked ? "text-muted-foreground" : "text-primary"}>
-            {icon}
-          </span>
-          <h3 className={`font-medium ${isLocked ? "text-muted-foreground" : ""}`}>
-            {title}
-          </h3>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          {icon}
+          <h3 className="font-bold text-foreground">{title}</h3>
         </div>
-        {isLocked ? <Lock className="h-4 w-4 text-muted-foreground" /> : null}
+        <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-bold text-accent-foreground">
+          Bientôt
+        </span>
       </div>
-
-      <p className="mb-4 min-h-[48px] text-sm text-muted-foreground">{text}</p>
-
-      {isLocked ? (
-        <div className="mb-3 inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-          <Lock className="h-3 w-3" />
-          {lockedLabel}
-        </div>
-      ) : null}
-
-      <Button variant="outline" className="w-full rounded-2xl" disabled>
-        {isLocked ? lockedLabel : "Bientôt disponible"}
-      </Button>
+      <p className="text-sm text-muted-foreground">{text}</p>
     </div>
   );
 }
