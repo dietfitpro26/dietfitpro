@@ -31,7 +31,7 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "DietFitPro — Votre coach Nutrition & Sport" },
       {
         property: "og:description",
-        content: "Pas de régime, juste de meilleures habitudes. Essayez gratuitement.",
+        content: "Pas de régime, juste de meilleures habitudes. 7 jours d'essai gratuit.",
       },
     ],
   }),
@@ -49,6 +49,8 @@ const HERO_VIDEO: string = "";
 const VIDEO_POSTER: string = "";
 const PHOTOS: { src: string; alt: string }[] = [];
 
+const TRIAL_LABEL = "7 jours d'essai gratuit";
+
 const MARQUEE = [
   "Suivi",
   "Accompagnement",
@@ -64,7 +66,7 @@ const STEPS = [
   {
     n: "1",
     title: "Créez votre compte",
-    desc: "Inscription en une minute, essai gratuit, sans engagement.",
+    desc: "Inscription en une minute, 7 jours d'essai gratuit, sans engagement.",
   },
   {
     n: "2",
@@ -95,17 +97,14 @@ const PREMIUM = [
   "Accès prioritaire",
 ];
 
-const VISIO = [
-  "20-30 min avec un expert",
-  "Via WhatsApp",
-  "Compte-rendu inclus",
-  "Sans engagement",
-];
-
 const FAQ = [
   {
     q: "Dois-je compter mes calories ?",
     a: "Non. L'approche est comportementale : faim, satiété, humeur et énergie. Vous construisez de meilleures habitudes sans comptage permanent.",
+  },
+  {
+    q: "Combien de temps dure l'essai gratuit ?",
+    a: "L'essai dure 7 jours, aussi bien pour le Basic que pour le Premium. Il est offert lors de votre première souscription, et vous pouvez annuler avant la fin de l'essai.",
   },
   {
     q: "Puis-je annuler quand je veux ?",
@@ -236,7 +235,7 @@ function LandingPage() {
               </div>
 
               <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-muted-foreground">
-                {["Essai gratuit", "Sans engagement", "Annulable à tout moment"].map((t) => (
+                {[TRIAL_LABEL, "Sans engagement", "Annulable à tout moment"].map((t) => (
                   <li key={t} className="flex items-center gap-2">
                     <CheckCircle2 className="h-5 w-5 text-primary" />
                     {t}
@@ -454,7 +453,7 @@ function LandingPage() {
             Choisissez l'offre qui vous convient. Changez à tout moment.
           </p>
 
-          <div className="mt-14 grid items-stretch gap-6 md:grid-cols-3">
+          <div className="mx-auto mt-14 grid max-w-4xl items-stretch gap-6 md:grid-cols-2">
             {/* Basic */}
             <div className="flex flex-col rounded-3xl border bg-card p-8 shadow-sm transition-all hover:shadow-xl">
               <div className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
@@ -463,7 +462,7 @@ function LandingPage() {
               <p className="text-5xl font-extrabold">
                 9,99€<span className="text-base font-medium text-muted-foreground">/mois</span>
               </p>
-              <p className="mt-2 text-sm font-semibold text-primary">Essai gratuit</p>
+              <p className="mt-2 text-sm font-semibold text-primary">{TRIAL_LABEL}</p>
               <ul className="mt-6 flex-1 space-y-3">
                 {BASIC.map((i) => (
                   <li key={i} className="flex items-start gap-2">
@@ -488,7 +487,7 @@ function LandingPage() {
               <p className="text-5xl font-extrabold">
                 25,99€<span className="text-base font-medium text-background/70">/mois</span>
               </p>
-              <p className="mt-2 text-sm font-semibold text-brand">Essai gratuit</p>
+              <p className="mt-2 text-sm font-semibold text-brand">{TRIAL_LABEL}</p>
               <ul className="mt-6 flex-1 space-y-3">
                 {PREMIUM.map((i) => (
                   <li key={i} className="flex items-start gap-2">
@@ -504,27 +503,29 @@ function LandingPage() {
                 <Link to="/register">Commencer l'essai</Link>
               </Button>
             </div>
+          </div>
 
-            {/* Visio */}
-            <div className="flex flex-col rounded-3xl border bg-card p-8 shadow-sm transition-all hover:shadow-xl">
-              <div className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                <MessageCircle className="h-5 w-5 text-primary" /> Visio
+          {/* Option programme personnalisé */}
+          <div className="mx-auto mt-14 flex max-w-4xl flex-col gap-6 rounded-3xl border-2 border-dashed border-primary/40 bg-accent p-8 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-4">
+              <Sparkles className="mt-1 h-8 w-8 shrink-0 text-primary" />
+              <div>
+                <p className="text-sm font-bold uppercase tracking-wider text-primary">
+                  Option
+                </p>
+                <h3 className="text-2xl">Programme ultra-personnalisé</h3>
+                <p className="mt-2 text-muted-foreground">
+                  Avec votre abonnement Premium, ajoutez un programme nutrition conçu
+                  spécialement pour vous, à partir de votre profil et de vos objectifs.
+                </p>
               </div>
-              <p className="text-5xl font-extrabold">
-                30€<span className="text-base font-medium text-muted-foreground">/session</span>
+            </div>
+
+            <div className="shrink-0 text-left md:text-right">
+              <p className="text-4xl font-extrabold">5 €</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                une seule fois, à ajouter depuis votre espace
               </p>
-              <p className="mt-2 text-sm font-semibold text-primary">Sans abonnement</p>
-              <ul className="mt-6 flex-1 space-y-3">
-                {VISIO.map((i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <Check />
-                    <span>{i}</span>
-                  </li>
-                ))}
-              </ul>
-              <Button className="mt-8 h-12 w-full rounded-full font-bold" variant="outline" asChild>
-                <Link to="/register">Réserver</Link>
-              </Button>
             </div>
           </div>
         </section>
@@ -556,8 +557,8 @@ function LandingPage() {
           <div className="relative mx-auto max-w-3xl px-4 sm:px-6">
             <h2 className="text-4xl sm:text-5xl">Prêt à changer vos habitudes ?</h2>
             <p className="mx-auto mt-5 max-w-xl text-lg text-background/80">
-              Commencez aujourd'hui avec un essai gratuit, un suivi personnalisé et un
-              accompagnement à vos côtés.
+              Commencez aujourd'hui avec 7 jours d'essai gratuit, un suivi personnalisé et
+              un accompagnement à vos côtés.
             </p>
             <Button
               size="lg"
