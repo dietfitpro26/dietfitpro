@@ -27,8 +27,6 @@ import { useConversations } from "@/hooks/useMessages";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
-
-
 const NAV = [
   { to: "/pro/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/pro/patients", label: "Mes patients", icon: Users },
@@ -44,8 +42,6 @@ const NAV = [
   { to: "/pro/settings", label: "Paramètres", icon: Settings },
 ] as const;
 
-
-
 export function ProLayout({ children }: { children: ReactNode }) {
   const { profile, signOut } = useAuth();
   const [open, setOpen] = useState(false);
@@ -53,8 +49,6 @@ export function ProLayout({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const { totalUnread: unreadMessages } = useConversations();
-
-
 
   // Nombre de contenus signalés en attente (mis à jour à chaque changement de page)
   useEffect(() => {
@@ -101,8 +95,6 @@ export function ProLayout({ children }: { children: ReactNode }) {
     };
   }, [pathname]);
 
-
-
   const initials = (profile?.full_name ?? profile?.email ?? "?")
     .split(" ")
     .map((word) => word[0])
@@ -110,21 +102,17 @@ export function ProLayout({ children }: { children: ReactNode }) {
     .slice(0, 2)
     .toUpperCase();
 
-
-
   const handleSignOut = async () => {
     await signOut();
     void navigate({ to: "/login" });
   };
 
-
-
   const SidebarInner = (
     <div className="flex h-full w-64 flex-col bg-[#1A1A1A] text-white">
       <div className="flex items-center justify-between border-b border-white/10 p-4">
-        <Logo className="[&_span]:text-white [&_span:last-child]:text-white/60" />
-
-
+        <div className="rounded-xl bg-white px-3 py-2 shadow-sm">
+          <Logo className="[&_span]:!text-[#1A1A1A] [&_span:last-child]:!text-[#6DB33F]" />
+        </div>
 
         <button
           type="button"
@@ -136,8 +124,6 @@ export function ProLayout({ children }: { children: ReactNode }) {
         </button>
       </div>
 
-
-
       <nav
         className="flex-1 space-y-1 overflow-y-auto px-3 py-4"
         aria-label="Navigation professionnelle"
@@ -146,8 +132,6 @@ export function ProLayout({ children }: { children: ReactNode }) {
           const active =
             pathname === item.to || pathname.startsWith(`${item.to}/`);
           const Icon = item.icon;
-
-
 
           return (
             <Link
@@ -165,15 +149,11 @@ export function ProLayout({ children }: { children: ReactNode }) {
               <Icon className="h-4 w-4 shrink-0" />
               <span className="min-w-0 flex-1 truncate">{item.label}</span>
 
-
-
               {item.to === "/pro/messages" && unreadMessages > 0 ? (
                 <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#6DB33F] px-1 text-[10px] font-semibold text-white">
                   {unreadMessages > 99 ? "99+" : unreadMessages}
                 </span>
               ) : null}
-
-
 
               {item.to === "/pro/feed" && pendingReports > 0 ? (
                 <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#6DB33F] px-1 text-[10px] font-semibold text-white">
@@ -185,16 +165,12 @@ export function ProLayout({ children }: { children: ReactNode }) {
         })}
       </nav>
 
-
-
       <div className="flex items-center gap-3 border-t border-white/10 p-3">
         <Avatar className="h-9 w-9">
           <AvatarFallback className="bg-[#6DB33F] text-xs text-white">
             {initials}
           </AvatarFallback>
         </Avatar>
-
-
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">
@@ -204,8 +180,6 @@ export function ProLayout({ children }: { children: ReactNode }) {
             Professionnel
           </span>
         </div>
-
-
 
         <Button
           type="button"
@@ -221,19 +195,13 @@ export function ProLayout({ children }: { children: ReactNode }) {
     </div>
   );
 
-
-
   return (
     <div className="flex min-h-screen bg-background">
       <UpcomingConsultationReminder />
 
-
-
       <aside className="fixed inset-y-0 left-0 z-40 hidden md:block">
         {SidebarInner}
       </aside>
-
-
 
       {open ? (
         <div className="fixed inset-0 z-50 flex md:hidden">
@@ -247,8 +215,6 @@ export function ProLayout({ children }: { children: ReactNode }) {
         </div>
       ) : null}
 
-
-
       <div className="flex min-w-0 flex-1 flex-col md:ml-64">
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 backdrop-blur md:hidden">
           <button
@@ -259,16 +225,12 @@ export function ProLayout({ children }: { children: ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
 
-
-
-          <Logo />
-
-
+          <div className="rounded-lg bg-white px-2 py-1 shadow-sm">
+            <Logo />
+          </div>
 
           <NotificationBell to="/pro/notifications" />
         </header>
-
-
 
         <main className="min-w-0 flex-1">{children}</main>
       </div>

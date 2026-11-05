@@ -406,25 +406,21 @@ function SportContent() {
   return (
     <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
       <div className="mx-auto max-w-6xl space-y-6">
-        <Card className="rounded-3xl border shadow-sm">
-          <CardHeader>
-            <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <Dumbbell className="h-6 w-6" />
-              </div>
-
-              <div>
-                <CardTitle className="text-xl sm:text-2xl">
-                  Sport
-                </CardTitle>
-                <CardDescription className="mt-1 text-sm sm:text-base">
-                  Bonjour {profile?.full_name?.split(" ")[0] ?? "vous"}, voici
-                  vos programmes et votre planning sportif.
-                </CardDescription>
-              </div>
+        <header className="relative overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-primary/5 p-5 shadow-sm sm:p-7">
+          <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+          <div className="relative space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/80 px-3 py-1.5 text-xs font-semibold text-primary">
+              <Dumbbell className="h-4 w-4" aria-hidden="true" />
+              Mon suivi
             </div>
-          </CardHeader>
-        </Card>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              Sport
+            </h1>
+            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+              Bonjour {profile?.full_name?.split(" ")[0] ?? "vous"}, voici vos programmes et votre planning sportif.
+            </p>
+          </div>
+        </header>
 
         <div className="grid gap-4 md:grid-cols-3">
           <InfoCard

@@ -377,39 +377,40 @@ function DashboardContent() {
   return (
     <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        <section className="overflow-hidden rounded-3xl border bg-card shadow-sm">
-          <div className="bg-gradient-to-br from-primary/10 via-card to-card p-5 sm:p-7">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <p className="text-sm font-medium text-primary">Votre espace professionnel</p>
-                <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-                  Bonjour {firstName}
-                </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Voici les éléments importants à traiter dans votre activité.
-                </p>
+        <header className="relative overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-primary/5 p-5 shadow-sm sm:p-7">
+          <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/80 px-3 py-1.5 text-xs font-semibold text-primary">
+                Votre espace professionnel
               </div>
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                Bonjour {firstName}
+              </h1>
+              <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+                Voici les éléments importants à traiter dans votre activité.
+              </p>
+            </div>
 
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  className="rounded-2xl"
-                  onClick={() => void navigate({ to: "/pro/notifications" })}
-                >
-                  <Bell className="mr-2 h-4 w-4" />
-                  Notifications{unreadCount > 0 ? ` (${unreadCount})` : ""}
-                </Button>
-                <Button
-                  className="rounded-2xl bg-[#6DB33F] text-white hover:bg-[#2D7A1F]"
-                  onClick={() => void navigate({ to: "/pro/patients" })}
-                >
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Nouveau patient
-                </Button>
-              </div>
+            <div className="relative flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                className="rounded-2xl bg-background/80"
+                onClick={() => void navigate({ to: "/pro/notifications" })}
+              >
+                <Bell className="mr-2 h-4 w-4" />
+                Notifications{unreadCount > 0 ? ` (${unreadCount})` : ""}
+              </Button>
+              <Button
+                className="rounded-2xl bg-[#6DB33F] text-white hover:bg-[#2D7A1F]"
+                onClick={() => void navigate({ to: "/pro/patients" })}
+              >
+                <UserPlus className="mr-2 h-4 w-4" />
+                Nouveau patient
+              </Button>
             </div>
           </div>
-        </section>
+        </header>
 
         {error ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
@@ -461,20 +462,20 @@ function DashboardContent() {
 
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold">Votre activité</h2>
+            <h2 className="text-lg font-semibold tracking-tight">Votre activité</h2>
             <p className="text-sm text-muted-foreground">
               Mises à jour automatiques toutes les minutes.
             </p>
           </div>
-          <Button variant="outline" size="sm" className="rounded-xl" onClick={handleRefresh} disabled={refreshing}>
+          <Button variant="outline" size="sm" className="rounded-xl bg-background/80" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />
             Actualiser
           </Button>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Card className="rounded-3xl border-border/60 shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <Card className="rounded-3xl border-border/60 bg-gradient-to-br from-card via-card to-muted/20 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/40 pb-4">
               <CardTitle className="flex items-center gap-2 text-base font-semibold">
                 <Video className="h-4 w-4 text-[#6DB33F]" />
                 Prochaines consultations
@@ -494,8 +495,8 @@ function DashboardContent() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-3xl border-border/60 shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <Card className="rounded-3xl border-border/60 bg-gradient-to-br from-card via-card to-muted/20 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/40 pb-4">
               <CardTitle className="flex items-center gap-2 text-base font-semibold">
                 <Users className="h-4 w-4 text-[#6DB33F]" />
                 Derniers patients
@@ -515,8 +516,8 @@ function DashboardContent() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-3xl border-border/60 shadow-sm lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <Card className="rounded-3xl border-border/60 bg-gradient-to-br from-card via-card to-muted/20 shadow-sm lg:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/40 pb-4">
               <CardTitle className="flex items-center gap-2 text-base font-semibold">
                 <UserCheck className="h-4 w-4 text-[#6DB33F]" />
                 Derniers abonnés
@@ -556,13 +557,19 @@ function DashboardContent() {
 
 function KpiCard({ label, value, icon, loading, highlight, onClick }: { label: string; value: number | undefined; icon: React.ReactNode; loading: boolean; highlight?: boolean; onClick?: () => void }) {
   return (
-    <button type="button" className="text-left" onClick={onClick} disabled={!onClick}>
-      <Card className={cn("h-full rounded-3xl border-border/60 text-left transition-shadow", onClick && "cursor-pointer hover:shadow-md", highlight && "border-[#6DB33F]/40 bg-[#6DB33F]/5")}>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
-          <div className="rounded-xl bg-[#6DB33F]/10 p-2">{icon}</div>
+    <button type="button" className="group text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-3xl" onClick={onClick} disabled={!onClick}>
+      <Card className={cn(
+        "h-full rounded-3xl border border-border/60 bg-gradient-to-br from-card via-card to-muted/30 text-left shadow-sm transition-all duration-200",
+        onClick && "cursor-pointer group-hover:-translate-y-0.5 group-hover:border-primary/25 group-hover:shadow-md",
+        highlight && "border-[#6DB33F]/35 from-[#6DB33F]/5 to-card"
+      )}>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-3 pb-3">
+          <CardTitle className="text-sm font-medium leading-snug text-muted-foreground">{label}</CardTitle>
+          <div className="shrink-0 rounded-2xl border border-primary/10 bg-primary/10 p-2.5">{icon}</div>
         </CardHeader>
-        <CardContent>{loading ? <Skeleton className="h-8 w-16" /> : <p className="text-3xl font-bold text-foreground">{value ?? 0}</p>}</CardContent>
+        <CardContent>
+          {loading ? <Skeleton className="h-9 w-16 rounded-lg" /> : <p className="text-3xl font-bold tracking-tight text-foreground">{value ?? 0}</p>}
+        </CardContent>
       </Card>
     </button>
   );
@@ -570,7 +577,7 @@ function KpiCard({ label, value, icon, loading, highlight, onClick }: { label: s
 
 function EmptyPanel({ icon, text, action, onClick }: { icon: React.ReactNode; text: string; action: string; onClick: () => void }) {
   return (
-    <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/70 bg-background/50 px-4 py-8 text-center text-sm text-muted-foreground">
       <span className="text-muted-foreground/40">{icon}</span>
       <span>{text}</span>
       <Button variant="outline" size="sm" onClick={onClick}>{action}</Button>
@@ -583,7 +590,7 @@ function ConsultationRow({ consult }: { consult: UpcomingConsultation }) {
   const dayLabel = isToday(date) ? "Aujourd'hui" : isTomorrow(date) ? "Demain" : format(date, "EEE d MMM", { locale: fr });
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-border/50 bg-muted/30 px-3 py-2.5">
+    <div className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/70 px-3 py-3 shadow-sm transition-colors hover:border-primary/20 hover:bg-muted/30">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{consult.patient_name}</p>
         <p className="text-xs text-muted-foreground">{dayLabel} à {format(date, "HH:mm")}{consult.duration_min ? ` · ${consult.duration_min} min` : ""}</p>
@@ -598,7 +605,7 @@ function PatientRow({ patient }: { patient: RecentPatient }) {
   const initials = `${patient.first_name[0] ?? ""}${patient.last_name[0] ?? ""}`.toUpperCase();
 
   return (
-    <button type="button" className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-muted/50" onClick={() => void navigate({ to: "/pro/patients/$patientId", params: { patientId: patient.id } })}>
+    <button type="button" className="flex w-full items-center gap-3 rounded-2xl border border-transparent bg-background/50 px-3 py-3 text-left transition-all hover:border-primary/15 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" onClick={() => void navigate({ to: "/pro/patients/$patientId", params: { patientId: patient.id } })}>
       <Avatar className="h-8 w-8"><AvatarFallback className="bg-[#6DB33F]/20 text-xs font-semibold text-[#2D7A1F]">{initials}</AvatarFallback></Avatar>
       <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{patient.first_name} {patient.last_name}</p><p className="text-xs text-muted-foreground">{(patient.goal && GOAL_LABEL[patient.goal]) ?? "Objectif non défini"}</p></div>
       <Badge variant="outline" className={cn("shrink-0 text-[10px]", patient.is_active ? "border-green-500/40 bg-green-50 text-green-700" : "border-gray-300 text-gray-500")}>{patient.is_active ? "Actif" : "Inactif"}</Badge>
@@ -615,14 +622,14 @@ function SubscriberRow({ subscriber, updating, deleting, onTogglePlan, onDelete 
   const isPremium = plan === "premium";
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-border/50 px-3 py-3 transition-colors hover:bg-muted/40">
-      <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => void navigate({ to: "/pro/subscribers" })}>
+    <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-border/50 bg-background/70 px-3 py-3 shadow-sm transition-all hover:border-primary/20 hover:bg-muted/30">
+      <button type="button" className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" onClick={() => void navigate({ to: "/pro/subscribers" })}>
         <Avatar className="h-8 w-8"><AvatarFallback className="bg-blue-100 text-xs font-semibold text-blue-700">{initials}</AvatarFallback></Avatar>
         <div className="min-w-0"><p className="truncate text-sm font-medium">{name}</p><p className="truncate text-xs text-muted-foreground">{subscriber.email}</p><Badge variant="outline" className={cn("mt-1 shrink-0 text-[10px]", isPremium ? "border-amber-500/40 bg-amber-50 text-amber-700" : "border-green-500/40 bg-green-50 text-green-700")}>{planLabel}</Badge></div>
       </button>
       <div className="flex shrink-0 items-center gap-2">
-        <Button size="sm" variant={isPremium ? "outline" : "default"} className={cn("h-8 rounded-xl", !isPremium && "bg-[#6DB33F] text-white hover:bg-[#2D7A1F]")} onClick={() => onTogglePlan(subscriber)} disabled={updating}>{updating ? "..." : isPremium ? "Basic" : "Premium"}</Button>
-        <Button size="sm" variant="destructive" className="h-8 rounded-xl" onClick={() => onDelete(subscriber)} disabled={deleting}>{deleting ? "..." : <Trash2 className="h-4 w-4" />}</Button>
+        <Button size="sm" variant={isPremium ? "outline" : "default"} className={cn("h-8 rounded-xl", !isPremium && "bg-[#6DB33F] text-white hover:bg-[#2D7A1F]")} onClick={() => onTogglePlan(subscriber)} disabled={updating} aria-label={`Passer ${name} au forfait ${isPremium ? "Basic" : "Premium"}`}>{updating ? "..." : isPremium ? "Basic" : "Premium"}</Button>
+        <Button size="sm" variant="destructive" className="h-8 rounded-xl" onClick={() => onDelete(subscriber)} disabled={deleting} aria-label={`Supprimer l’abonné ${name}`}>{deleting ? "..." : <Trash2 className="h-4 w-4" />}</Button>
       </div>
     </div>
   );

@@ -1073,27 +1073,21 @@ function Content() {
   return (
     <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
       <div className="mx-auto max-w-5xl space-y-6">
-        <Card className="rounded-3xl border shadow-sm">
-          <CardHeader className="space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <Utensils className="h-6 w-6" />
-              </div>
-
-              <div>
-                <CardTitle className="text-xl sm:text-2xl">
-                  Nutrition
-                </CardTitle>
-
-                <CardDescription className="mt-1 text-sm sm:text-base">
-                  Bonjour {firstName}, retrouvez ici
-                  vos documents, votre plan alimentaire
-                  et vos objectifs du jour.
-                </CardDescription>
-              </div>
+        <header className="relative overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-primary/5 p-5 shadow-sm sm:p-7">
+          <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+          <div className="relative space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/80 px-3 py-1.5 text-xs font-semibold text-primary">
+              <Utensils className="h-4 w-4" aria-hidden="true" />
+              Mon suivi
             </div>
-          </CardHeader>
-        </Card>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              Nutrition
+            </h1>
+            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+              Bonjour {firstName}, retrouvez ici vos documents, votre plan alimentaire et vos objectifs du jour.
+            </p>
+          </div>
+        </header>
 
         {patientId ? (
           <NutritionDocuments
@@ -1414,7 +1408,7 @@ function SlotCard({
       className={cn(
         "rounded-3xl border shadow-sm",
         checked &&
-          "border-[#6DB33F]/50 bg-[#6DB33F]/5",
+          "border-primary/40 bg-primary/5",
       )}
     >
       <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
@@ -1431,7 +1425,7 @@ function SlotCard({
           aria-pressed={checked}
           className={cn(
             checked &&
-              "bg-[#6DB33F] text-white hover:bg-[#2D7A1F]",
+              "bg-primary text-primary-foreground hover:bg-primary/90",
           )}
           onClick={onToggle}
         >
