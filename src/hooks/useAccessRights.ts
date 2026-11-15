@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth, type Profile } from "./useAuth";
@@ -43,7 +44,8 @@ type FreshProfileRow = {
 
 type BillingRow = {
   status: string | null;
-  managed_by_pro: boolean | null;
+  managed_by_pro: boolean;
+  billing_plan: string | null;
 };
 
 const ACCESS_KEYS: AccessKey[] = [
@@ -132,9 +134,13 @@ function isAccessKey(value: string): value is AccessKey {
   return ACCESS_KEYS.includes(value as AccessKey);
 }
 
+function isValidPlan(value: unknown): value is "basic" | "premium" {
+  return value === "basic" || value === "premium";
+}
+
 function getBaseRights(
   role: Profile["role"],
-  plan: Profile["plan"]
+  plan: Profile["plan"],
 ): AccessRights {
   if (role === "patient") {
     return plan === "premium"
@@ -152,19 +158,15 @@ function getBaseRights(
 function applyBooleanOverride(
   base: AccessRights,
   key: AccessKey,
-  value: boolean | null | undefined
+  value: boolean | null | undefined,
 ) {
   if (typeof value === "boolean") {
     base[key] = value;
   }
 }
 
-function isBillingActive(billing: BillingRow | null): boolean {
-  if (!billing) {
-    return false;
-  }
-
-  if (billing.managed_by_pro === true) {
+function isBillingActive(billing: BillingRow): boolean {
+  if (billing.managed_by_pro) {
     return true;
   }
 
@@ -180,154 +182,221 @@ export function useAccessRights() {
 
   const [rights, setRights] = useState<AccessRights | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
+    setRights(null);
+    setError(null);
+    setLoading(true);
+
     if (authLoading) {
-      return;
+      return () => {
+        cancelled = true;
+      };
     }
 
     if (!user || !profile) {
-      setRights(null);
       setLoading(false);
-      return;
+
+      return () => {
+        cancelled = true;
+      };
     }
 
     const currentUser = user;
     const currentProfile = profile;
 
     if (currentProfile.role === "pro") {
-      setRights(PRO_RIGHTS);
+      setRights({ ...PRO_RIGHTS });
       setLoading(false);
-      return;
+
+      return () => {
+        cancelled = true;
+      };
     }
 
-    let cancelled = false;
-
     async function loadRights() {
-      setLoading(true);
+      try {
+        let effectiveRole: Profile["role"] = currentProfile.role;
+        let effectivePlan: Profile["plan"] = currentProfile.plan;
 
-      let effectiveRole: Profile["role"] = currentProfile.role;
-      let effectivePlan: Profile["plan"] = currentProfile.plan;
-
-      const { data: freshProfile, error: freshProfileError } =
-        await supabase
+        // 1. Relecture du profil depuis Supabase.
+        const {
+          data: freshProfile,
+          error: freshProfileError,
+        } = await supabase
           .from("profiles")
           .select("role, plan")
           .eq("id", currentUser.id)
           .maybeSingle();
 
-      if (freshProfileError) {
-        console.error(
-          "[useAccessRights] erreur chargement profil :",
-          freshProfileError
-        );
-      } else {
-        const row = freshProfile as FreshProfileRow | null;
-
-        if (row?.role) {
-          effectiveRole = row.role;
+        if (freshProfileError) {
+          throw freshProfileError;
         }
 
-        if (row?.plan) {
-          effectivePlan = row.plan;
-        }
-      }
-
-      if (effectiveRole === "subscriber") {
-        const { data: billing, error: billingError } = await supabase
-          .from("subscriber_billing")
-          .select("status, managed_by_pro")
-          .eq("user_id", currentUser.id)
-          .maybeSingle();
-
-        if (billingError) {
-          console.error(
-            "[useAccessRights] erreur chargement abonnement :",
-            billingError
+        if (!freshProfile) {
+          throw new Error(
+            "Profil introuvable lors de la vérification des droits.",
           );
         }
 
-        const activeBilling = isBillingActive(
-          (billing ?? null) as BillingRow | null
-        );
+        if (cancelled) return;
 
-        if (!cancelled) {
-          if (!activeBilling) {
-            setRights(SUSPENDED_RIGHTS);
+        const row = freshProfile as FreshProfileRow;
+
+        if (row.role) {
+          effectiveRole = row.role;
+        }
+
+        if (row.plan) {
+          effectivePlan = row.plan;
+        }
+
+        // 2. Vérification de l'abonnement des abonnés.
+        if (effectiveRole === "subscriber") {
+          const { data: billing, error: billingError } = await supabase
+            .from("subscriber_billing")
+            .select("status, managed_by_pro, billing_plan")
+            .eq("user_id", currentUser.id)
+            .maybeSingle();
+
+          if (billingError) {
+            throw billingError;
+          }
+
+          if (cancelled) return;
+
+          // Une absence de facturation signifie que l'accès est suspendu.
+          if (!billing) {
+            setRights({ ...SUSPENDED_RIGHTS });
+            setLoading(false);
+            return;
+          }
+
+          const billingRow = billing as BillingRow;
+
+          // Les abonnés gérés par un professionnel conservent
+          // le plan défini dans leur profil.
+          if (billingRow.managed_by_pro === true) {
+            // effectivePlan reste celui de profiles.plan.
+          } else {
+            // Pour les abonnés Stripe, billing_plan fait foi.
+            if (!isValidPlan(billingRow.billing_plan)) {
+              throw new Error(
+                "Forfait de facturation invalide. Impossible de vérifier les droits du compte.",
+              );
+            }
+
+            effectivePlan = billingRow.billing_plan;
+          }
+
+          // Un abonnement Stripe inactif ne donne aucun droit.
+          if (!isBillingActive(billingRow)) {
+            setRights({ ...SUSPENDED_RIGHTS });
             setLoading(false);
             return;
           }
         }
-      }
 
-      const base = getBaseRights(effectiveRole, effectivePlan);
+        // 3. Calcul des droits de base.
+        const base = getBaseRights(effectiveRole, effectivePlan);
 
-      const { data: overrides, error: overridesError } = await supabase
-        .from("subscriber_overrides")
-        .select(`
-          feature_key,
-          enabled,
-          access_recipes,
-          access_sport_programs,
-          access_nutrition_programs,
-          access_messaging,
-          access_visio,
-          access_premium_content,
-          access_ai_coach,
-          metadata
-        `)
-        .eq("user_id", currentUser.id);
+        // 4. Lecture des dérogations configurées par le professionnel.
+        const { data: overrides, error: overridesError } = await supabase
+          .from("subscriber_overrides")
+          .select(`
+            feature_key,
+            enabled,
+            access_recipes,
+            access_sport_programs,
+            access_nutrition_programs,
+            access_messaging,
+            access_visio,
+            access_premium_content,
+            access_ai_coach,
+            metadata
+          `)
+          .eq("user_id", currentUser.id);
 
-      if (cancelled) {
-        return;
-      }
+        if (overridesError) {
+          throw overridesError;
+        }
 
-      if (overridesError) {
-        console.error(
-          "[useAccessRights] erreur chargement overrides :",
-          overridesError
-        );
-      } else if (overrides && overrides.length > 0) {
-        for (const row of overrides as OverrideRow[]) {
-          applyBooleanOverride(base, "access_recipes", row.access_recipes);
-          applyBooleanOverride(
-            base,
-            "access_sport_programs",
-            row.access_sport_programs
-          );
-          applyBooleanOverride(
-            base,
-            "access_nutrition_programs",
-            row.access_nutrition_programs
-          );
-          applyBooleanOverride(base, "access_messaging", row.access_messaging);
-          applyBooleanOverride(base, "access_visio", row.access_visio);
-          applyBooleanOverride(
-            base,
-            "access_premium_content",
-            row.access_premium_content
-          );
-          applyBooleanOverride(base, "access_ai_coach", row.access_ai_coach);
+        if (cancelled) return;
 
-          if (row.feature_key && isAccessKey(row.feature_key)) {
-            applyBooleanOverride(base, row.feature_key, row.enabled);
-          }
+        if (overrides && overrides.length > 0) {
+          for (const row of overrides as OverrideRow[]) {
+            applyBooleanOverride(base, "access_recipes", row.access_recipes);
 
-          const sportLimit =
-            row.metadata &&
-            typeof row.metadata === "object" &&
-            typeof row.metadata["sport_session_limit"] === "number"
-              ? row.metadata["sport_session_limit"]
-              : null;
+            applyBooleanOverride(
+              base,
+              "access_sport_programs",
+              row.access_sport_programs,
+            );
 
-          if (typeof sportLimit === "number") {
-            base.sport_session_limit = sportLimit;
+            applyBooleanOverride(
+              base,
+              "access_nutrition_programs",
+              row.access_nutrition_programs,
+            );
+
+            applyBooleanOverride(
+              base,
+              "access_messaging",
+              row.access_messaging,
+            );
+
+            applyBooleanOverride(base, "access_visio", row.access_visio);
+
+            applyBooleanOverride(
+              base,
+              "access_premium_content",
+              row.access_premium_content,
+            );
+
+            applyBooleanOverride(
+              base,
+              "access_ai_coach",
+              row.access_ai_coach,
+            );
+
+            if (row.feature_key && isAccessKey(row.feature_key)) {
+              applyBooleanOverride(base, row.feature_key, row.enabled);
+            }
+
+            const sportLimit =
+              row.metadata &&
+              typeof row.metadata === "object" &&
+              typeof row.metadata["sport_session_limit"] === "number"
+                ? row.metadata["sport_session_limit"]
+                : null;
+
+            if (typeof sportLimit === "number") {
+              base.sport_session_limit = sportLimit;
+            }
           }
         }
-      }
 
-      if (!cancelled) {
-        setRights(base);
+        if (!cancelled) {
+          setRights(base);
+          setLoading(false);
+        }
+      } catch (caughtError) {
+        if (cancelled) return;
+
+        console.error(
+          "[useAccessRights] erreur de vérification des droits :",
+          caughtError,
+        );
+
+        setRights(null);
+        setError(
+          caughtError instanceof Error
+            ? caughtError
+            : new Error("Impossible de vérifier les droits du compte."),
+        );
         setLoading(false);
       }
     }
@@ -342,5 +411,7 @@ export function useAccessRights() {
   return {
     rights,
     loading: loading || authLoading,
+    error,
+    verified: rights !== null && error === null && !authLoading,
   };
 }

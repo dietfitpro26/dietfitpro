@@ -141,7 +141,7 @@ const EXERCISE_TYPE_LABEL: Record<string, string> = {
 
 function SportContent() {
   const { profile, user } = useAuth();
-  const { rights, loading: accessLoading } = useAccessRights();
+  const { rights, loading: accessLoading, error: accessError } = useAccessRights();
   const { state: accessState } = useAccessState();
 
 
@@ -600,6 +600,34 @@ function SportContent() {
   }
 
 
+
+  if (accessError || !rights) {
+    return (
+      <div className="min-h-full p-4 sm:p-6">
+        <div className="mx-auto max-w-2xl">
+          <Card className="rounded-3xl border shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-xl">
+                Vérification de votre accès impossible
+              </CardTitle>
+              <CardDescription>
+                Nous ne pouvons pas vérifier votre formule pour le moment.
+                Vos droits n'ont pas été modifiés. Veuillez réessayer.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                className="rounded-full"
+                onClick={() => window.location.reload()}
+              >
+                Réessayer
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (accessState === "suspended") {
     return <SuspendedAccountScreen />;

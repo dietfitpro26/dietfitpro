@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -16,11 +15,20 @@ function json(body: Record<string, unknown>, status = 200) {
 
 type FormValue = string | number | boolean | null | undefined;
 
+type StripeResponse = {
+  id?: string;
+  url?: string;
+  amount_total?: number | null;
+  error?: {
+    message?: string;
+  };
+};
+
 async function stripeCall(
   path: string,
   method: "GET" | "POST",
   params?: Record<string, FormValue>,
-): Promise<any> {
+): Promise<StripeResponse> {
   const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
   if (!stripeKey) throw new Error("STRIPE_SECRET_KEY manquante.");
 
@@ -38,13 +46,13 @@ async function stripeCall(
     body: method === "POST" ? form.toString() : undefined,
   });
 
-  const data = await response.json().catch(() => null);
+  const data: StripeResponse | null = await response.json().catch(() => null);
 
   if (!response.ok) {
     throw new Error(data?.error?.message ?? `Erreur Stripe (${response.status}).`);
   }
 
-  return data;
+  return data ?? {};
 }
 
 // N'accepte que le site officiel (SITE_URL) ou un site local de développement.
@@ -73,12 +81,17 @@ Deno.serve(async (request: Request) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const authorization = request.headers.get("Authorization");
 
-    if (!supabaseUrl || !serviceRoleKey) return json({ error: "Configuration serveur incomplète." }, 500);
+    if (!supabaseUrl || !serviceRoleKey) {
+      return json({ error: "Configuration serveur incomplète." }, 500);
+    }
     if (!authorization) return json({ error: "Connexion requise." }, 401);
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
     const token = authorization.replace(/^Bearer\s+/i, "");
-    const { data: { user }, error: userError } = await admin.auth.getUser(token);
+    const {
+      data: { user },
+      error: userError,
+    } = await admin.auth.getUser(token);
 
     if (userError || !user) return json({ error: "Session invalide." }, 401);
 
@@ -132,12 +145,20 @@ Deno.serve(async (request: Request) => {
         email: profile.email,
         "metadata[user_id]": user.id,
       });
-      customerId = customer.id as string;
+      if (!customer.id) throw new Error("Stripe n'a pas retourné d'identifiant client.");
+      customerId = customer.id;
 
       if (billing) {
-        await admin.from("subscriber_billing").update({ stripe_customer_id: customerId }).eq("user_id", user.id);
+        const { error } = await admin
+          .from("subscriber_billing")
+          .update({ stripe_customer_id: customerId })
+          .eq("user_id", user.id);
+        if (error) throw new Error("Impossible d'enregistrer le client Stripe.");
       } else {
-        await admin.from("subscriber_billing").insert({ user_id: user.id, stripe_customer_id: customerId });
+        const { error } = await admin
+          .from("subscriber_billing")
+          .insert({ user_id: user.id, stripe_customer_id: customerId });
+        if (error) throw new Error("Impossible d'enregistrer le client Stripe.");
       }
     }
 
@@ -157,7 +178,9 @@ Deno.serve(async (request: Request) => {
       if (!isSubscriber) return json({ error: "Réservé aux abonnés." }, 403);
 
       const plan = body.plan;
-      if (plan !== "basic" && plan !== "premium") return json({ error: "Formule invalide." }, 400);
+      if (plan !== "basic" && plan !== "premium") {
+        return json({ error: "Formule invalide." }, 400);
+      }
 
       if (billing?.stripe_subscription_id && ACTIVE_STATUSES.includes(billing.status)) {
         return json({ error: "Vous avez déjà un abonnement en ligne. Utilisez « Gérer mon abonnement »." }, 409);
@@ -184,13 +207,16 @@ Deno.serve(async (request: Request) => {
         cancel_url: `${origin}/home?checkout=cancel`,
       });
 
+      if (!session.url) throw new Error("Stripe n'a pas retourné d'URL de paiement.");
       return json({ url: session.url });
     }
 
     // 2) Programme personnalisé (Premium uniquement)
     if (kind === "custom_program") {
       if (!isSubscriber) return json({ error: "Réservé aux abonnés." }, 403);
-      if (profile.plan !== "premium") return json({ error: "Le programme personnalisé est réservé aux abonnés Premium." }, 403);
+      if (profile.plan !== "premium") {
+        return json({ error: "Le programme personnalisé est réservé aux abonnés Premium." }, 403);
+      }
 
       const priceId = settings.stripe_price_custom_program;
       if (!priceId) return json({ error: "Tarif non configuré." }, 500);
@@ -207,7 +233,11 @@ Deno.serve(async (request: Request) => {
         cancel_url: `${origin}/subscriber/nutrition`,
       });
 
-      await admin.from("purchases").insert({
+      if (!session.id || !session.url) {
+        throw new Error("Stripe n'a pas retourné les informations de paiement attendues.");
+      }
+
+      const { error } = await admin.from("purchases").insert({
         user_id: user.id,
         kind: "custom_program",
         amount_cents: session.amount_total ?? 500,
@@ -215,6 +245,7 @@ Deno.serve(async (request: Request) => {
         status: "pending",
         stripe_checkout_session_id: session.id,
       });
+      if (error) throw new Error("Impossible d'enregistrer l'achat en attente.");
 
       return json({ url: session.url });
     }
@@ -257,7 +288,11 @@ Deno.serve(async (request: Request) => {
         cancel_url: `${origin}${backPath}?payment=cancel`,
       });
 
-      await admin.from("purchases").insert({
+      if (!session.id || !session.url) {
+        throw new Error("Stripe n'a pas retourné les informations de paiement attendues.");
+      }
+
+      const { error } = await admin.from("purchases").insert({
         user_id: user.id,
         kind: "visio",
         amount_cents: session.amount_total ?? 3000,
@@ -266,6 +301,7 @@ Deno.serve(async (request: Request) => {
         stripe_checkout_session_id: session.id,
         visio_consultation_id: consultationId,
       });
+      if (error) throw new Error("Impossible d'enregistrer le paiement en attente.");
 
       return json({ url: session.url });
     }

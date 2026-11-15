@@ -472,7 +472,9 @@ function SubscriberProfileContent() {
 
   const planLabel =
     profile?.plan === "premium" ? "Premium" : profile?.plan === "basic" ? "Basic" : (profile?.plan ?? "—");
-  const statusLabel = ACCESS_STATE_LABELS[accessState] ?? "—";
+  const statusLabel = accessState
+  ? ACCESS_STATE_LABELS[accessState] ?? "—"
+  : "—";
   const initials =
     (profile?.full_name ?? "")
       .split(" ")

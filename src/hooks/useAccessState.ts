@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -39,20 +40,25 @@ export function useAccessState() {
       const { data, error } = await supabase.rpc("my_access_state");
 
       if (error) {
-        // En cas d'erreur technique, on ne bloque jamais l'abonné.
         console.error("[useAccessState]", error);
-        return "unrestricted";
+        throw error;
       }
 
-      return KNOWN_STATES.includes(data as AccessState)
-        ? (data as AccessState)
-        : "unrestricted";
+      if (!KNOWN_STATES.includes(data as AccessState)) {
+        throw new Error(
+          `[useAccessState] État d'accès inconnu reçu : ${String(data)}`,
+        );
+      }
+
+      return data as AccessState;
     },
   });
 
   return {
-    state: (query.data ?? "unrestricted") as AccessState,
+    state: query.data ?? null,
     loading: enabled && query.isLoading,
+    error: query.error,
+    verified: !enabled || query.isSuccess,
   };
 }
 
@@ -69,14 +75,19 @@ export function useBillingEnabled() {
 
       if (error) {
         console.error("[useBillingEnabled]", error);
-        return false;
+        throw error;
       }
 
       return data === true;
     },
   });
 
-  return { billingEnabled: query.data ?? false, loading: query.isLoading };
+  return {
+    billingEnabled: query.data ?? false,
+    loading: query.isLoading,
+    error: query.error,
+    verified: query.isSuccess,
+  };
 }
 
 export interface MyBillingRow {
@@ -94,10 +105,11 @@ export interface MyBillingRow {
 /** Ligne d'abonnement de l'utilisateur connecté (vide tant qu'il n'a jamais payé). */
 export function useMyBilling() {
   const { user, role } = useAuth();
+  const enabled = Boolean(user) && role === "subscriber";
 
   const query = useQuery({
     queryKey: ["my-billing", user?.id ?? null],
-    enabled: Boolean(user) && role === "subscriber",
+    enabled,
     staleTime: 60_000,
     queryFn: async (): Promise<MyBillingRow | null> => {
       const { data, error } = await supabase
@@ -110,12 +122,17 @@ export function useMyBilling() {
 
       if (error) {
         console.error("[useMyBilling]", error);
-        return null;
+        throw error;
       }
 
       return (data as MyBillingRow | null) ?? null;
     },
   });
 
-  return { billing: query.data ?? null, loading: query.isLoading };
+  return {
+    billing: query.data ?? null,
+    loading: enabled && query.isLoading,
+    error: query.error,
+    verified: !enabled || query.isSuccess,
+  };
 }

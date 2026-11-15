@@ -131,7 +131,7 @@ function SubscriberHomePage() {
 
 function HomeContent() {
   const { user, profile } = useAuth();
-  const { rights, loading } = useAccessRights();
+  const { rights, loading, error } = useAccessRights();
 
 
   const firstName = profile?.full_name?.split(" ")[0] ?? "vous";
@@ -159,7 +159,7 @@ function HomeContent() {
   const isPremium = displayedPlan === "premium";
 
 
-  if (loading || !rights) {
+  if (loading) {
     return (
       <div className="space-y-4 p-4 sm:p-6">
         <div className="mx-auto max-w-5xl space-y-4">
@@ -173,6 +173,28 @@ function HomeContent() {
             <div className="h-52 animate-pulse rounded-3xl bg-muted" />
             <div className="h-52 animate-pulse rounded-3xl bg-muted" />
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !rights) {
+    return (
+      <div className="min-h-full p-4 sm:p-6">
+        <div className="mx-auto max-w-2xl rounded-3xl border bg-card p-6 text-center shadow-sm">
+          <h2 className="text-xl font-bold">
+            Vérification de votre accès impossible
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Nous ne pouvons pas vérifier votre formule pour le moment.
+            Vos droits n'ont pas été modifiés. Veuillez réessayer.
+          </p>
+          <Button
+            className="mt-5 rounded-full"
+            onClick={() => window.location.reload()}
+          >
+            Réessayer
+          </Button>
         </div>
       </div>
     );
