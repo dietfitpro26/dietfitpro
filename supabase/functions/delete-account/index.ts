@@ -98,6 +98,14 @@ Deno.serve(async (request: Request) => {
     if (!isSelfDelete && !isPro) return json({ error: "Suppression non autorisée." }, 403);
 
     let targetRole: string | null = null;
+    if (isSelfDelete) {
+      const { data: selfProfile, error: selfProfileError } = await admin
+        .from("profiles").select("role").eq("id", caller.id).maybeSingle();
+      if (selfProfileError) {
+        return json({ error: "Erreur lecture du compte à supprimer.", details: selfProfileError.message }, 500);
+      }
+      targetRole = selfProfile?.role ?? null;
+    }
     let proId: string | null = null;
     let patientFolder: string | null = null;
 
