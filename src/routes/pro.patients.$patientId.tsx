@@ -299,11 +299,15 @@ function PatientDetailContent() {
         throw new Error(data?.error || "La suppression du patient n'a pas été confirmée.");
       }
 
-      toast.success(
-        patient.user_id
-          ? "Le dossier et le compte patient ont été supprimés."
-          : "Le dossier patient a été supprimé.",
-      );
+      if (data?.warning) {
+        toast.warning(data.warning);
+      } else {
+        toast.success(
+          patient.user_id
+            ? "Le dossier et le compte patient ont été supprimés."
+            : "Le dossier patient a été supprimé.",
+        );
+      }
       navigate({ to: "/pro/patients" });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur inconnue.";
@@ -803,7 +807,9 @@ function PatientDetailContent() {
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Vous allez supprimer <strong>{patient?.first_name} {patient?.last_name}</strong> ainsi que toutes ses données. Cette action est <strong>irréversible</strong>.
+            Vous allez supprimer <strong>{patient?.first_name} {patient?.last_name}</strong> ainsi que son dossier et toutes ses données.
+            {patient?.user_id ? " Son compte de connexion DietFitPro sera également supprimé définitivement." : ""}
+            {" "}Cette action est <strong>irréversible</strong>.
           </p>
           <DialogFooter className="gap-2 mt-2">
             <Button variant="ghost" onClick={() => setDeleteOpen(false)}>Annuler</Button>
