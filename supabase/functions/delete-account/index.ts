@@ -167,19 +167,6 @@ Deno.serve(async (request: Request) => {
       }
     }
 
-    if (patientFolder) {
-      try {
-        await removeStorageFolder(admin, "message-attachments", patientFolder);
-      } catch (error) {
-        const details = error instanceof Error ? error.message : String(error);
-        console.error("[delete-account] Nettoyage documents patient incomplet :", details);
-        return json({
-          error: "Le compte/dossier n'a pas été supprimé car les documents n'ont pas pu être nettoyés.",
-          details,
-        }, 500);
-      }
-    }
-
     if (patientId) {
       const { error: visioError } = await admin.from("visio_consultations")
         .delete().eq("patient_id", patientId);
@@ -210,10 +197,28 @@ Deno.serve(async (request: Request) => {
       if (patientDeleteError) return json({ error: "La suppression du dossier patient a échoué.", details: patientDeleteError.message }, 500);
     }
 
+    let storageWarning: string | null = null;
+    const storageFolder = patientFolder ?? (targetRole === "subscriber" && effectiveUserId
+      ? `${caller.id}/subscriber-docs/${effectiveUserId}`
+      : null);
+
+    if (storageFolder) {
+      try {
+        await removeStorageFolder(admin, "message-attachments", storageFolder);
+      } catch (error) {
+        storageWarning = error instanceof Error ? error.message : String(error);
+        console.error("[delete-account] Nettoyage documents incomplet :", storageWarning);
+      }
+    }
+
     return json({
       success: true,
       deleted_user_id: effectiveUserId,
       deleted_patient_id: patientId,
+      ...(storageWarning ? {
+        warning: "Le compte/dossier est supprimé, mais certains fichiers stockés restent à nettoyer.",
+        storage_details: storageWarning,
+      } : {}),
     });
   } catch (error) {
     console.error("[delete-account] Exception :", error);
