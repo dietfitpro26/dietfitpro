@@ -283,20 +283,35 @@ function PatientDetailContent() {
   }, [patientId, user]);
 
   const handleDelete = async () => {
+    if (!patient || !user || deleting) return;
+
     setDeleting(true);
     try {
-      await supabase.from("body_measurements").delete().eq("patient_id", patientId);
-      await supabase.from("nutrition_programs").delete().eq("patient_id", patientId);
-      await supabase.from("patient_sport_programs").delete().eq("patient_id", patientId);
-      await supabase.from("patient_documents").delete().eq("patient_id", patientId);
-      if (patient?.user_id) {
-        await supabase.from("appointments").delete().eq("patient_user_id", patient.user_id);
+      const { data, error: invokeError } = await supabase.functions.invoke(
+        "delete-account",
+        { body: { patient_id: patient.id } },
+      );
+
+      if (invokeError) {
+        throw new Error(invokeError.message || "La suppression du patient a échoué.");
       }
-      const { error } = await supabase.from("patients").delete().eq("id", patientId);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Patient supprimé ✅");
+      if (!data?.success) {
+        throw new Error(data?.error || "La suppression du patient n'a pas été confirmée.");
+      }
+
+      toast.success(
+        patient.user_id
+          ? "Le dossier et le compte patient ont été supprimés."
+          : "Le dossier patient a été supprimé.",
+      );
       navigate({ to: "/pro/patients" });
-    } finally { setDeleting(false); setDeleteOpen(false); }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur inconnue.";
+      console.error("[patient.delete] Échec suppression :", error);
+      toast.error(message);
+    } finally {
+      setDeleting(false);
+    }
   };
   const handleDeleteMeasurement = async (id: string) => {
     if (!confirm("Supprimer cette mesure ?")) return;
