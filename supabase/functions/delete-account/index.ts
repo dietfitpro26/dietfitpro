@@ -159,6 +159,19 @@ Deno.serve(async (request: Request) => {
       }
     }
 
+    if (patientFolder) {
+      try {
+        await removeStorageFolder(admin, "message-attachments", patientFolder);
+      } catch (error) {
+        const details = error instanceof Error ? error.message : String(error);
+        console.error("[delete-account] Nettoyage documents patient incomplet :", details);
+        return json({
+          error: "Le compte/dossier n'a pas été supprimé car les documents n'ont pas pu être nettoyés.",
+          details,
+        }, 500);
+      }
+    }
+
     if (patientId) {
       const { error: visioError } = await admin.from("visio_consultations")
         .delete().eq("patient_id", patientId);
@@ -187,19 +200,6 @@ Deno.serve(async (request: Request) => {
       const { error: patientDeleteError } = await admin.from("patients")
         .delete().eq("id", patientId).eq("pro_id", caller.id);
       if (patientDeleteError) return json({ error: "La suppression du dossier patient a échoué.", details: patientDeleteError.message }, 500);
-    }
-
-    if (patientFolder) {
-      try {
-        await removeStorageFolder(admin, "message-attachments", patientFolder);
-      } catch (error) {
-        const details = error instanceof Error ? error.message : String(error);
-        console.error("[delete-account] Nettoyage documents patient incomplet :", details);
-        return json({
-          error: "Le compte/dossier n'a pas été supprimé car les documents n'ont pas pu être nettoyés.",
-          details,
-        }, 500);
-      }
     }
 
     return json({
