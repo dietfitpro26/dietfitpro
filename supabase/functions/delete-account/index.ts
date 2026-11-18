@@ -98,15 +98,16 @@ Deno.serve(async (request: Request) => {
     if (!isSelfDelete && !isPro) return json({ error: "Suppression non autorisée." }, 403);
 
     let targetRole: string | null = null;
+    let targetProId: string | null = null;
     if (isSelfDelete) {
       const { data: selfProfile, error: selfProfileError } = await admin
-        .from("profiles").select("role").eq("id", caller.id).maybeSingle();
+        .from("profiles").select("role, pro_id").eq("id", caller.id).maybeSingle();
       if (selfProfileError) {
         return json({ error: "Erreur lecture du compte à supprimer.", details: selfProfileError.message }, 500);
       }
       targetRole = selfProfile?.role ?? null;
+      targetProId = selfProfile?.pro_id ?? null;
     }
-    let proId: string | null = null;
     let patientFolder: string | null = null;
 
     if (patientId) {
@@ -125,8 +126,8 @@ Deno.serve(async (request: Request) => {
         return json({ error: "Le compte transmis ne correspond pas à ce dossier patient." }, 403);
       }
 
-      proId = patient.pro_id;
-      patientFolder = `${proId}/patient-docs/${patient.id}`;
+      targetProId = patient.pro_id;
+      patientFolder = `${targetProId}/patient-docs/${patient.id}`;
 
       if (patient.user_id) {
         const { data: profile, error } = await admin
@@ -146,6 +147,7 @@ Deno.serve(async (request: Request) => {
         return json({ error: "Cet abonné n'est pas rattaché à votre compte." }, 403);
       }
       targetRole = target.role;
+      targetProId = target.pro_id;
     }
 
     const effectiveUserId = targetUserId ?? (patientId ? await (async () => {
@@ -199,7 +201,7 @@ Deno.serve(async (request: Request) => {
 
     let storageWarning: string | null = null;
     const storageFolder = patientFolder ?? (targetRole === "subscriber" && effectiveUserId
-      ? `${caller.id}/subscriber-docs/${effectiveUserId}`
+      ? `${targetProId ?? caller.id}/subscriber-docs/${effectiveUserId}`
       : null);
 
     if (storageFolder) {
