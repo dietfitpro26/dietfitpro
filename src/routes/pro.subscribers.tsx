@@ -985,7 +985,10 @@ function Content() {
         );
 
 
-        window.alert("Abonné supprimé avec succès.");
+        window.alert(
+          result.data?.warning ??
+            "Abonné supprimé avec succès.",
+        );
       } catch (error) {
         console.error(
           "[pro.subscribers] Erreur suppression :",
