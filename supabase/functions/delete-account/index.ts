@@ -170,6 +170,15 @@ Deno.serve(async (request: Request) => {
         .delete().eq("patient_user_id", effectiveUserId);
       if (visioUserError) return json({ error: "Impossible de supprimer les visioconsultations du compte.", details: visioUserError.message }, 500);
 
+      // Préserver les check-ins d'autres utilisateurs si ce compte était leur auteur.
+      const { error: filledByError } = await admin
+        .from("weekly_checkins")
+        .update({ filled_by: null })
+        .eq("filled_by", effectiveUserId);
+      if (filledByError) {
+        return json({ error: "Impossible de détacher les check-ins liés à ce compte.", details: filledByError.message }, 500);
+      }
+
       const { error: authDeleteError } = await admin.auth.admin.deleteUser(effectiveUserId, false);
       if (authDeleteError) {
         return json({ error: "La suppression du compte de connexion a échoué. Les données n'ont pas été supprimées.", details: authDeleteError.message }, 500);
@@ -180,13 +189,16 @@ Deno.serve(async (request: Request) => {
       if (patientDeleteError) return json({ error: "La suppression du dossier patient a échoué.", details: patientDeleteError.message }, 500);
     }
 
-    let storageWarning: string | null = null;
     if (patientFolder) {
       try {
         await removeStorageFolder(admin, "message-attachments", patientFolder);
       } catch (error) {
-        storageWarning = error instanceof Error ? error.message : String(error);
-        console.error("[delete-account] Nettoyage documents patient incomplet :", storageWarning);
+        const details = error instanceof Error ? error.message : String(error);
+        console.error("[delete-account] Nettoyage documents patient incomplet :", details);
+        return json({
+          error: "Le compte/dossier n'a pas été supprimé car les documents n'ont pas pu être nettoyés.",
+          details,
+        }, 500);
       }
     }
 
@@ -194,7 +206,6 @@ Deno.serve(async (request: Request) => {
       success: true,
       deleted_user_id: effectiveUserId,
       deleted_patient_id: patientId,
-      ...(storageWarning ? { warning: "Compte/dossier supprimé, mais certains fichiers stockés n'ont pas pu être nettoyés.", storage_details: storageWarning } : {}),
     });
   } catch (error) {
     console.error("[delete-account] Exception :", error);
