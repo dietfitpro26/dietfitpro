@@ -1,314 +1,320 @@
+// deno-lint-ignore-file no-explicit-any -- Stripe payloads are dynamically shaped and validated by Stripe's signature.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// IMPORTANT : cette fonction doit être déployée avec "Verify JWT" désactivé,
+// car c'est Stripe (et non un utilisateur connecté) qui l'appelle.
+// La sécurité repose sur la vérification de la signature Stripe ci-dessous.
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const encoder = new TextEncoder();
 
-function json(body: Record<string, unknown>, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+function toHex(buffer: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
-type FormValue = string | number | boolean | null | undefined;
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 
-type StripeResponse = {
-  id?: string;
-  url?: string;
-  amount_total?: number | null;
-  error?: {
-    message?: string;
-  };
-};
+async function verifySignature(payload: string, header: string | null, secret: string): Promise<boolean> {
+  if (!header) return false;
 
-async function stripeCall(
-  path: string,
-  method: "GET" | "POST",
-  params?: Record<string, FormValue>,
-): Promise<StripeResponse> {
-  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-  if (!stripeKey) throw new Error("STRIPE_SECRET_KEY manquante.");
+  let timestamp = "";
+  const signatures: string[] = [];
 
-  const form = new URLSearchParams();
-  for (const [key, value] of Object.entries(params ?? {})) {
-    if (value !== undefined && value !== null) form.append(key, String(value));
+  for (const part of header.split(",")) {
+    const [key, value] = part.split("=");
+    if (key === "t") timestamp = value;
+    if (key === "v1") signatures.push(value);
   }
+
+  if (!timestamp || signatures.length === 0) return false;
+
+  // On refuse les messages de plus de 5 minutes.
+  if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+
+  const signed = await crypto.subtle.sign("HMAC", key, encoder.encode(`${timestamp}.${payload}`));
+  const expected = toHex(signed);
+
+  return signatures.some((signature) => safeEqual(signature, expected));
+}
+
+async function stripeGet(path: string): Promise<Record<string, unknown> | null> {
+  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+  if (!stripeKey) return null;
 
   const response = await fetch(`https://api.stripe.com/v1${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${stripeKey}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: method === "POST" ? form.toString() : undefined,
+    headers: { Authorization: `Bearer ${stripeKey}` },
   });
 
-  const data: StripeResponse | null = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    throw new Error(data?.error?.message ?? `Erreur Stripe (${response.status}).`);
-  }
-
-  return data ?? {};
+  return response.ok ? await response.json() : null;
 }
 
-// N'accepte que le site officiel (SITE_URL) ou un site local de développement.
-function safeUrl(value: unknown): URL | null {
-  if (typeof value !== "string") return null;
+function toIso(seconds: number | null | undefined): string | null {
+  return typeof seconds === "number" ? new Date(seconds * 1000).toISOString() : null;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// Envoi d'e-mail via Resend. Ne fait jamais échouer le webhook : en cas de problème, on note l'erreur dans les journaux.
+async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+  const apiKey = Deno.env.get("RESEND_API_KEY");
+
+  if (!apiKey) {
+    console.error("[stripe-webhook] RESEND_API_KEY manquante : e-mail non envoyé.");
+    return;
+  }
+
+  const from = Deno.env.get("RESEND_FROM") ?? "DietFitPro <onboarding@resend.dev>";
 
   try {
-    const url = new URL(value);
-    const siteUrl = Deno.env.get("SITE_URL");
-    const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
-    const isSite = Boolean(siteUrl) && url.origin === new URL(siteUrl as string).origin;
-    return isLocal || isSite ? url : null;
-  } catch {
-    return null;
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from, to: [to], subject, html }),
+    });
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      console.error("[stripe-webhook] Resend a refusé l'envoi :", response.status, detail);
+    }
+  } catch (error) {
+    console.error("[stripe-webhook] Resend injoignable :", error instanceof Error ? error.message : error);
   }
 }
 
-const ACTIVE_STATUSES = ["trialing", "active", "past_due"];
-const TRIAL_DAYS = 7;
+type Admin = any;
+
+async function onCheckoutCompleted(admin: Admin, session: any) {
+  if (session.mode !== "payment" || session.payment_status !== "paid") return;
+
+  const { error } = await admin
+    .from("purchases")
+    .update({
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      stripe_payment_intent_id: session.payment_intent ?? null,
+    })
+    .eq("stripe_checkout_session_id", session.id);
+
+  if (error) throw new Error(`purchases : ${error.message}`);
+
+  if (session.metadata?.kind === "visio" && session.metadata?.consultation_id) {
+    const { error: visioError } = await admin
+      .from("visio_consultations")
+      .update({
+        payment_status: "paid",
+        stripe_payment_intent_id: session.payment_intent ?? null,
+        amount_cents: session.amount_total ?? null,
+      })
+      .eq("id", session.metadata.consultation_id);
+
+    if (visioError) throw new Error(`visio_consultations : ${visioError.message}`);
+  }
+}
+
+async function onSubscription(admin: Admin, eventSubscription: any, deleted: boolean) {
+  // On relit l'abonnement chez Stripe : l'état est toujours le plus récent, même si les messages arrivent dans le désordre.
+  const subscription = (await stripeGet(`/subscriptions/${eventSubscription.id}`)) ?? eventSubscription;
+
+  const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
+  let userId: string | undefined = subscription.metadata?.user_id;
+
+  if (!userId && customerId) {
+    const { data } = await admin
+      .from("subscriber_billing")
+      .select("user_id")
+      .eq("stripe_customer_id", customerId)
+      .maybeSingle();
+    userId = data?.user_id;
+  }
+
+  if (!userId) throw new Error("Abonné introuvable pour cet abonnement.");
+
+  const { data: settingsRows } = await admin
+    .from("app_settings")
+    .select("key, value")
+    .in("key", ["stripe_price_basic", "stripe_price_premium"]);
+
+  const prices: Record<string, string> = {};
+  for (const row of settingsRows ?? []) prices[row.key] = row.value;
+
+  const item = subscription.items?.data?.[0];
+  const priceId: string | undefined = item?.price?.id;
+
+  let plan: string | null = subscription.metadata?.plan ?? null;
+  if (priceId === prices.stripe_price_basic) plan = "basic";
+  if (priceId === prices.stripe_price_premium) plan = "premium";
+
+  const { error } = await admin.rpc("apply_stripe_subscription", {
+    p_user_id: userId,
+    p_customer_id: customerId ?? null,
+    p_subscription_id: subscription.id,
+    p_status: deleted ? "canceled" : subscription.status,
+    p_plan: plan,
+    p_trial_end: toIso(subscription.trial_end),
+    p_current_period_end: toIso(subscription.current_period_end ?? item?.current_period_end),
+    p_cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
+    p_cancel_at: toIso(subscription.cancel_at),
+  });
+
+  if (error) throw new Error(`apply_stripe_subscription : ${error.message}`);
+}
+
+// Paiement d'abonnement refusé : on prévient l'abonné par e-mail pour qu'il mette à jour sa carte.
+async function onPaymentFailed(admin: Admin, invoice: any) {
+  const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+  if (!customerId) return;
+
+  const { data: billing } = await admin
+    .from("subscriber_billing")
+    .select("user_id, managed_by_pro")
+    .eq("stripe_customer_id", customerId)
+    .maybeSingle();
+
+  if (!billing?.user_id) return;
+
+  // Formule gérée à la main par le professionnel : pas d'e-mail automatique.
+  if (billing.managed_by_pro) return;
+
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("email, full_name")
+    .eq("id", billing.user_id)
+    .maybeSingle();
+
+  const to: string | null = profile?.email ?? invoice.customer_email ?? null;
+  if (!to) return;
+
+  const siteUrl = (Deno.env.get("SITE_URL") ?? "http://localhost:8080").replace(/\/$/, "");
+  const profileUrl = `${siteUrl}/subscriber/profile`;
+
+  const firstName = escapeHtml(((profile?.full_name as string | null) ?? "").trim().split(" ")[0] ?? "");
+  const greeting = firstName ? `Bonjour ${firstName},` : "Bonjour,";
+
+  const amount = (((invoice.amount_due as number | undefined) ?? 0) / 100).toFixed(2).replace(".", ",");
+
+  const nextAttempt = typeof invoice.next_payment_attempt === "number"
+    ? new Date(invoice.next_payment_attempt * 1000).toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
+    : null;
+
+  const retryLine = nextAttempt
+    ? `<p>Une nouvelle tentative de prélèvement aura lieu le ${nextAttempt}.</p>`
+    : "<p>Sans mise à jour de votre moyen de paiement, votre accès pourra être suspendu.</p>";
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; color: #1f2937; line-height: 1.5;">
+      <h2 style="color: #2D7A1F;">Votre paiement n'a pas abouti</h2>
+      <p>${greeting}</p>
+      <p>Nous n'avons pas pu prélever ${amount} € pour votre abonnement DietFitPro.</p>
+      ${retryLine}
+      <p>Pour éviter toute interruption, mettez à jour votre moyen de paiement depuis votre espace :</p>
+      <p style="margin: 24px 0;">
+        <a href="${profileUrl}" style="background: #6DB33F; color: #ffffff; padding: 12px 20px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+          Mettre à jour mon moyen de paiement
+        </a>
+      </p>
+      <p style="font-size: 12px; color: #6b7280;">Dans votre profil, utilisez « Gérer mon abonnement et mes factures ». Vos données sont conservées. Si vous avez déjà régularisé, ignorez ce message.</p>
+    </div>
+  `;
+
+  await sendEmail(to, "Votre paiement DietFitPro n'a pas abouti", html);
+}
 
 Deno.serve(async (request: Request) => {
-  if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (request.method !== "POST") return new Response("Méthode non autorisée", { status: 405 });
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+
+  if (!supabaseUrl || !serviceRoleKey || !webhookSecret) {
+    console.error("[stripe-webhook] Configuration incomplète.");
+    return new Response("Configuration incomplète", { status: 500 });
+  }
+
+  const payload = await request.text();
+
+  if (!(await verifySignature(payload, request.headers.get("stripe-signature"), webhookSecret))) {
+    return new Response("Signature invalide", { status: 400 });
+  }
+
+  const event = JSON.parse(payload);
+  const admin = createClient(supabaseUrl, serviceRoleKey);
+
+  // Anti-doublon : on mémorise chaque événement (données minimales, sans infos personnelles).
+  const { error: insertError } = await admin.from("billing_events").insert({
+    stripe_event_id: event.id,
+    type: event.type,
+    payload: { id: event.id, type: event.type, livemode: event.livemode },
+  });
+
+  if (insertError) {
+    const { data: existing } = await admin
+      .from("billing_events")
+      .select("processed_at")
+      .eq("stripe_event_id", event.id)
+      .maybeSingle();
+
+    if (existing?.processed_at) return new Response("Déjà traité", { status: 200 });
+  }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const authorization = request.headers.get("Authorization");
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      return json({ error: "Configuration serveur incomplète." }, 500);
-    }
-    if (!authorization) return json({ error: "Connexion requise." }, 401);
-
-    const admin = createClient(supabaseUrl, serviceRoleKey);
-    const token = authorization.replace(/^Bearer\s+/i, "");
-    const {
-      data: { user },
-      error: userError,
-    } = await admin.auth.getUser(token);
-
-    if (userError || !user) return json({ error: "Session invalide." }, 401);
-
-    const body = (await request.json().catch(() => ({}))) as {
-      kind?: string;
-      plan?: string;
-      consultationId?: string;
-      returnUrl?: string;
-    };
-
-    const returnUrl = safeUrl(body.returnUrl);
-    if (!returnUrl) return json({ error: "Adresse de retour non autorisée." }, 400);
-
-    const { data: settingsRows } = await admin
-      .from("app_settings")
-      .select("key, value")
-      .in("key", [
-        "billing_enabled",
-        "stripe_price_basic",
-        "stripe_price_premium",
-        "stripe_price_custom_program",
-        "stripe_price_visio",
-      ]);
-
-    const settings: Record<string, string> = {};
-    for (const row of settingsRows ?? []) settings[row.key] = row.value;
-
-    if (settings.billing_enabled !== "true") {
-      return json({ error: "Le paiement en ligne n'est pas encore disponible." }, 403);
+    switch (event.type) {
+      case "checkout.session.completed":
+        await onCheckoutCompleted(admin, event.data.object);
+        break;
+      case "customer.subscription.created":
+      case "customer.subscription.updated":
+        await onSubscription(admin, event.data.object, false);
+        break;
+      case "customer.subscription.deleted":
+        await onSubscription(admin, event.data.object, true);
+        break;
+      case "invoice.payment_failed":
+        await onPaymentFailed(admin, event.data.object);
+        break;
+      default:
+        break;
     }
 
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("id, email, role, plan")
-      .eq("id", user.id)
-      .maybeSingle();
+    await admin
+      .from("billing_events")
+      .update({ processed_at: new Date().toISOString(), error: null })
+      .eq("stripe_event_id", event.id);
 
-    if (!profile) return json({ error: "Profil introuvable." }, 404);
-
-    // Client Stripe : créé une seule fois puis réutilisé.
-    const { data: billing } = await admin
-      .from("subscriber_billing")
-      .select("stripe_customer_id, stripe_subscription_id, status")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    let customerId = billing?.stripe_customer_id as string | null | undefined;
-
-    if (!customerId) {
-      const customer = await stripeCall("/customers", "POST", {
-        email: profile.email,
-        "metadata[user_id]": user.id,
-      });
-      if (!customer.id) throw new Error("Stripe n'a pas retourné d'identifiant client.");
-      customerId = customer.id;
-
-      if (billing) {
-        const { error } = await admin
-          .from("subscriber_billing")
-          .update({ stripe_customer_id: customerId })
-          .eq("user_id", user.id);
-        if (error) throw new Error("Impossible d'enregistrer le client Stripe.");
-      } else {
-        const { error } = await admin
-          .from("subscriber_billing")
-          .insert({ user_id: user.id, stripe_customer_id: customerId });
-        if (error) throw new Error("Impossible d'enregistrer le client Stripe.");
-      }
-    }
-
-    const isSubscriber = profile.role === "subscriber";
-    const origin = returnUrl.origin;
-    const kind = body.kind;
-
-    const baseParams: Record<string, FormValue> = {
-      customer: customerId,
-      locale: "fr",
-      client_reference_id: user.id,
-      "metadata[user_id]": user.id,
-    };
-
-    // 1) Abonnement Basic ou Premium
-    if (kind === "subscription") {
-      if (!isSubscriber) return json({ error: "Réservé aux abonnés." }, 403);
-
-      const plan = body.plan;
-      if (plan !== "basic" && plan !== "premium") {
-        return json({ error: "Formule invalide." }, 400);
-      }
-
-      if (billing?.stripe_subscription_id && ACTIVE_STATUSES.includes(billing.status)) {
-        return json({ error: "Vous avez déjà un abonnement en ligne. Utilisez « Gérer mon abonnement »." }, 409);
-      }
-
-      const priceId = settings[`stripe_price_${plan}`];
-      if (!priceId) return json({ error: "Tarif non configuré." }, 500);
-
-      // Essai gratuit : uniquement lors de la toute première souscription.
-      const trialDays = billing?.stripe_subscription_id ? undefined : TRIAL_DAYS;
-
-      const session = await stripeCall("/checkout/sessions", "POST", {
-        ...baseParams,
-        mode: "subscription",
-        "line_items[0][price]": priceId,
-        "line_items[0][quantity]": 1,
-        allow_promotion_codes: true,
-        "metadata[kind]": "subscription",
-        "metadata[plan]": plan,
-        "subscription_data[metadata][user_id]": user.id,
-        "subscription_data[metadata][plan]": plan,
-        "subscription_data[trial_period_days]": trialDays,
-        success_url: `${origin}/home?checkout=success`,
-        cancel_url: `${origin}/home?checkout=cancel`,
-      });
-
-      if (!session.url) throw new Error("Stripe n'a pas retourné d'URL de paiement.");
-      return json({ url: session.url });
-    }
-
-    // 2) Programme personnalisé (Premium uniquement)
-    if (kind === "custom_program") {
-      if (!isSubscriber) return json({ error: "Réservé aux abonnés." }, 403);
-      if (profile.plan !== "premium") {
-        return json({ error: "Le programme personnalisé est réservé aux abonnés Premium." }, 403);
-      }
-
-      const priceId = settings.stripe_price_custom_program;
-      if (!priceId) return json({ error: "Tarif non configuré." }, 500);
-
-      const session = await stripeCall("/checkout/sessions", "POST", {
-        ...baseParams,
-        mode: "payment",
-        "line_items[0][price]": priceId,
-        "line_items[0][quantity]": 1,
-        "metadata[kind]": "custom_program",
-        "payment_intent_data[metadata][user_id]": user.id,
-        "payment_intent_data[metadata][kind]": "custom_program",
-        success_url: `${origin}/home?checkout=success`,
-        cancel_url: `${origin}/subscriber/nutrition`,
-      });
-
-      if (!session.id || !session.url) {
-        throw new Error("Stripe n'a pas retourné les informations de paiement attendues.");
-      }
-
-      const { error } = await admin.from("purchases").insert({
-        user_id: user.id,
-        kind: "custom_program",
-        amount_cents: session.amount_total ?? 500,
-        currency: "eur",
-        status: "pending",
-        stripe_checkout_session_id: session.id,
-      });
-      if (error) throw new Error("Impossible d'enregistrer l'achat en attente.");
-
-      return json({ url: session.url });
-    }
-
-    // 3) Consultation en visio (patients et abonnés)
-    if (kind === "visio") {
-      const consultationId = body.consultationId;
-      if (!consultationId) return json({ error: "Consultation manquante." }, 400);
-
-      const { data: consultation } = await admin
-        .from("visio_consultations")
-        .select("id, patient_user_id, payment_status")
-        .eq("id", consultationId)
-        .maybeSingle();
-
-      if (!consultation || consultation.patient_user_id !== user.id) {
-        return json({ error: "Consultation introuvable." }, 404);
-      }
-
-      if (consultation.payment_status === "paid") {
-        return json({ error: "Cette consultation est déjà réglée." }, 409);
-      }
-
-      const priceId = settings.stripe_price_visio;
-      if (!priceId) return json({ error: "Tarif non configuré." }, 500);
-
-      const backPath = isSubscriber ? "/subscriber/profile" : "/patient/consultations";
-
-      const session = await stripeCall("/checkout/sessions", "POST", {
-        ...baseParams,
-        mode: "payment",
-        "line_items[0][price]": priceId,
-        "line_items[0][quantity]": 1,
-        "metadata[kind]": "visio",
-        "metadata[consultation_id]": consultationId,
-        "payment_intent_data[metadata][user_id]": user.id,
-        "payment_intent_data[metadata][kind]": "visio",
-        "payment_intent_data[metadata][consultation_id]": consultationId,
-        success_url: `${origin}${backPath}?payment=success`,
-        cancel_url: `${origin}${backPath}?payment=cancel`,
-      });
-
-      if (!session.id || !session.url) {
-        throw new Error("Stripe n'a pas retourné les informations de paiement attendues.");
-      }
-
-      const { error } = await admin.from("purchases").insert({
-        user_id: user.id,
-        kind: "visio",
-        amount_cents: session.amount_total ?? 3000,
-        currency: "eur",
-        status: "pending",
-        stripe_checkout_session_id: session.id,
-        visio_consultation_id: consultationId,
-      });
-      if (error) throw new Error("Impossible d'enregistrer le paiement en attente.");
-
-      return json({ url: session.url });
-    }
-
-    return json({ error: "Type de paiement inconnu." }, 400);
+    return new Response("ok", { status: 200 });
   } catch (error) {
-    console.error("[create-checkout-session]", error);
-    return json({ error: "Impossible d'ouvrir la page de paiement pour le moment." }, 500);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[stripe-webhook]", message);
+
+    await admin.from("billing_events").update({ error: message }).eq("stripe_event_id", event.id);
+
+    // 500 : Stripe réessaiera automatiquement plus tard.
+    return new Response("Erreur de traitement", { status: 500 });
   }
 });

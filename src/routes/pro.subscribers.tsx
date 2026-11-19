@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { ProLayout } from "@/layouts/ProLayout";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {
   UserCheck,
   Search,
@@ -735,9 +736,11 @@ function DeleteButton({
 
 function Page() {
   return (
-    <ProLayout>
-      <Content />
-    </ProLayout>
+    <ProtectedRoute allow={["pro"]}>
+      <ProLayout>
+        <Content />
+      </ProLayout>
+    </ProtectedRoute>
   );
 }
 
