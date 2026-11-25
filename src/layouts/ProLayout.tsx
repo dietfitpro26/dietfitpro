@@ -13,6 +13,7 @@ import {
   UserCheck,
   Rss,
   Settings,
+  ShieldCheck,
   LogOut,
   Menu,
   X,
@@ -26,20 +27,21 @@ import { useAuth } from "@/hooks/useAuth";
 import { useConversations } from "@/hooks/useMessages";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { useSuperAdminStatus } from "@/hooks/useSuperAdminStatus";
 
 const NAV = [
-  { to: "/pro/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/pro/patients", label: "Mes patients", icon: Users },
-  { to: "/pro/consultations", label: "Consultations", icon: Video },
-  { to: "/pro/nutrition", label: "Programmes nutrition", icon: Salad },
-  { to: "/pro/sport", label: "Programmes sport", icon: Dumbbell },
-  { to: "/pro/messages", label: "Messagerie", icon: MessageSquare },
-  { to: "/pro/notifications", label: "Notifications", icon: Bell },
-  { to: "/pro/subscribers", label: "Abonnés", icon: UserCheck },
-  { to: "/pro/recipes", label: "Mes recettes", icon: BookOpen },
-  { to: "/pro/feed", label: "Feed", icon: Rss },
-  { to: "/groups", label: "Groupes", icon: MessagesSquare },
-  { to: "/pro/settings", label: "Paramètres", icon: Settings },
+  { to: "/pro/dashboard", label: "Dashboard", section: "Vue d'ensemble", icon: LayoutDashboard },
+  { to: "/pro/patients", label: "Mes patients", section: "Accompagnement", icon: Users },
+  { to: "/pro/subscribers", label: "Abonnés", section: "Accompagnement", icon: UserCheck },
+  { to: "/pro/consultations", label: "Consultations", section: "Accompagnement", icon: Video },
+  { to: "/pro/nutrition", label: "Programmes nutrition", section: "Programmes", icon: Salad },
+  { to: "/pro/sport", label: "Programmes sport", section: "Programmes", icon: Dumbbell },
+  { to: "/pro/recipes", label: "Mes recettes", section: "Programmes", icon: BookOpen },
+  { to: "/pro/messages", label: "Messagerie", section: "Communauté", icon: MessageSquare },
+  { to: "/pro/notifications", label: "Notifications", section: "Communauté", icon: Bell },
+  { to: "/pro/feed", label: "Feed", section: "Communauté", icon: Rss },
+  { to: "/groups", label: "Groupes", section: "Communauté", icon: MessagesSquare },
+  { to: "/pro/settings", label: "Paramètres", section: "Préférences", icon: Settings },
 ] as const;
 
 export function ProLayout({ children }: { children: ReactNode }) {
@@ -49,6 +51,11 @@ export function ProLayout({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const { totalUnread: unreadMessages } = useConversations();
+  const { status: superAdminStatus } = useSuperAdminStatus();
+
+  const navItems = superAdminStatus === "confirmed"
+    ? [...NAV, { to: "/admin" as const, label: "Super Administration", section: "Administration", icon: ShieldCheck }]
+    : NAV;
 
   // Nombre de contenus signalés en attente (mis à jour à chaque changement de page)
   useEffect(() => {
@@ -108,9 +115,9 @@ export function ProLayout({ children }: { children: ReactNode }) {
   };
 
   const SidebarInner = (
-    <div className="flex h-full w-64 flex-col bg-[#1A1A1A] text-white">
-      <div className="flex items-center justify-between border-b border-white/10 p-4">
-        <div className="rounded-xl bg-white px-3 py-2 shadow-sm">
+    <div className="flex h-full w-[min(18rem,88vw)] flex-col border-r border-white/10 bg-[#101B13] text-white shadow-2xl shadow-black/30 md:w-64 md:shadow-none">
+      <div className="flex min-h-[84px] items-center justify-between border-b border-white/10 px-5 py-4">
+        <div className="rounded-2xl border border-white/70 bg-[#F8FAF4] px-3.5 py-2.5 shadow-[0_8px_24px_rgba(0,0,0,0.16)]">
           <Logo className="[&_span]:!text-[#1A1A1A] [&_span:last-child]:!text-[#6DB33F]" />
         </div>
 
@@ -125,49 +132,55 @@ export function ProLayout({ children }: { children: ReactNode }) {
       </div>
 
       <nav
-        className="flex-1 space-y-1 overflow-y-auto px-3 py-4"
+        className="flex-1 overflow-y-auto px-3 py-5"
         aria-label="Navigation professionnelle"
       >
-        {NAV.map((item) => {
+        {navItems.map((item, index) => {
           const active =
             pathname === item.to || pathname.startsWith(`${item.to}/`);
           const Icon = item.icon;
 
           return (
-            <Link
-              key={item.to}
-              to={item.to}
-              onClick={() => setOpen(false)}
-              className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
-                active
-                  ? "bg-[#6DB33F] font-medium text-white shadow-sm"
-                  : "text-white/75 hover:bg-white/10 hover:text-white",
-              )}
-              aria-current={active ? "page" : undefined}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">{item.label}</span>
-
-              {item.to === "/pro/messages" && unreadMessages > 0 ? (
-                <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#6DB33F] px-1 text-[10px] font-semibold text-white">
-                  {unreadMessages > 99 ? "99+" : unreadMessages}
-                </span>
+            <div key={item.to} className={index === 0 || item.section !== navItems[index - 1]?.section ? "mt-6 first:mt-0" : "mt-0.5"}>
+              {index === 0 || item.section !== navItems[index - 1]?.section ? (
+                <p className="mb-2 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-[#AFC0B2]">
+                  {item.section}
+                </p>
               ) : null}
+              <Link
+                to={item.to}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  "relative flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-[13px] transition-colors duration-150",
+                  active
+                    ? "bg-[#2B6240] font-semibold text-white shadow-[0_5px_16px_rgba(4,17,9,0.3)] before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-[#9BD26E]"
+                    : "text-[#D3DED4]/80 hover:bg-white/[0.07] hover:text-white",
+                )}
+                aria-current={active ? "page" : undefined}
+              >
+                <Icon className={cn("h-[17px] w-[17px] shrink-0", active ? "text-[#D6F3C1]" : "text-[#A8B8AA]")} />
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
 
-              {item.to === "/pro/feed" && pendingReports > 0 ? (
-                <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#6DB33F] px-1 text-[10px] font-semibold text-white">
-                  {pendingReports > 99 ? "99+" : pendingReports}
-                </span>
-              ) : null}
-            </Link>
+                {item.to === "/pro/messages" && unreadMessages > 0 ? (
+                  <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#9AD26E] px-1 text-[10px] font-bold text-[#17331F]">
+                    {unreadMessages > 99 ? "99+" : unreadMessages}
+                  </span>
+                ) : null}
+
+                {item.to === "/pro/feed" && pendingReports > 0 ? (
+                  <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#9AD26E] px-1 text-[10px] font-bold text-[#17331F]">
+                    {pendingReports > 99 ? "99+" : pendingReports}
+                  </span>
+                ) : null}
+              </Link>
+            </div>
           );
         })}
       </nav>
 
-      <div className="flex items-center gap-3 border-t border-white/10 p-3">
+      <div className="m-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-3">
         <Avatar className="h-9 w-9">
-          <AvatarFallback className="bg-[#6DB33F] text-xs text-white">
+          <AvatarFallback className="border border-[#B4E28F]/30 bg-[#2E7545] text-xs font-semibold text-[#E7F5DE]">
             {initials}
           </AvatarFallback>
         </Avatar>
@@ -176,7 +189,7 @@ export function ProLayout({ children }: { children: ReactNode }) {
           <p className="truncate text-sm font-medium">
             {profile?.full_name ?? profile?.email ?? "Professionnel"}
           </p>
-          <span className="mt-0.5 inline-block rounded-full bg-[#6DB33F] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+          <span className="mt-1 inline-block text-[9px] font-semibold uppercase tracking-[0.14em] text-[#A8C5A8]">
             Professionnel
           </span>
         </div>
@@ -185,7 +198,7 @@ export function ProLayout({ children }: { children: ReactNode }) {
           type="button"
           variant="ghost"
           size="icon"
-          className="text-white/70 hover:bg-white/10 hover:text-white"
+          className="text-white/65 hover:bg-white/10 hover:text-white"
           onClick={() => void handleSignOut()}
           aria-label="Se déconnecter"
         >
@@ -211,16 +224,17 @@ export function ProLayout({ children }: { children: ReactNode }) {
             onClick={() => setOpen(false)}
             aria-label="Fermer le menu"
           />
-          <div className="relative">{SidebarInner}</div>
+          <div className="relative h-full">{SidebarInner}</div>
         </div>
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col md:ml-64">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 backdrop-blur md:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border/70 bg-background/95 px-4 backdrop-blur md:hidden">
           <button
             type="button"
             onClick={() => setOpen(true)}
             aria-label="Ouvrir le menu"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/70 bg-card text-foreground shadow-sm"
           >
             <Menu className="h-5 w-5" />
           </button>

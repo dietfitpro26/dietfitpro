@@ -120,7 +120,7 @@ function Composer({ userId, pseudo, allowed, groupId, onChanged }: { userId: str
       {preview && <img src={preview} alt="Aperçu du fichier sélectionné" className="max-h-64 w-full rounded-xl object-contain" />}
       <div className="flex items-center justify-between gap-2"><span className="truncate text-xs">{file.name}</span><button type="button" className={ACTION} disabled={busy} onClick={clearFile}><X className="h-4 w-4" />Retirer</button></div>
     </div>}
-    <p className="text-xs text-muted-foreground">Ne partagez pas d'informations médicales personnelles, d'analyses ni d'ordonnances. Le stockage est en cours de sécurisation : les fichiers restent actuellement accessibles par leur lien public.</p>
+    <p className="text-xs text-muted-foreground">Ne partagez pas d'informations médicales personnelles, d'analyses ni d'ordonnances. Les fichiers suivent les droits d'accès du fil ou du groupe auquel vous les joignez.</p>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <button type="button" className={ACTION} disabled={busy} onClick={() => input.current?.click()}><Paperclip className="h-4 w-4" />Photo ou PDF (5 Mo max)</button>
       <span className="text-xs text-muted-foreground">{text.length}/1000</span>

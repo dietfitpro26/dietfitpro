@@ -64,26 +64,6 @@ interface Measurement {
   waist_cm: number | null;
 }
 
-interface PatientAccess {
-  access_recipes: boolean;
-  access_sport_programs: boolean;
-  access_nutrition_programs: boolean;
-  access_messaging: boolean;
-  access_visio: boolean;
-  access_ai_coach: boolean;
-  access_premium_content: boolean;
-}
-
-const DEFAULT_ACCESS: PatientAccess = {
-  access_recipes: true,
-  access_sport_programs: true,
-  access_nutrition_programs: true,
-  access_messaging: true,
-  access_visio: false,
-  access_ai_coach: false,
-  access_premium_content: false,
-};
-
 const GOAL_LABEL: Record<string, string> = {
   perte_de_poids: "Perte de poids",
   prise_de_masse: "Prise de masse",
@@ -115,9 +95,7 @@ export function PatientQuickPanel({
   const [patient, setPatient] = useState<Patient | null>(null);
   const [latestMeasurement, setLatestMeasurement] =
     useState<Measurement | null>(null);
-  const [access, setAccess] = useState<PatientAccess>(DEFAULT_ACCESS);
   const [loading, setLoading] = useState(false);
-  const [savingAccess, setSavingAccess] = useState(false);
   const [savingMeasurement, setSavingMeasurement] = useState(false);
 
   const [measurementDate, setMeasurementDate] = useState(
@@ -137,7 +115,6 @@ export function PatientQuickPanel({
       setLoading(true);
       setPatient(null);
       setLatestMeasurement(null);
-      setAccess(DEFAULT_ACCESS);
 
       const { data: patientData, error: patientError } = await supabase
         .from("patients")
@@ -178,23 +155,6 @@ export function PatientQuickPanel({
         setLatestMeasurement(measurementData as Measurement);
       }
 
-      if (patientRow.user_id) {
-        const { data: accessData } = await supabase
-          .from("subscriber_overrides")
-          .select(
-            "access_recipes, access_sport_programs, access_nutrition_programs, access_messaging, access_visio, access_ai_coach, access_premium_content",
-          )
-          .eq("user_id", patientRow.user_id)
-          .maybeSingle();
-
-        if (accessData) {
-          setAccess({
-            ...DEFAULT_ACCESS,
-            ...(accessData as Partial<PatientAccess>),
-          });
-        }
-      }
-
       setLoading(false);
     }
 
@@ -217,38 +177,6 @@ export function PatientQuickPanel({
     latestMeasurement?.weight_kg ?? patient?.weight_kg ?? null,
     patient?.height_cm ?? null,
   );
-
-  async function handleSaveAccess() {
-    if (!patient?.user_id) {
-      toast.error(
-        "Ce patient n’a pas encore de compte utilisateur. Envoyez-lui une invitation.",
-      );
-      return;
-    }
-
-    setSavingAccess(true);
-
-    const { error } = await supabase.from("subscriber_overrides").upsert(
-      {
-        user_id: patient.user_id,
-        ...access,
-        updated_at: new Date().toISOString(),
-      },
-      {
-        onConflict: "user_id",
-      },
-    );
-
-    setSavingAccess(false);
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    toast.success("Options du patient mises à jour.");
-    onUpdated?.();
-  }
 
   async function handleSaveMeasurement() {
     if (!patient) return;
@@ -298,48 +226,6 @@ export function PatientQuickPanel({
     });
     onUpdated?.();
   }
-
-  const accessItems: Array<{
-    key: keyof PatientAccess;
-    label: string;
-    icon: React.ReactNode;
-  }> = [
-    {
-      key: "access_nutrition_programs",
-      label: "Programme nutrition",
-      icon: <Utensils className="h-4 w-4" />,
-    },
-    {
-      key: "access_sport_programs",
-      label: "Programme sport",
-      icon: <Dumbbell className="h-4 w-4" />,
-    },
-    {
-      key: "access_recipes",
-      label: "Recettes",
-      icon: <Target className="h-4 w-4" />,
-    },
-    {
-      key: "access_messaging",
-      label: "Messagerie",
-      icon: <MessageCircle className="h-4 w-4" />,
-    },
-    {
-      key: "access_visio",
-      label: "Visio",
-      icon: <Calendar className="h-4 w-4" />,
-    },
-    {
-      key: "access_ai_coach",
-      label: "Coach IA",
-      icon: <Activity className="h-4 w-4" />,
-    },
-    {
-      key: "access_premium_content",
-      label: "Contenu Premium",
-      icon: <ShieldCheck className="h-4 w-4" />,
-    },
-  ];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -557,54 +443,7 @@ export function PatientQuickPanel({
 
             <Separator />
 
-            <section className="space-y-3">
-              <div>
-                <h3 className="font-semibold">Accès et options</h3>
-                <p className="text-xs text-muted-foreground">
-                  Active ou désactive les fonctionnalités disponibles pour ce patient.
-                </p>
-              </div>
-
-              {!patient.user_id ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                  Ce patient n’a pas encore de compte utilisateur. Les options
-                  seront disponibles après son invitation.
-                </div>
-              ) : null}
-
-              <div className="space-y-2">
-                {accessItems.map((item) => (
-                  <div
-                    key={item.key}
-                    className="flex items-center justify-between rounded-2xl border p-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-primary">{item.icon}</span>
-                      <span className="text-sm font-medium">{item.label}</span>
-                    </div>
-
-                    <Switch
-                      checked={access[item.key]}
-                      disabled={!patient.user_id}
-                      onCheckedChange={(checked) =>
-                        setAccess((previous) => ({
-                          ...previous,
-                          [item.key]: checked,
-                        }))
-                      }
-                    />
-                  </div>
-                ))}
-              </div>
-
-              <Button
-                className="w-full rounded-xl"
-                onClick={() => void handleSaveAccess()}
-                disabled={savingAccess || !patient.user_id}
-              >
-                {savingAccess ? "Enregistrement…" : "Enregistrer les options"}
-              </Button>
-            </section>
+            <p className="text-sm text-muted-foreground">Les options individuelles sont attribuées par le super administrateur. Le professionnel conserve le suivi du patient et de ses mesures.</p>
           </div>
         )}
 

@@ -151,23 +151,23 @@ function Content() {
   }
 
   return (
-    <div className="flex flex-col">
-      <header className="flex items-center gap-3 border-b bg-white px-6 py-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/pro/sport" })}><ArrowLeft className="h-5 w-5" /></Button>
+    <div className="min-h-full bg-[#F8F9F6]">
+      <header className="flex flex-wrap items-center gap-3 border-b border-[#2A4532] bg-[#15251B] px-4 py-5 text-white shadow-[0_8px_22px_rgba(21,37,27,0.08)] sm:px-6 xl:px-10">
+        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 hover:text-white" onClick={() => navigate({ to: "/pro/sport" })}><ArrowLeft className="h-5 w-5" /></Button>
         <div className="flex-1">
-          <h1 className="text-lg font-semibold">{program.name}</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-lg font-semibold tracking-tight text-white">{program.name}</h1>
+          <p className="text-sm text-[#C8D7C9]">
             {patient ? `${patient.first_name} ${patient.last_name}` : "—"}
             {program.frequency_per_week ? ` • ${program.frequency_per_week}×/sem.` : ""}
           </p>
         </div>
-        <Button variant="outline"><Pencil className="h-4 w-4" /> Modifier</Button>
+        <Button variant="outline" className="border-white/20 bg-white/[0.08] text-white hover:bg-white/[0.14] hover:text-white"><Pencil className="h-4 w-4" /> Modifier</Button>
       </header>
 
-      <div className="p-6 space-y-6">
+      <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 xl:px-10">
 
         {/* ✅ AJOUT : Section PDF */}
-        <Card>
+        <Card className="rounded-2xl border-[#E2E8DE] shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <FileText className="h-4 w-4 text-[#6DB33F]" />

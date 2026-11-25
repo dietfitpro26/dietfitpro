@@ -1,0 +1,7 @@
+{
+  "project_ref": "mmixqichtdumhqbxjuxf",
+  "query_type": "read-only role metadata check",
+  "query": "SELECT rolname, rolcanlogin, rolvaliduntil FROM pg_catalog.pg_roles WHERE rolname LIKE 'cli_login_postgres%' ORDER BY rolname",
+  "result": [],
+  "interpretation": "No cli_login_postgres role is present at the time of this check. The prior CLI attempt failed during login-role initialization, before producing a schema dump. This check cannot establish whether a short-lived role existed and expired before inspection."
+}

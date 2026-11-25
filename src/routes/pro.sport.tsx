@@ -188,18 +188,18 @@ function Content() {
 
   return (
     <div className="flex flex-col">
-      <header className="flex items-center justify-between border-b bg-white px-6 py-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#2A4532] bg-[#15251B] px-4 py-5 text-white shadow-[0_8px_22px_rgba(21,37,27,0.08)] sm:px-6 xl:px-10">
         <div>
-          <h1 className="text-xl font-semibold">
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
             Programmes personnalisés
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-[#D0DCD1]">
             Créez et gérez les programmes sur mesure de vos patients.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" aria-label="Notifications">
+          <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 hover:text-white" aria-label="Notifications">
             <Bell className="h-5 w-5" />
           </Button>
 
@@ -213,22 +213,22 @@ function Content() {
         </div>
       </header>
 
-      <div className="space-y-4 p-6">
-        <div className="relative max-w-md">
+      <div className="mx-auto w-full max-w-[1480px] space-y-4 px-4 py-6 sm:px-6 sm:py-8 xl:px-10">
+        <div className="relative w-full max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
           <Input
             placeholder="Rechercher par nom ou patient…"
-            className="pl-9"
+            className="h-11 rounded-xl border-[#E1E8DD] bg-white pl-9 shadow-none focus-visible:ring-[#6DB33F]/20"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
 
-        <div className="overflow-hidden rounded-lg border bg-white">
+        <div className="overflow-x-auto rounded-2xl border border-[#E2E8DE] bg-white shadow-sm">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="border-[#E6EBE3] bg-[#F6F8F4] hover:bg-[#F6F8F4]">
                 <TableHead>Nom</TableHead>
                 <TableHead>Patient</TableHead>
                 <TableHead>Fréquence</TableHead>
@@ -264,7 +264,7 @@ function Content() {
                   : filtered.map((row) => (
                     <TableRow
                       key={row.id}
-                      className="cursor-pointer hover:bg-muted/40"
+                      className="cursor-pointer border-[#EDF0EA] transition-colors hover:bg-[#F5F9F2]"
                       onClick={() =>
                         navigate({
                           to: "/pro/sport/$programId",

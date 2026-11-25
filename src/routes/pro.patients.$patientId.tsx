@@ -89,17 +89,6 @@ interface PatientDocument {
   category: string | null;
   created_at: string;
 }
-interface PatientAccess {
-  access_recipes: boolean;
-  access_sport_programs: boolean;
-  access_nutrition_programs: boolean;
-  access_messaging: boolean;
-  access_visio: boolean;
-  access_premium_content: boolean;
-  access_ai_coach: boolean;
-}
-
-// ── Constantes ────────────────────────────────────────────
 const GOAL_LABEL: Record<string, string> = {
   perte_de_poids: "Perte de poids", prise_de_masse: "Prise de masse",
   maintien: "Maintien", autre: "Autre",
@@ -109,34 +98,6 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Annulé", no_show: "Absent",
 };
 
-const DEFAULT_ACCESS: PatientAccess = {
-  access_recipes: true,
-  access_sport_programs: true,
-  access_nutrition_programs: true,
-  access_messaging: true,
-  access_visio: false,
-  access_premium_content: false,
-  access_ai_coach: false,
-};
-
-const ACCESS_FEATURES: {
-  key: keyof PatientAccess;
-  label: string;
-  description: string;
-  icon: string;
-}[] = [
-  { key: "access_recipes",            label: "Recettes",            description: "Accès aux recettes partagées",             icon: "🍽️" },
-  { key: "access_nutrition_programs", label: "Programme nutrition", description: "Consultation du plan alimentaire",          icon: "🥗" },
-  { key: "access_sport_programs",     label: "Programme sport",     description: "Consultation du programme sportif",         icon: "🏋️" },
-  { key: "access_messaging",          label: "Messagerie",          description: "Échange de messages avec le pro",           icon: "💬" },
-  { key: "access_visio",              label: "Visio-consultation",  description: "Accès aux séances en visioconférence",      icon: "📹" },
-  { key: "access_premium_content",    label: "Contenu premium",     description: "Accès au contenu exclusif du feed",         icon: "⭐" },
-  { key: "access_ai_coach",           label: "Coach IA",            description: "Utilisation du coach nutritionnel IA",      icon: "🤖" },
-];
-
-// Regroupement des métriques disponibles pour chacun des 3 blocs de courbes
-// de l'onglet Évolution. On garde exactement la même répartition visuelle
-// que l'ancienne version (3 cartes), seul le rendu du graphique change.
 const WEIGHT_METRICS: MetricKey[] = ["weight_kg", "bmi"];
 const COMPOSITION_METRICS: MetricKey[] = ["body_fat_pct", "muscle_mass_kg", "metabolic_age", "visceral_fat"];
 const MENSURATION_METRICS: MetricKey[] = ["waist_cm", "hip_cm", "arm_cm", "thigh_cm", "chest_cm"];
@@ -174,10 +135,6 @@ function PatientDetailContent() {
   const [programRefresh, setProgramRefresh] = useState(0);
 
   // ── Accès & Options ──
-  const [access, setAccess]               = useState<PatientAccess>(DEFAULT_ACCESS);
-  const [accessLoading, setAccessLoading] = useState(false);
-  const [savingAccess, setSavingAccess]   = useState(false);
-
   const loadPatient = async () => {
     if (!user) return;
     const { data: p } = await supabase
@@ -218,52 +175,6 @@ function PatientDetailContent() {
     setDocuments((docsRes.data as PatientDocument[]) ?? []);
   };
 
-  const loadAccess = async (patientRow: Patient) => {
-    if (!patientRow.user_id) return;
-    setAccessLoading(true);
-    const { data } = await supabase
-      .from("subscriber_overrides")
-      .select("*")
-      .eq("user_id", patientRow.user_id);
-    setAccessLoading(false);
-    const rows = (data ?? []) as Array<Record<string, unknown>>;
-    if (rows.length === 0) {
-      setAccess(DEFAULT_ACCESS);
-      return;
-    }
-    const next: PatientAccess = { ...DEFAULT_ACCESS };
-    (Object.keys(DEFAULT_ACCESS) as (keyof PatientAccess)[]).forEach((key) => {
-      const row = rows.find((r) => r.feature_key === key);
-      if (row) next[key] = Boolean(row.enabled);
-      else if (typeof rows[0][key] === "boolean") next[key] = rows[0][key] as boolean;
-    });
-    setAccess(next);
-  };
-
-  const saveAccess = async () => {
-    if (!patient?.user_id) {
-      toast.error("Ce patient n'a pas encore de compte — envoyez-lui une invitation d'abord.");
-      return;
-    }
-    setSavingAccess(true);
-    const keys = Object.keys(access) as (keyof PatientAccess)[];
-    const rows = keys.map((key) => ({
-      user_id: patient.user_id,
-      feature_key: key,
-      enabled: access[key],
-      ...access,
-    }));
-    const { error } = await supabase
-      .from("subscriber_overrides")
-      .upsert(rows, { onConflict: "user_id,feature_key" });
-    setSavingAccess(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Droits d'accès mis à jour ✅");
-  };
-
-  const toggleAccess = (key: keyof PatientAccess) =>
-    setAccess((prev) => ({ ...prev, [key]: !prev[key] }));
-
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -277,7 +188,7 @@ function PatientDetailContent() {
       if (!p) { setError("Patient introuvable."); setLoading(false); return; }
       const row = p as Patient;
       setPatient(row); setLoading(false);
-      await Promise.all([loadSecondary(row), loadAccess(row)]);
+      await loadSecondary(row);
     })();
     return () => { cancelled = true; };
   }, [patientId, user]);
@@ -348,21 +259,21 @@ function PatientDetailContent() {
   );
 
   return (
-    <div className="flex flex-col">
+    <div className="min-h-full bg-[#F8F9F6]">
       {/* HEADER */}
-      <header className="flex items-center gap-3 border-b bg-white px-6 py-4 flex-wrap">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/pro/patients" })}>
+      <header className="flex flex-wrap items-center gap-3 border-b border-[#2A4532] bg-[#15251B] px-4 py-5 text-white shadow-[0_8px_22px_rgba(21,37,27,0.08)] sm:px-6 xl:px-10">
+        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 hover:text-white" onClick={() => navigate({ to: "/pro/patients" })}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <Avatar className="h-12 w-12">
-          <AvatarFallback className="bg-[#6DB33F]/10 text-[#2D7A1F] font-semibold">{initials || "?"}</AvatarFallback>
+        <Avatar className="h-12 w-12 border border-white/20">
+          <AvatarFallback className="bg-[#2E7545] font-semibold text-[#E7F5DE]">{initials || "?"}</AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold">{patient.first_name} {patient.last_name}</h1>
+            <h1 className="text-lg font-semibold tracking-tight text-white">{patient.first_name} {patient.last_name}</h1>
             <PatientAccountBadge patientId={patient.id} hasAccount={Boolean(patient.user_id)} />
           </div>
-          <p className="text-sm text-muted-foreground">Objectif : {goal}</p>
+          <p className="text-sm text-[#C8D7C9]">Objectif : {goal}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <PatientInviteButton
@@ -371,14 +282,14 @@ function PatientDetailContent() {
             hasAccount={Boolean(patient.user_id)}
             onSent={() => void loadPatient()}
           />
-          <Button variant="outline" onClick={() => setMeasureOpen(true)}>
+          <Button variant="outline" className="border-white/20 bg-white/[0.08] text-white hover:bg-white/[0.14] hover:text-white" onClick={() => setMeasureOpen(true)}>
             <Plus className="h-4 w-4 mr-1" /> Ajouter une mesure
           </Button>
-          <Button variant="outline" onClick={() => setEditOpen(true)}>
+          <Button variant="outline" className="border-white/20 bg-white/[0.08] text-white hover:bg-white/[0.14] hover:text-white" onClick={() => setEditOpen(true)}>
             <Pencil className="h-4 w-4 mr-1" /> Modifier
           </Button>
           <Button variant="outline" onClick={() => setDeleteOpen(true)}
-            className="border-red-300 text-red-600 hover:bg-red-50">
+            className="border-red-300/40 bg-red-500/10 text-red-100 hover:bg-red-500/20 hover:text-white">
             <Trash2 className="h-4 w-4 mr-1" /> Supprimer
           </Button>
         </div>
@@ -393,9 +304,9 @@ function PatientDetailContent() {
         </div>
       )}
 
-      <div className="p-6">
+      <div className="mx-auto w-full max-w-[1480px] px-4 py-6 sm:px-6 sm:py-8 xl:px-10">
         <Tabs defaultValue="evolution">
-          <TabsList className="mb-4 flex-wrap">
+          <TabsList className="mb-5 h-auto flex-wrap rounded-xl border border-[#DCE6D6] bg-[#EEF3EA] p-1">
             <TabsTrigger value="evolution">📈 Évolution</TabsTrigger>
             <TabsTrigger value="info">Infos générales</TabsTrigger>
             <TabsTrigger value="anamnese">📋 Dossier santé</TabsTrigger>
@@ -702,63 +613,7 @@ function PatientDetailContent() {
 
           {/* ── ACCÈS & OPTIONS ── */}
           <TabsContent value="access" className="mt-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-[#6DB33F]" />
-                  Droits d'accès — {patient.first_name} {patient.last_name}
-                </CardTitle>
-                {!patient.user_id && (
-                  <div className="rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2 mt-2">
-                    ⚠️ Ce patient n'a pas encore de compte. Envoyez-lui une invitation pour activer les accès.
-                  </div>
-                )}
-              </CardHeader>
-              <CardContent className="space-y-2">
-              <PatientPlanControl
-  patientUserId={patient.user_id}
-  patientName={`${patient.first_name} ${patient.last_name}`}
-/>
-                {accessLoading ? (
-                  Array.from({ length: 7 }).map((_, i) => (
-                    <Skeleton key={i} className="h-14 w-full rounded-lg" />
-                  ))
-                ) : (
-                  <>
-                    {ACCESS_FEATURES.map((feature) => (
-                      <div
-                        key={feature.key}
-                        className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/20 px-4 py-3 hover:bg-muted/40 transition-colors"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="text-xl flex-shrink-0">{feature.icon}</span>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium">{feature.label}</p>
-                            <p className="text-xs text-muted-foreground">{feature.description}</p>
-                          </div>
-                        </div>
-                        <Switch
-                          checked={access[feature.key]}
-                          onCheckedChange={() => toggleAccess(feature.key)}
-                          disabled={!patient.user_id}
-                          className="flex-shrink-0 ml-4 data-[state=checked]:bg-[#6DB33F]"
-                        />
-                      </div>
-                    ))}
-                    <div className="pt-4 flex justify-end">
-                      <Button
-                        className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white"
-                        onClick={saveAccess}
-                        disabled={savingAccess || !patient.user_id}
-                      >
-                        <Save className="h-4 w-4 mr-1" />
-                        {savingAccess ? "Enregistrement…" : "Enregistrer les accès"}
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+            <Card><CardHeader><CardTitle className="text-base">Formule et options</CardTitle></CardHeader><CardContent className="space-y-3"><PatientPlanControl patientUserId={patient.user_id} patientName={patient.first_name + " " + patient.last_name} /><p className="text-sm text-muted-foreground">Les options Premium individuelles sont g?r?es par le super administrateur. Les formules commerciales restent g?r?es par le professionnel.</p></CardContent></Card>
           </TabsContent>
 
           {/* ── AUTO-ÉVALUATION ── */}
@@ -1152,11 +1007,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 function KpiCard({ label, value, color = "default" }: { label: string; value: string; color?: "default" | "green" | "orange" }) {
-  const colors = { default: "bg-card border", green: "bg-[#6DB33F]/10 border-[#6DB33F]/20", orange: "bg-orange-50 border-orange-200" };
+  const colors = { default: "bg-white border-[#E2E8DE]", green: "bg-[#F0F6EB] border-[#D7E6CE]", orange: "bg-orange-50 border-orange-200" };
   return (
-    <div className={`rounded-lg p-4 ${colors[color]}`}>
-      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
-      <p className="text-2xl font-bold">{value}</p>
+    <div className={`rounded-2xl border p-4 shadow-sm sm:p-5 ${colors[color]}`}>
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className="text-2xl font-semibold tracking-tight text-[#203124]">{value}</p>
     </div>
   );
 }

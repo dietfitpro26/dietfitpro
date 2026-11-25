@@ -306,24 +306,11 @@ function DashboardContent() {
     setUpdatingSubscriberId(subscriber.id);
 
     try {
-    const rights = PLAN_FEATURES[nextPlan];
     const { error: profileError } = await supabase.rpc("set_patient_plan", {
   p_patient_user_id: subscriber.id,
   p_plan: nextPlan,
 });
       if (profileError) throw profileError;
-
-      const overrideRows = Object.entries(rights).map(([feature_key, enabled]) => ({
-        user_id: subscriber.id,
-        feature_key,
-        enabled,
-      }));
-
-      const { error: overridesError } = await supabase
-        .from("subscriber_overrides")
-        .upsert(overrideRows, { onConflict: "user_id,feature_key" });
-
-      if (overridesError) throw overridesError;
 
       setRecentSubscribers((previous) =>
         (previous ?? []).map((item) =>
@@ -375,34 +362,35 @@ function DashboardContent() {
   const isLoading = !kpis && !error;
 
   return (
-    <div className="min-h-full bg-gradient-to-b from-background to-muted/20 p-4 sm:p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <header className="relative overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-primary/5 p-5 shadow-sm sm:p-7">
-          <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
-          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+    <div className="min-h-full bg-background px-4 py-6 sm:px-6 sm:py-8 xl:px-10">
+      <div className="mx-auto max-w-[1480px] space-y-8">
+        <header className="relative overflow-hidden rounded-[1.75rem] border border-[#2A4532] border-l-4 border-l-[#9BD26E] bg-[#15251B] px-5 py-6 shadow-[0_12px_30px_rgba(21,37,27,0.12)] sm:px-8 sm:py-7">
+          <div className="pointer-events-none absolute -right-10 -top-16 h-52 w-52 rounded-full border-[30px] border-white/[0.045]" />
+          <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/80 px-3 py-1.5 text-xs font-semibold text-primary">
+              <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#B4E28F]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#9BD26E]" />
                 Votre espace professionnel
               </div>
-              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              <h1 className="text-[1.85rem] font-semibold tracking-[-0.045em] text-white sm:text-3xl">
                 Bonjour {firstName}
               </h1>
-              <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+              <p className="max-w-2xl text-sm leading-6 text-[#D0DCD1] sm:text-[15px]">
                 Voici les éléments importants à traiter dans votre activité.
               </p>
             </div>
 
-            <div className="relative flex flex-wrap gap-2">
+            <div className="flex flex-col gap-2 min-[420px]:flex-row sm:shrink-0">
               <Button
                 variant="outline"
-                className="rounded-2xl bg-background/80"
+                className="rounded-xl border-white/20 bg-white/[0.08] text-white shadow-sm hover:bg-white/[0.14] hover:text-white"
                 onClick={() => void navigate({ to: "/pro/notifications" })}
               >
                 <Bell className="mr-2 h-4 w-4" />
                 Notifications{unreadCount > 0 ? ` (${unreadCount})` : ""}
               </Button>
               <Button
-                className="rounded-2xl bg-[#6DB33F] text-white hover:bg-[#2D7A1F]"
+                className="rounded-xl bg-[#6DB33F] font-semibold text-white shadow-[0_5px_16px_rgba(0,0,0,0.18)] hover:bg-[#5B9F33]"
                 onClick={() => void navigate({ to: "/pro/patients" })}
               >
                 <UserPlus className="mr-2 h-4 w-4" />
@@ -421,70 +409,75 @@ function DashboardContent() {
           </div>
         ) : null}
 
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <section className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
           <KpiCard
             label="Patients actifs"
             value={kpis?.patients}
-            icon={<Users className="h-5 w-5 text-[#6DB33F]" />}
+            icon={<Users className="h-5 w-5 text-[#2D7A1F]" />}
+            tone="soft"
             loading={isLoading}
             onClick={() => void navigate({ to: "/pro/patients" })}
           />
           <KpiCard
             label="Abonnés actifs"
             value={kpis?.subscribers}
-            icon={<UserCheck className="h-5 w-5 text-[#6DB33F]" />}
+            icon={<UserCheck className="h-5 w-5 text-[#517B43]" />}
+            tone="plain"
             loading={isLoading}
             onClick={() => void navigate({ to: "/pro/subscribers" })}
           />
           <KpiCard
             label="Consultations aujourd'hui"
             value={kpis?.todayConsultations}
-            icon={<CalendarCheck className="h-5 w-5 text-[#6DB33F]" />}
+            icon={<CalendarCheck className="h-5 w-5 text-[#2D7A1F]" />}
+            tone="outline"
             loading={isLoading}
             onClick={() => void navigate({ to: "/pro/consultations" })}
           />
           <KpiCard
             label="Programmes actifs"
             value={kpis?.activePrograms}
-            icon={<ClipboardList className="h-5 w-5 text-[#6DB33F]" />}
+            icon={<ClipboardList className="h-5 w-5 text-[#2D7A1F]" />}
+            tone="soft"
             loading={isLoading}
             onClick={() => void navigate({ to: "/pro/nutrition" })}
           />
           <KpiCard
             label="Messages non lus"
             value={kpis?.unreadMessages}
-            icon={<MessageSquare className="h-5 w-5 text-[#6DB33F]" />}
+            icon={<MessageSquare className="h-5 w-5 text-[#D8F1C6]" />}
+            tone="deep"
             loading={isLoading}
             highlight={Boolean(kpis?.unreadMessages)}
             onClick={() => void navigate({ to: "/pro/messages" })}
           />
         </section>
 
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border/70 pb-4">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Votre activité</h2>
             <p className="text-sm text-muted-foreground">
               Mises à jour automatiques toutes les minutes.
             </p>
           </div>
-          <Button variant="outline" size="sm" className="rounded-xl bg-background/80" onClick={handleRefresh} disabled={refreshing}>
+          <Button variant="outline" size="sm" className="rounded-lg bg-card" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />
             Actualiser
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Card className="rounded-3xl border-border/60 bg-gradient-to-br from-card via-card to-muted/20 shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/40 pb-4">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <Video className="h-4 w-4 text-[#6DB33F]" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-12">
+          <Card className="rounded-2xl border-border/70 bg-card shadow-sm xl:col-span-7">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/60 px-5 pb-4 pt-5">
+              <CardTitle className="flex items-center gap-3 text-base font-semibold">
+                <span className="rounded-xl bg-[#EAF3E4] p-2"><Video className="h-4 w-4 text-[#2D7A1F]" /></span>
                 Prochaines consultations
               </CardTitle>
               <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground" onClick={() => void navigate({ to: "/pro/consultations" })}>
                 Voir tout <ArrowRight className="h-3 w-3" />
               </Button>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-2 p-5">
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-14 w-full rounded-md" />)
               ) : upcoming?.length === 0 ? (
@@ -495,17 +488,17 @@ function DashboardContent() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-3xl border-border/60 bg-gradient-to-br from-card via-card to-muted/20 shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/40 pb-4">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <Users className="h-4 w-4 text-[#6DB33F]" />
+          <Card className="rounded-2xl border-border/70 bg-card shadow-sm xl:col-span-5">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/60 px-5 pb-4 pt-5">
+              <CardTitle className="flex items-center gap-3 text-base font-semibold">
+                <span className="rounded-xl bg-[#EAF3E4] p-2"><Users className="h-4 w-4 text-[#2D7A1F]" /></span>
                 Derniers patients
               </CardTitle>
               <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground" onClick={() => void navigate({ to: "/pro/patients" })}>
                 Voir tout <ArrowRight className="h-3 w-3" />
               </Button>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-2 p-5">
               {isLoading ? (
                 Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-12 w-full rounded-md" />)
               ) : recentPatients?.length === 0 ? (
@@ -516,17 +509,17 @@ function DashboardContent() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-3xl border-border/60 bg-gradient-to-br from-card via-card to-muted/20 shadow-sm lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/40 pb-4">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <UserCheck className="h-4 w-4 text-[#6DB33F]" />
+          <Card className="rounded-2xl border-border/70 bg-card shadow-sm xl:col-span-12">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/60 px-5 pb-4 pt-5">
+              <CardTitle className="flex items-center gap-3 text-base font-semibold">
+                <span className="rounded-xl bg-[#EAF3E4] p-2"><UserCheck className="h-4 w-4 text-[#2D7A1F]" /></span>
                 Derniers abonnés
               </CardTitle>
               <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground" onClick={() => void navigate({ to: "/pro/subscribers" })}>
                 Voir tout <ArrowRight className="h-3 w-3" />
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-5">
               {isLoading ? (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                   {Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-12 w-full rounded-md" />)}
@@ -555,20 +548,29 @@ function DashboardContent() {
   );
 }
 
-function KpiCard({ label, value, icon, loading, highlight, onClick }: { label: string; value: number | undefined; icon: React.ReactNode; loading: boolean; highlight?: boolean; onClick?: () => void }) {
+function KpiCard({ label, value, icon, loading, highlight, onClick, tone = "plain" }: { label: string; value: number | undefined; icon: React.ReactNode; loading: boolean; highlight?: boolean; onClick?: () => void; tone?: "plain" | "soft" | "outline" | "deep" }) {
+  const toneStyles = {
+    plain: "border-[#E4E8E0] bg-card text-foreground",
+    soft: "border-[#DCE9D4] bg-[#F2F7ED] text-foreground",
+    outline: "border-[#BFD4B4] bg-card text-foreground shadow-[inset_0_3px_0_#6DB33F]",
+    deep: "border-[#1F5D2B] bg-[#245F32] text-white shadow-[0_8px_20px_rgba(31,93,43,0.16)]",
+  };
+  const isDeep = tone === "deep";
+
   return (
-    <button type="button" className="group text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-3xl" onClick={onClick} disabled={!onClick}>
+    <button type="button" className="group rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" onClick={onClick} disabled={!onClick}>
       <Card className={cn(
-        "h-full rounded-3xl border border-border/60 bg-gradient-to-br from-card via-card to-muted/30 text-left shadow-sm transition-all duration-200",
-        onClick && "cursor-pointer group-hover:-translate-y-0.5 group-hover:border-primary/25 group-hover:shadow-md",
-        highlight && "border-[#6DB33F]/35 from-[#6DB33F]/5 to-card"
+        "h-full rounded-2xl border text-left shadow-[0_3px_12px_rgba(24,41,27,0.045)] transition-all duration-200",
+        toneStyles[tone],
+        onClick && "cursor-pointer group-hover:-translate-y-0.5 group-hover:shadow-md",
+        highlight && !isDeep && "border-[#6DB33F]/50 bg-[#EDF6E7]",
       )}>
-        <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-3 pb-3">
-          <CardTitle className="text-sm font-medium leading-snug text-muted-foreground">{label}</CardTitle>
-          <div className="shrink-0 rounded-2xl border border-primary/10 bg-primary/10 p-2.5">{icon}</div>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-3 px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
+          <CardTitle className={cn("text-[13px] font-medium leading-snug", isDeep ? "text-white/75" : "text-muted-foreground")}>{label}</CardTitle>
+          <div className={cn("shrink-0 rounded-xl p-2.5", isDeep ? "bg-white/10" : "bg-white/85 shadow-sm")}>{icon}</div>
         </CardHeader>
-        <CardContent>
-          {loading ? <Skeleton className="h-9 w-16 rounded-lg" /> : <p className="text-3xl font-bold tracking-tight text-foreground">{value ?? 0}</p>}
+        <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5">
+          {loading ? <Skeleton className="h-9 w-16 rounded-lg" /> : <p className={cn("text-[1.9rem] font-semibold tracking-[-0.045em]", isDeep ? "text-white" : "text-[#203124]")}>{value ?? 0}</p>}
         </CardContent>
       </Card>
     </button>
@@ -590,7 +592,8 @@ function ConsultationRow({ consult }: { consult: UpcomingConsultation }) {
   const dayLabel = isToday(date) ? "Aujourd'hui" : isTomorrow(date) ? "Demain" : format(date, "EEE d MMM", { locale: fr });
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/70 px-3 py-3 shadow-sm transition-colors hover:border-primary/20 hover:bg-muted/30">
+    <div className="flex items-center gap-3 rounded-2xl border border-[#E5EAE1] bg-[#FBFCFA] px-3 py-3 transition-colors hover:border-[#BBD5AD] hover:bg-[#F5F9F1]">
+      <span className="h-9 w-1 shrink-0 rounded-full bg-[#6DB33F]/70" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{consult.patient_name}</p>
         <p className="text-xs text-muted-foreground">{dayLabel} à {format(date, "HH:mm")}{consult.duration_min ? ` · ${consult.duration_min} min` : ""}</p>
@@ -605,8 +608,8 @@ function PatientRow({ patient }: { patient: RecentPatient }) {
   const initials = `${patient.first_name[0] ?? ""}${patient.last_name[0] ?? ""}`.toUpperCase();
 
   return (
-    <button type="button" className="flex w-full items-center gap-3 rounded-2xl border border-transparent bg-background/50 px-3 py-3 text-left transition-all hover:border-primary/15 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" onClick={() => void navigate({ to: "/pro/patients/$patientId", params: { patientId: patient.id } })}>
-      <Avatar className="h-8 w-8"><AvatarFallback className="bg-[#6DB33F]/20 text-xs font-semibold text-[#2D7A1F]">{initials}</AvatarFallback></Avatar>
+    <button type="button" className="flex w-full items-center gap-3 rounded-2xl border border-transparent bg-[#FAFBF9] px-3 py-3 text-left transition-all hover:border-[#DCE9D4] hover:bg-[#F3F7EF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" onClick={() => void navigate({ to: "/pro/patients/$patientId", params: { patientId: patient.id } })}>
+      <Avatar className="h-9 w-9 border border-[#D8E7D0]"><AvatarFallback className="bg-[#E5F0DE] text-xs font-semibold text-[#2D7A1F]">{initials}</AvatarFallback></Avatar>
       <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{patient.first_name} {patient.last_name}</p><p className="text-xs text-muted-foreground">{(patient.goal && GOAL_LABEL[patient.goal]) ?? "Objectif non défini"}</p></div>
       <Badge variant="outline" className={cn("shrink-0 text-[10px]", patient.is_active ? "border-green-500/40 bg-green-50 text-green-700" : "border-gray-300 text-gray-500")}>{patient.is_active ? "Actif" : "Inactif"}</Badge>
     </button>
@@ -622,12 +625,12 @@ function SubscriberRow({ subscriber, updating, deleting, onTogglePlan, onDelete 
   const isPremium = plan === "premium";
 
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-border/50 bg-background/70 px-3 py-3 shadow-sm transition-all hover:border-primary/20 hover:bg-muted/30">
-      <button type="button" className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" onClick={() => void navigate({ to: "/pro/subscribers" })}>
-        <Avatar className="h-8 w-8"><AvatarFallback className="bg-blue-100 text-xs font-semibold text-blue-700">{initials}</AvatarFallback></Avatar>
+    <div className="flex min-w-0 flex-wrap items-center gap-3 rounded-2xl border border-[#E5EAE1] bg-[#FBFCFA] px-3 py-3 transition-colors hover:border-[#C9DCC0] hover:bg-white">
+      <button type="button" className="flex min-w-0 flex-1 basis-32 items-center gap-3 rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" onClick={() => void navigate({ to: "/pro/subscribers" })}>
+        <Avatar className="h-9 w-9 shrink-0 border border-[#D8E7D0]"><AvatarFallback className="bg-[#E5F0DE] text-xs font-semibold text-[#2D7A1F]">{initials}</AvatarFallback></Avatar>
         <div className="min-w-0"><p className="truncate text-sm font-medium">{name}</p><p className="truncate text-xs text-muted-foreground">{subscriber.email}</p><Badge variant="outline" className={cn("mt-1 shrink-0 text-[10px]", isPremium ? "border-amber-500/40 bg-amber-50 text-amber-700" : "border-green-500/40 bg-green-50 text-green-700")}>{planLabel}</Badge></div>
       </button>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         <Button size="sm" variant={isPremium ? "outline" : "default"} className={cn("h-8 rounded-xl", !isPremium && "bg-[#6DB33F] text-white hover:bg-[#2D7A1F]")} onClick={() => onTogglePlan(subscriber)} disabled={updating} aria-label={`Passer ${name} au forfait ${isPremium ? "Basic" : "Premium"}`}>{updating ? "..." : isPremium ? "Basic" : "Premium"}</Button>
         <Button size="sm" variant="destructive" className="h-8 rounded-xl" onClick={() => onDelete(subscriber)} disabled={deleting} aria-label={`Supprimer l’abonné ${name}`}>{deleting ? "..." : <Trash2 className="h-4 w-4" />}</Button>
       </div>

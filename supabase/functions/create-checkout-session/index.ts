@@ -6,6 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// V1 BETA uses manual payments only. Keep the Stripe implementation below
+// for a later release, but fail closed before creating any Stripe session.
+const CARD_PAYMENTS_ENABLED_IN_V1 = false;
+
 function json(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -75,6 +79,10 @@ const TRIAL_DAYS = 7;
 
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (request.method !== "POST") return json({ error: "METHODE_NON_AUTORISEE" }, 405);
+  if (!CARD_PAYMENTS_ENABLED_IN_V1) {
+    return json({ error: "Le paiement par carte est désactivé pour la BETA." }, 403);
+  }
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");

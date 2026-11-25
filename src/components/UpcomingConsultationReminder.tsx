@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useAccessRights } from "@/hooks/useAccessRights";
 import { createNotification } from "@/lib/notifications";
 
 /**
@@ -10,9 +11,11 @@ import { createNotification } from "@/lib/notifications";
  */
 export function UpcomingConsultationReminder() {
   const { user, role } = useAuth();
+  const { rights, loading: rightsLoading } = useAccessRights();
   const firedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    if (rightsLoading || rights?.access_visio !== true) return;
     if (!user || (role !== "pro" && role !== "patient")) return;
 
     const check = async () => {
@@ -49,7 +52,7 @@ export function UpcomingConsultationReminder() {
     void check();
     const interval = setInterval(() => void check(), 60_000);
     return () => clearInterval(interval);
-  }, [user, role]);
+  }, [user, role, rights, rightsLoading]);
 
   return null;
 }

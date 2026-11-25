@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AccountPasswordCard } from "@/components/admin/AccountPasswordCard";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
@@ -82,12 +83,12 @@ function SettingsContent() {
 
   return (
     <div className="flex flex-col">
-      <header className="flex items-center gap-3 border-b bg-white px-6 py-4">
-        <Settings className="h-6 w-6 text-[#6DB33F]" />
-        <h1 className="text-xl font-semibold text-foreground">Paramètres</h1>
+      <header className="flex items-center gap-3 border-b border-[#2A4532] bg-[#15251B] px-4 py-5 text-white shadow-[0_8px_22px_rgba(21,37,27,0.08)] sm:px-6 xl:px-10">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10"><Settings className="h-5 w-5 text-[#B4E28F]" /></span>
+        <h1 className="text-2xl font-semibold tracking-tight text-white">Paramètres</h1>
       </header>
 
-      <div className="p-6 space-y-6 max-w-2xl">
+      <div className="mx-auto w-full max-w-[1480px] space-y-5 px-4 py-6 sm:px-6 sm:py-8 xl:px-10">
         {profile === undefined ? (
           <Skeleton className="h-64 w-full" />
         ) : profile === null ? (
@@ -96,7 +97,7 @@ function SettingsContent() {
           <>
             <ProfileCard profile={profile} onSaved={(updated) => setProfile(updated)} />
             <AccountCard profile={profile} />
-            <PasswordCard />
+            <AccountPasswordCard />
             <LogoutCard onLogout={() => void signOut()} />
           </>
         )}
@@ -145,7 +146,7 @@ function ProfileCard({
   };
 
   return (
-    <Card className="border-border/60">
+    <Card className="max-w-3xl rounded-2xl border-[#E2E8DE] shadow-sm">
       <CardHeader className="flex flex-row items-center gap-3">
         <User className="h-5 w-5 text-[#6DB33F]" />
         <CardTitle className="text-base">Profil professionnel</CardTitle>
@@ -195,7 +196,7 @@ function ProfileCard({
 
 function AccountCard({ profile }: { profile: ProfileRow }) {
   return (
-    <Card className="border-border/60">
+    <Card className="max-w-3xl rounded-2xl border-[#E2E8DE] shadow-sm">
       <CardHeader className="flex flex-row items-center gap-3">
         <ShieldCheck className="h-5 w-5 text-[#6DB33F]" />
         <CardTitle className="text-base">Compte</CardTitle>
@@ -216,68 +217,6 @@ function Info({ label, value }: { label: string; value: string }) {
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="font-medium">{value}</div>
     </div>
-  );
-}
-
-function PasswordCard() {
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (password.length < 8) {
-      toast.error("Le mot de passe doit contenir au moins 8 caractères.");
-      return;
-    }
-    if (password !== confirm) {
-      toast.error("Les mots de passe ne correspondent pas.");
-      return;
-    }
-    setSaving(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    setSaving(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success("Mot de passe mis à jour");
-    setPassword("");
-    setConfirm("");
-  };
-
-  return (
-    <Card className="border-border/60">
-      <CardHeader className="flex flex-row items-center gap-3">
-        <ShieldCheck className="h-5 w-5 text-[#6DB33F]" />
-        <CardTitle className="text-base">Mot de passe</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={submit} className="space-y-4">
-          <div className="space-y-1">
-            <Label>Nouveau mot de passe</Label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              minLength={8}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Confirmer le mot de passe</Label>
-            <Input
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              minLength={8}
-            />
-          </div>
-          <Button type="submit" disabled={saving} className="bg-[#6DB33F] hover:bg-[#2D7A1F] text-white">
-            {saving ? "Enregistrement…" : "Mettre à jour le mot de passe"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
   );
 }
 

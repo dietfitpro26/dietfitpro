@@ -140,7 +140,7 @@ function ChatPane({
   onDeleteConversation?: (partner: Conversation["partner"]) => Promise<void>;
 }) {
   const { user } = useAuth();
-  const { messages, sendMessage } = useConversation(partner?.id ?? null);
+  const { messages, sendMessage, getFreshAttachmentUrl } = useConversation(partner?.id ?? null);
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
@@ -246,6 +246,16 @@ function ChatPane({
                     href={m.attachment_url}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      const attachmentWindow = window.open("about:blank", "_blank");
+                      if (!attachmentWindow) return;
+                      attachmentWindow.opener = null;
+                      void getFreshAttachmentUrl(m.id).then((url) => {
+                        if (url) attachmentWindow.location.href = url;
+                        else attachmentWindow.close();
+                      });
+                    }}
                     className={cn(
                       "flex items-center gap-2 mb-1 underline-offset-2 hover:underline",
                       mine ? "text-white" : "text-foreground",

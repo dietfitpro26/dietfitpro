@@ -1,0 +1,14 @@
+{
+  "functions": [
+    {
+      "schema_name": "public",
+      "function_name": "notify_pro_member_post",
+      "arguments": "",
+      "security_definer": true,
+      "function_settings": [
+        "search_path=public"
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.notify_pro_member_post()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_pro uuid;\n  v_pseudo text;\n  v_group text;\nbegin\n  if new.source <> 'member' then\n    return new;\n  end if;\n\n  select id into v_pro from public.profiles where role = 'pro' order by created_at limit 1;\n\n  if v_pro is null or v_pro = new.author_id then\n    return new;\n  end if;\n\n  select pseudo into v_pseudo from public.community_profiles where user_id = new.author_id;\n\n  if new.group_id is not null then\n    select name into v_group from public.feed_groups where id = new.group_id;\n  end if;\n\n  insert into public.scheduled_notifications\n    (user_id, channel, type, title, body, link, payload, scheduled_for, sent_at)\n  values (\n    v_pro, 'in_app', 'feed_post',\n    case\n      when new.group_id is null then 'Nouvelle publication sur le feed'\n      else 'Nouvelle publication dans « ' || coalesce(v_group, 'un groupe') || ' »'\n    end,\n    coalesce(v_pseudo, 'Un membre') || ' : ' || left(coalesce(nullif(new.body, ''), new.title), 120),\n    case\n      when new.group_id is null then '/pro/feed'\n      else '/groups/' || new.group_id::text\n    end,\n    jsonb_build_object('post_id', new.id, 'group_id', new.group_id),\n    now(), now()\n  );\n\n  return new;\nend;\n$function$\n"
+    }
+  ]
+}

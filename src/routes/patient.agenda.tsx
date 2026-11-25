@@ -6,6 +6,7 @@ import { CalendarDays, Clock3, Loader2, Plus, UserRound, CheckCircle2 } from "lu
 
 import { PatientLayout } from "@/layouts/PatientLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { V2FeatureUnavailable } from "@/components/V2FeatureUnavailable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,9 +18,7 @@ export const Route = createFileRoute("/patient/agenda")({
   head: () => ({ meta: [{ title: "Agenda — DietFitPro" }] }),
   component: () => (
     <ProtectedRoute allow={["patient"]}>
-      <PatientLayout>
-        <PatientAgendaPage />
-      </PatientLayout>
+      <PatientLayout><V2FeatureUnavailable feature="Agenda de consultation" /></PatientLayout>
     </ProtectedRoute>
   ),
 });

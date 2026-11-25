@@ -228,12 +228,12 @@ function AnalyticsContent() {
 
   return (
     <div className="flex flex-col">
-      <header className="flex items-center justify-between border-b bg-white px-6 py-4">
-        <h1 className="text-xl font-semibold text-foreground">Statistiques</h1>
+      <header className="border-b border-[#2A4532] bg-[#15251B] px-4 py-5 text-white shadow-[0_8px_22px_rgba(21,37,27,0.08)] sm:px-6 xl:px-10">
+        <h1 className="mx-auto w-full max-w-[1480px] text-2xl font-semibold tracking-tight text-white">Statistiques</h1>
       </header>
 
 
-      <div className="p-6 space-y-6">
+      <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 xl:px-10">
         {error && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
             {error}
@@ -280,7 +280,7 @@ function AnalyticsContent() {
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="border-border/60">
+          <Card className="rounded-2xl border-[#E2E8DE] shadow-sm">
             <CardHeader>
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Consultations par semaine (4 dernières semaines)
@@ -307,7 +307,7 @@ function AnalyticsContent() {
           </Card>
 
 
-          <Card className="border-border/60">
+          <Card className="rounded-2xl border-[#E2E8DE] shadow-sm">
             <CardHeader>
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Répartition des statuts de paiement
@@ -407,17 +407,17 @@ function KpiCard({
 
 
   return (
-    <Card className="border-border/60">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <Card className="rounded-2xl border-[#E2E8DE] shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 px-5 pb-2 pt-5">
         <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
-        <div className="rounded-md bg-[#6DB33F]/10 p-2">{icon}</div>
+        <div className="rounded-xl bg-[#EAF3E4] p-2.5">{icon}</div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-5 pb-5">
         {loading ? (
           <Skeleton className="h-8 w-16" />
         ) : (
           <div className="flex items-center gap-2">
-            <p className="text-3xl font-bold text-foreground">{value ?? 0}</p>
+            <p className="text-[1.85rem] font-semibold tracking-[-0.04em] text-[#203124]">{value ?? 0}</p>
             {evolution !== undefined && evolution !== null && (
               <span className={cn(
                 "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",

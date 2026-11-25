@@ -6,6 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// The V1 BETA is managed manually; online Stripe account actions stay off.
+// Preserve the Stripe portal implementation below for a later release.
+const CARD_PAYMENTS_ENABLED_IN_V1 = false;
+
 function json(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -63,6 +67,10 @@ function safeUrl(value: unknown): URL | null {
 
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (request.method !== "POST") return json({ error: "METHODE_NON_AUTORISEE" }, 405);
+  if (!CARD_PAYMENTS_ENABLED_IN_V1) {
+    return json({ error: "La gestion Stripe en ligne est désactivée pour la BETA." }, 403);
+  }
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");

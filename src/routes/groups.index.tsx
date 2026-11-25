@@ -6,6 +6,7 @@ import { PseudoForm } from "@/components/FeedView";
 import { CharterCard } from "@/components/CommunityCharter";
 import { SanctionsNotice } from "@/components/SanctionsNotice";
 import { GroupInvitations } from "@/components/GroupInvitations";
+import { FeatureEntitlementsPanel } from "@/components/admin/FeatureEntitlementsPanel";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { Users, Plus, Lock, ChevronRight, KeyRound, Loader2, ArrowLeft, Ban, Inbox, Crown } from "lucide-react";
@@ -48,13 +49,14 @@ function GroupsPage() {
   );
 }
 
-function GroupsContent() {
+export function GroupsContent({ showPremiumEntitlements = true }: { showPremiumEntitlements?: boolean } = {}) {
   const { user, role } = useAuth();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [canParticipate, setCanParticipate] = useState(false);
   const [canCreateGroup, setCanCreateGroup] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [pseudo, setPseudo] = useState<string | null>(null);
   const [charterOk, setCharterOk] = useState(false);
   const [groups, setGroups] = useState<GroupRow[]>([]);
@@ -71,12 +73,10 @@ function GroupsContent() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const userId = user?.id ?? "";
-  const isPro = role === "pro";
-
   const load = useCallback(async () => {
     if (!userId) return;
 
-    const [canRes, charterRes, groupsRes, pseudoRes, bansRes, appealsRes, badgeRes] = await Promise.all([
+    const [canRes, charterRes, groupsRes, pseudoRes, bansRes, appealsRes, createRes, adminRes] = await Promise.all([
       supabase.rpc("can_participate_in_community", { p_user: userId }),
       supabase.rpc("has_accepted_charter", { p_user: userId }),
       supabase
@@ -93,16 +93,16 @@ function GroupsContent() {
         .select("id, user_id, group_id, message, created_at")
         .eq("status", "pending")
         .order("created_at", { ascending: true }),
-      supabase.rpc("community_badges", { p_users: [userId] }),
+      supabase.rpc("can_create_community_group", { p_user: userId }),
+      supabase.rpc("is_current_super_admin"),
     ]);
 
     setCanParticipate(canRes.data === true);
     setCharterOk(charterRes.data === true);
+    setIsSuperAdmin(adminRes.data === true);
     setPseudo((pseudoRes.data as { pseudo: string } | null)?.pseudo ?? null);
 
-    const badgeRows = (badgeRes.data ?? []) as { user_id: string; badge: string }[];
-    const myBadge = badgeRows.find((badge) => badge.user_id === userId)?.badge;
-    setCanCreateGroup(isPro || role === "patient" || myBadge === "premium");
+    setCanCreateGroup(createRes.data === true);
 
     const list = (groupsRes.data ?? []) as GroupRow[];
     setGroups(list);
@@ -147,7 +147,7 @@ function GroupsContent() {
     setPseudos(pseudoMap);
 
     setLoading(false);
-  }, [userId, isPro, role]);
+  }, [userId]);
 
   useEffect(() => {
     void load();
@@ -274,7 +274,7 @@ function GroupsContent() {
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-bold flex items-center gap-2">
           <Users className="h-5 w-5 text-primary" />
-          {isPro ? "Tous les groupes" : "Mes groupes"}
+          Mes groupes
         </h1>
 
         <Link
@@ -291,7 +291,7 @@ function GroupsContent() {
       {ownBan ? null : !canParticipate ? (
         <div className="flex items-start gap-2 rounded-xl border border-dashed bg-card px-4 py-4 text-sm text-muted-foreground">
           <Lock className="h-4 w-4 shrink-0 mt-0.5" />
-          <span>Les groupes sont réservés aux membres Premium et aux patients.</span>
+          <span>Les abonnés Basic peuvent rejoindre un groupe avec une invitation valide. Les autres règles d'accès restent applicables.</span>
         </div>
       ) : !pseudo ? (
         <div className="rounded-xl border bg-card p-4">
@@ -330,7 +330,7 @@ function GroupsContent() {
 
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground">
-                  {isPro ? "Pas de limite pour le coach" : "5 groupes maximum par personne"}
+                  {role === "pro" ? "Pas de limite pour le coach" : "5 groupes maximum par personne"}
                 </span>
 
                 <button
@@ -388,8 +388,15 @@ function GroupsContent() {
 
       {msg && <p className="text-sm text-red-500">{msg}</p>}
       {notice && <p className="text-sm text-green-700">{notice}</p>}
+      {isSuperAdmin && showPremiumEntitlements && (
+        <div id="super-admin-entitlements" className="scroll-mt-24">
+          <FeatureEntitlementsPanel />
+        </div>
+      )}
 
-      {isPro && (
+
+
+      {isSuperAdmin && (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
             <Inbox className="h-4 w-4" /> Demandes de réintégration ({appeals.length})
@@ -496,7 +503,7 @@ function GroupsContent() {
         </section>
       )}
 
-      {isPro && (
+      {isSuperAdmin && (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
             <Ban className="h-4 w-4" /> Personnes bannies ({otherBans.length})

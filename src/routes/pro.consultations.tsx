@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { ProLayout } from "@/layouts/ProLayout";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { V2FeatureUnavailable } from "@/components/V2FeatureUnavailable";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -28,9 +30,9 @@ export const Route = createFileRoute("/pro/consultations")({
 
 function Page() {
   return (
-    <ProLayout>
-      <ConsultationsContent />
-    </ProLayout>
+    <ProtectedRoute allow={["pro"]}>
+      <ProLayout><V2FeatureUnavailable feature="Consultations" /></ProLayout>
+    </ProtectedRoute>
   );
 }
 

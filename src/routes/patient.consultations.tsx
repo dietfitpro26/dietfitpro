@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { PatientLayout } from "@/layouts/PatientLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { V2FeatureUnavailable } from "@/components/V2FeatureUnavailable";
 import {
   Card,
   CardContent,
@@ -42,7 +43,7 @@ export const Route = createFileRoute("/patient/consultations")({
   component: () => (
     <ProtectedRoute allow={["patient"]}>
       <PatientLayout>
-        <Content />
+        <V2FeatureUnavailable feature="Consultations" />
       </PatientLayout>
     </ProtectedRoute>
   ),

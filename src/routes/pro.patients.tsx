@@ -234,26 +234,28 @@ function PatientsContent() {
   }
 
   return (
-    <div className="min-h-full bg-gradient-to-b from-background to-muted/20">
-      <header className="border-b bg-card/95 px-4 py-5 shadow-sm backdrop-blur sm:px-6">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-medium text-primary">
+    <div className="min-h-full bg-[#F8F9F6]">
+      <header className="px-4 pt-5 sm:px-6 sm:pt-7 xl:px-10">
+        <div className="relative mx-auto flex max-w-[1480px] flex-col gap-6 overflow-hidden rounded-[1.75rem] border border-[#2A4532] border-l-4 border-l-[#9BD26E] bg-[#15251B] px-5 py-6 shadow-[0_12px_30px_rgba(21,37,27,0.12)] sm:flex-row sm:items-end sm:justify-between sm:px-8 sm:py-7">
+          <div className="pointer-events-none absolute -right-10 -top-16 h-52 w-52 rounded-full border-[30px] border-white/[0.045]" />
+          <div className="relative">
+            <p className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#B4E28F]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#9BD26E]" />
               Espace professionnel
             </p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight">
+            <h1 className="mt-2 text-[1.85rem] font-semibold tracking-[-0.045em] text-white sm:text-3xl">
               Mes patients
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-2 text-sm text-[#D0DCD1]">
               Gérez vos patients et accédez rapidement à leur suivi.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="relative flex flex-col gap-2 min-[420px]:flex-row sm:shrink-0">
             <Button
               variant="outline"
               size="icon"
-              className="rounded-xl"
+              className="h-10 w-10 rounded-xl border-white/20 bg-white/[0.08] text-white shadow-sm hover:bg-white/[0.14] hover:text-white"
               aria-label="Ouvrir les notifications"
               onClick={() => void navigate({ to: "/pro/notifications" })}
             >
@@ -262,7 +264,7 @@ function PatientsContent() {
 
             <Button
               variant="outline"
-              className="rounded-xl"
+              className="rounded-xl border-white/20 bg-white/[0.08] text-white shadow-sm hover:bg-white/[0.14] hover:text-white"
               onClick={() => void handleRefresh()}
               disabled={refreshing}
             >
@@ -273,7 +275,7 @@ function PatientsContent() {
             </Button>
 
             <Button
-              className="rounded-xl bg-[#6DB33F] text-white hover:bg-[#2D7A1F]"
+              className="rounded-xl bg-[#6DB33F] font-semibold text-white shadow-[0_5px_16px_rgba(0,0,0,0.18)] hover:bg-[#5B9F33]"
               onClick={() => setModalOpen(true)}
             >
               <UserPlus className="mr-2 h-4 w-4" />
@@ -283,16 +285,16 @@ function PatientsContent() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
-        <section className="rounded-3xl border bg-card p-4 shadow-sm sm:p-5">
-          <div className="flex flex-col gap-3 lg:flex-row">
+      <main className="mx-auto w-full max-w-[1480px] space-y-5 px-4 py-5 sm:px-6 sm:py-7 xl:px-10">
+        <section className="rounded-2xl border border-[#E2E8DE] bg-white p-4 shadow-[0_4px_16px_rgba(24,41,27,0.045)] sm:p-5">
+          <div className="flex flex-col gap-3 md:flex-row">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#4E7F3C]" />
               <Input
                 placeholder="Rechercher par nom ou email…"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                className="h-11 rounded-xl pl-9"
+                className="h-12 rounded-xl border-[#E1E8DD] bg-[#FAFBF9] pl-10 shadow-none placeholder:text-muted-foreground/75 focus-visible:border-[#8DBB75] focus-visible:ring-[#6DB33F]/20"
               />
             </div>
 
@@ -300,7 +302,7 @@ function PatientsContent() {
               value={status}
               onValueChange={(value) => setStatus(value as StatusFilter)}
             >
-              <SelectTrigger className="h-11 w-full rounded-xl lg:w-48">
+              <SelectTrigger className="h-12 w-full rounded-xl border-[#E1E8DD] bg-[#FAFBF9] shadow-none focus:ring-[#6DB33F]/20 md:w-56">
                 <SelectValue placeholder="Statut" />
               </SelectTrigger>
               <SelectContent>
@@ -311,8 +313,8 @@ function PatientsContent() {
             </Select>
           </div>
 
-          <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-            <Users className="h-4 w-4" />
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EAF3E4] text-[#2D7A1F]"><Users className="h-4 w-4" /></span>
             <span>
               {filtered === null
                 ? "Chargement des patients…"
@@ -330,11 +332,71 @@ function PatientsContent() {
           </div>
         ) : null}
 
-        <section className="overflow-hidden rounded-3xl border bg-card shadow-sm">
-          <div className="overflow-x-auto">
+        <section className="overflow-hidden rounded-2xl border border-[#E2E8DE] bg-white shadow-[0_5px_20px_rgba(24,41,27,0.05)]">
+          <div className="space-y-3 p-3 md:hidden">
+            {filtered === null ? (
+              Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="space-y-3 rounded-2xl border border-[#E5EAE1] p-4">
+                  <Skeleton className="h-11 w-2/3 rounded-xl" />
+                  <Skeleton className="h-12 w-full rounded-xl" />
+                </div>
+              ))
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 px-4 py-12 text-center text-muted-foreground">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EAF3E4] text-[#2D7A1F]"><Users className="h-5 w-5" /></span>
+                <p className="text-sm">Aucun patient ne correspond à votre recherche.</p>
+                <Button variant="outline" size="sm" className="rounded-xl border-[#DCE5D7]" onClick={() => setModalOpen(true)}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Ajouter un patient
+                </Button>
+              </div>
+            ) : (
+              filtered.map((patient) => {
+                const initials = `${patient.first_name[0] ?? ""}${patient.last_name[0] ?? ""}`.toUpperCase();
+
+                return (
+                  <article key={patient.id} className="rounded-2xl border border-[#E3E9DF] bg-[#FEFFFD] p-4 shadow-[0_2px_8px_rgba(24,41,27,0.035)]">
+                    <div className="flex items-start justify-between gap-3">
+                      <button type="button" className="flex min-w-0 items-center gap-3 rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6DB33F] focus-visible:ring-offset-2" onClick={() => setSelectedPatientId(patient.id)}>
+                        <Avatar className="h-11 w-11 shrink-0 border border-[#DCE9D4]">
+                          <AvatarFallback className="bg-[#EAF3E4] text-xs font-semibold text-[#2D7A1F]">{initials || "?"}</AvatarFallback>
+                        </Avatar>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-[#203124]">{patient.first_name} {patient.last_name}</span>
+                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">{patient.email ?? "—"}</span>
+                        </span>
+                      </button>
+                      <span className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-semibold", patient.is_active ? "bg-[#EAF3E4] text-[#2D7A1F]" : "bg-[#F0F1EF] text-[#68716A]")}>
+                        <span className={cn("h-1.5 w-1.5 rounded-full", patient.is_active ? "bg-[#6DB33F]" : "bg-[#9AA19B]")} />
+                        {patient.is_active ? "Actif" : "Inactif"}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <div className="rounded-xl bg-[#F5F8F2] px-3 py-2.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#788478]">Objectif</p>
+                        <p className="mt-1 truncate text-xs font-medium text-[#334535]">{getGoal(patient)}</p>
+                      </div>
+                      <div className="rounded-xl bg-[#F5F8F2] px-3 py-2.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#788478]">Dernier rendez-vous</p>
+                        <p className="mt-1 truncate text-xs font-medium text-[#334535]">{patient.lastAppointment ? new Date(patient.lastAppointment).toLocaleDateString("fr-FR") : "—"}</p>
+                      </div>
+                    </div>
+
+                    <Button variant="outline" size="sm" className="mt-3 w-full rounded-xl border-[#DCE5D7] text-[#315B32] hover:border-[#9FC58C] hover:bg-[#F1F7EC]" onClick={() => openFullProfile(patient.id)}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      Fiche complète
+                    </Button>
+                  </article>
+                );
+              })
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="border-[#E6EBE3] bg-[#F6F8F4] hover:bg-[#F6F8F4]">
                   <TableHead className="w-14" />
                   <TableHead>Nom complet</TableHead>
                   <TableHead>Email</TableHead>
@@ -387,12 +449,12 @@ function PatientsContent() {
                     return (
                       <TableRow
                         key={patient.id}
-                        className="cursor-pointer transition-colors hover:bg-muted/40"
+                        className="cursor-pointer border-[#EDF0EA] transition-colors hover:bg-[#F5F9F2]"
                         onClick={() => setSelectedPatientId(patient.id)}
                       >
                         <TableCell>
-                          <Avatar className="h-9 w-9">
-                            <AvatarFallback className="bg-[#6DB33F]/10 text-xs font-semibold text-[#2D7A1F]">
+                          <Avatar className="h-10 w-10 border border-[#DCE9D4]">
+                            <AvatarFallback className="bg-[#EAF3E4] text-xs font-semibold text-[#2D7A1F]">
                               {initials || "?"}
                             </AvatarFallback>
                           </Avatar>
@@ -419,12 +481,13 @@ function PatientsContent() {
                         <TableCell>
                           <span
                             className={cn(
-                              "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium",
+                              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold",
                               patient.is_active
-                                ? "bg-[#6DB33F]/15 text-[#2D7A1F]"
-                                : "bg-muted text-muted-foreground",
+                                ? "bg-[#EAF3E4] text-[#2D7A1F]"
+                                : "bg-[#F0F1EF] text-[#68716A]",
                             )}
                           >
+                            <span className={cn("h-1.5 w-1.5 rounded-full", patient.is_active ? "bg-[#6DB33F]" : "bg-[#9AA19B]")} />
                             {patient.is_active ? "Actif" : "Inactif"}
                           </span>
                         </TableCell>
@@ -433,7 +496,7 @@ function PatientsContent() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="rounded-lg"
+                            className="rounded-lg border-[#DCE5D7] text-[#315B32] hover:border-[#9FC58C] hover:bg-[#F1F7EC]"
                             onClick={(event) => {
                               event.stopPropagation();
                               openFullProfile(patient.id);

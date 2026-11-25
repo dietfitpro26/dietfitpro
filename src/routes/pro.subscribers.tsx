@@ -490,171 +490,9 @@ function BillingPanel({
 }
 
 
-function OverridesPanel({ userId }: { userId: string }) {
-  const [overrides, setOverrides] = useState<Overrides>({});
-  const [loadingKey, setLoadingKey] = useState<string | null>(null);
-  const [fetched, setFetched] = useState(false);
-
-
-  useEffect(() => {
-    let mounted = true;
-
-
-    const load = async () => {
-      const { data, error } = await supabase
-        .from("subscriber_overrides")
-        .select("feature_key, enabled")
-        .eq("user_id", userId);
-
-
-      if (!mounted) return;
-
-
-      if (error) {
-        console.error("[OverridesPanel] Erreur :", error);
-        setFetched(true);
-        return;
-      }
-
-
-      const map: Overrides = {};
-
-
-      for (const row of data ?? []) {
-        map[row.feature_key] = row.enabled;
-      }
-
-
-      setOverrides(map);
-      setFetched(true);
-    };
-
-
-    void load();
-
-
-    return () => {
-      mounted = false;
-    };
-  }, [userId]);
-
-
-  const toggle = useCallback(
-    async (featureKey: string) => {
-      const current = overrides[featureKey] ?? false;
-      const next = !current;
-
-
-      setLoadingKey(featureKey);
-      setOverrides((previous) => ({
-        ...previous,
-        [featureKey]: next,
-      }));
-
-
-      const { error } = await supabase
-        .from("subscriber_overrides")
-        .upsert(
-          {
-            user_id: userId,
-            feature_key: featureKey,
-            enabled: next,
-          },
-          {
-            onConflict: "user_id,feature_key",
-          },
-        );
-
-
-      if (error) {
-        setOverrides((previous) => ({
-          ...previous,
-          [featureKey]: current,
-        }));
-
-
-        console.error("[OverridesPanel] Erreur toggle :", error);
-      }
-
-
-      setLoadingKey(null);
-    },
-    [overrides, userId],
-  );
-
-
-  if (!fetched) {
-    return (
-      <div className="grid grid-cols-2 gap-2 px-4 pb-4 pt-2 sm:grid-cols-3">
-        {FEATURES.map((feature) => (
-          <div
-            key={feature.key}
-            className="h-8 animate-pulse rounded bg-muted"
-          />
-        ))}
-      </div>
-    );
-  }
-
-
-  return (
-    <div className="border-t px-4 pb-4 pt-2">
-      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Accès activés
-      </p>
-
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {FEATURES.map((feature) => {
-          const enabled = overrides[feature.key] ?? false;
-
-
-          return (
-            <div
-              key={feature.key}
-              className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
-                enabled
-                  ? "border-primary/30 bg-primary/5"
-                  : "border-border bg-background"
-              }`}
-            >
-              <div className="flex items-center gap-1.5 text-xs font-medium">
-                <span
-                  className={
-                    enabled
-                      ? "text-primary"
-                      : "text-muted-foreground"
-                  }
-                >
-                  {feature.icon}
-                </span>
-
-
-                <span
-                  className={
-                    enabled
-                      ? "text-foreground"
-                      : "text-muted-foreground"
-                  }
-                >
-                  {feature.label}
-                </span>
-              </div>
-
-
-              <Toggle
-                enabled={enabled}
-                onChange={() => void toggle(feature.key)}
-                loading={loadingKey === feature.key}
-              />
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+function OverridesPanel() {
+  return <div className="border-t px-4 py-3 text-sm text-muted-foreground">Les options individuelles sont administr?es par le super administrateur. Les professionnels conservent la gestion de la formule commerciale ci-dessus.</div>;
 }
-
 
 function PremiumToggleButton({
   subscriber,
@@ -1058,22 +896,22 @@ function Content() {
 
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center gap-3">
-        <UserCheck className="h-6 w-6 text-primary" />
+    <div className="mx-auto w-full max-w-[1480px] space-y-6 bg-[#F8F9F6] px-4 py-6 sm:px-6 sm:py-8 xl:px-10">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#2A4532] bg-[#15251B] px-5 py-4 text-white shadow-[0_8px_22px_rgba(21,37,27,0.08)]">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10"><UserCheck className="h-5 w-5 text-[#B4E28F]" /></span>
 
 
-        <h1 className="text-2xl font-bold">Abonnés</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-white">Abonnés</h1>
 
 
-        <Badge variant="secondary" className="ml-auto">
+        <Badge variant="secondary" className="ml-auto border border-white/15 bg-white/10 text-white">
           {subscribers.length} au total
         </Badge>
       </div>
 
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-        <div className="rounded-lg border bg-card p-4 text-center">
+      <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 md:grid-cols-3">
+        <div className="rounded-2xl border border-[#DCE9D4] bg-[#F2F7ED] p-4 text-center shadow-sm">
           <p className="text-2xl font-bold text-primary">
             {subscribers.length}
           </p>
@@ -1085,7 +923,7 @@ function Content() {
         </div>
 
 
-        <div className="rounded-lg border bg-card p-4 text-center">
+        <div className="rounded-2xl border border-[#E2E8DE] bg-white p-4 text-center shadow-sm">
           <p className="text-2xl font-bold text-primary">
             {avgBMI ?? "—"}
           </p>
@@ -1097,7 +935,7 @@ function Content() {
         </div>
 
 
-        <div className="rounded-lg border bg-card p-4 text-center">
+        <div className="rounded-2xl border border-[#E2E8DE] bg-white p-4 text-center shadow-sm">
           <p
             className={`text-2xl font-bold ${
               pastDueCount > 0 ? "text-orange-500" : "text-primary"
@@ -1120,7 +958,7 @@ function Content() {
 
 
           <Input
-            className="pl-9"
+            className="h-11 rounded-xl border-[#E1E8DD] bg-white pl-9 shadow-none focus-visible:ring-[#6DB33F]/20"
             placeholder="Rechercher par nom ou email…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -1133,7 +971,7 @@ function Content() {
 
 
           <select
-            className="rounded-md border bg-background px-3 py-2 text-sm"
+            className="h-11 rounded-xl border border-[#E1E8DD] bg-white px-3 py-2 text-sm"
             value={filterGoal}
             onChange={(event) =>
               setFilterGoal(event.target.value)
@@ -1160,7 +998,7 @@ function Content() {
           {[1, 2, 3].map((item) => (
             <div
               key={item}
-              className="animate-pulse rounded-lg border bg-card p-4"
+              className="animate-pulse rounded-2xl border border-[#E2E8DE] bg-white p-4"
             >
               <div className="mb-2 h-4 w-1/3 rounded bg-muted" />
               <div className="h-3 w-1/2 rounded bg-muted" />
@@ -1168,7 +1006,7 @@ function Content() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-lg border bg-card p-12 text-center text-muted-foreground">
+        <div className="rounded-2xl border border-dashed border-[#D8E3D2] bg-white p-12 text-center text-muted-foreground">
           <UserCheck className="mx-auto mb-3 h-10 w-10 opacity-30" />
 
 
@@ -1204,10 +1042,10 @@ function Content() {
             return (
               <div
                 key={subscriber.id}
-                className="overflow-hidden rounded-lg border bg-card transition-shadow hover:shadow-sm"
+                className="overflow-hidden rounded-2xl border border-[#E2E8DE] bg-white shadow-sm transition-shadow hover:shadow-md"
               >
                 <div
-                  className="flex cursor-pointer select-none items-center gap-4 p-4"
+                  className="flex cursor-pointer select-none items-center gap-4 p-4 transition-colors hover:bg-[#F7F9F5]"
                   onClick={() =>
                     setExpandedId(
                       isOpen ? null : subscriber.id,
@@ -1340,7 +1178,7 @@ function Content() {
                     />
 
 
-                    <OverridesPanel userId={subscriber.id} />
+                    <OverridesPanel />
 
 
                     <div className="border-t px-4 pb-4 pt-3">

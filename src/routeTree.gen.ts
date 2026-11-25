@@ -20,6 +20,7 @@ import { Route as FeedRouteImport } from './routes/feed'
 import { Route as ConfidentialiteRouteImport } from './routes/confidentialite'
 import { Route as CgvRouteImport } from './routes/cgv'
 import { Route as BienvenueRouteImport } from './routes/bienvenue'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as GroupsIndexRouteImport } from './routes/groups.index'
 import { Route as SubscriberSportRouteImport } from './routes/subscriber.sport'
@@ -52,6 +53,9 @@ import { Route as PatientAnamneseRouteImport } from './routes/patient.anamnese'
 import { Route as PatientAgendaRouteImport } from './routes/patient.agenda'
 import { Route as GroupsJoinRouteImport } from './routes/groups.join'
 import { Route as GroupsGroupIdRouteImport } from './routes/groups.$groupId'
+import { Route as AdminSecurityRouteImport } from './routes/admin.security'
+import { Route as AdminPremiumRouteImport } from './routes/admin.premium'
+import { Route as AdminCommunityRouteImport } from './routes/admin.community'
 import { Route as ProSportProgramIdRouteImport } from './routes/pro.sport.$programId'
 import { Route as ProRecipesNewRouteImport } from './routes/pro.recipes.new'
 import { Route as ProPatientsPatientIdRouteImport } from './routes/pro.patients.$patientId'
@@ -111,6 +115,11 @@ const CgvRoute = CgvRouteImport.update({
 const BienvenueRoute = BienvenueRouteImport.update({
   id: '/bienvenue',
   path: '/bienvenue',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -273,6 +282,21 @@ const GroupsGroupIdRoute = GroupsGroupIdRouteImport.update({
   path: '/groups/$groupId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSecurityRoute = AdminSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPremiumRoute = AdminPremiumRouteImport.update({
+  id: '/premium',
+  path: '/premium',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCommunityRoute = AdminCommunityRouteImport.update({
+  id: '/community',
+  path: '/community',
+  getParentRoute: () => AdminRoute,
+} as any)
 const ProSportProgramIdRoute = ProSportProgramIdRouteImport.update({
   id: '/$programId',
   path: '/$programId',
@@ -301,6 +325,7 @@ const ProConsultationsIdRoute = ProConsultationsIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/bienvenue': typeof BienvenueRoute
   '/cgv': typeof CgvRoute
   '/confidentialite': typeof ConfidentialiteRoute
@@ -312,6 +337,9 @@ export interface FileRoutesByFullPath {
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/admin/community': typeof AdminCommunityRoute
+  '/admin/premium': typeof AdminPremiumRoute
+  '/admin/security': typeof AdminSecurityRoute
   '/groups/$groupId': typeof GroupsGroupIdRoute
   '/groups/join': typeof GroupsJoinRoute
   '/patient/agenda': typeof PatientAgendaRoute
@@ -351,6 +379,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/bienvenue': typeof BienvenueRoute
   '/cgv': typeof CgvRoute
   '/confidentialite': typeof ConfidentialiteRoute
@@ -362,6 +391,9 @@ export interface FileRoutesByTo {
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/admin/community': typeof AdminCommunityRoute
+  '/admin/premium': typeof AdminPremiumRoute
+  '/admin/security': typeof AdminSecurityRoute
   '/groups/$groupId': typeof GroupsGroupIdRoute
   '/groups/join': typeof GroupsJoinRoute
   '/patient/agenda': typeof PatientAgendaRoute
@@ -402,6 +434,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/bienvenue': typeof BienvenueRoute
   '/cgv': typeof CgvRoute
   '/confidentialite': typeof ConfidentialiteRoute
@@ -413,6 +446,9 @@ export interface FileRoutesById {
   '/progress': typeof ProgressRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/admin/community': typeof AdminCommunityRoute
+  '/admin/premium': typeof AdminPremiumRoute
+  '/admin/security': typeof AdminSecurityRoute
   '/groups/$groupId': typeof GroupsGroupIdRoute
   '/groups/join': typeof GroupsJoinRoute
   '/patient/agenda': typeof PatientAgendaRoute
@@ -454,6 +490,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/bienvenue'
     | '/cgv'
     | '/confidentialite'
@@ -465,6 +502,9 @@ export interface FileRouteTypes {
     | '/progress'
     | '/register'
     | '/reset-password'
+    | '/admin/community'
+    | '/admin/premium'
+    | '/admin/security'
     | '/groups/$groupId'
     | '/groups/join'
     | '/patient/agenda'
@@ -504,6 +544,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/bienvenue'
     | '/cgv'
     | '/confidentialite'
@@ -515,6 +556,9 @@ export interface FileRouteTypes {
     | '/progress'
     | '/register'
     | '/reset-password'
+    | '/admin/community'
+    | '/admin/premium'
+    | '/admin/security'
     | '/groups/$groupId'
     | '/groups/join'
     | '/patient/agenda'
@@ -554,6 +598,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/bienvenue'
     | '/cgv'
     | '/confidentialite'
@@ -565,6 +610,9 @@ export interface FileRouteTypes {
     | '/progress'
     | '/register'
     | '/reset-password'
+    | '/admin/community'
+    | '/admin/premium'
+    | '/admin/security'
     | '/groups/$groupId'
     | '/groups/join'
     | '/patient/agenda'
@@ -605,6 +653,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   BienvenueRoute: typeof BienvenueRoute
   CgvRoute: typeof CgvRoute
   ConfidentialiteRoute: typeof ConfidentialiteRoute
@@ -726,6 +775,13 @@ declare module '@tanstack/react-router' {
       path: '/bienvenue'
       fullPath: '/bienvenue'
       preLoaderRoute: typeof BienvenueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -952,6 +1008,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GroupsGroupIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/security': {
+      id: '/admin/security'
+      path: '/security'
+      fullPath: '/admin/security'
+      preLoaderRoute: typeof AdminSecurityRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/premium': {
+      id: '/admin/premium'
+      path: '/premium'
+      fullPath: '/admin/premium'
+      preLoaderRoute: typeof AdminPremiumRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/community': {
+      id: '/admin/community'
+      path: '/community'
+      fullPath: '/admin/community'
+      preLoaderRoute: typeof AdminCommunityRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/pro/sport/$programId': {
       id: '/pro/sport/$programId'
       path: '/$programId'
@@ -989,6 +1066,20 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AdminRouteChildren {
+  AdminCommunityRoute: typeof AdminCommunityRoute
+  AdminPremiumRoute: typeof AdminPremiumRoute
+  AdminSecurityRoute: typeof AdminSecurityRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminCommunityRoute: AdminCommunityRoute,
+  AdminPremiumRoute: AdminPremiumRoute,
+  AdminSecurityRoute: AdminSecurityRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface ProConsultationsRouteChildren {
   ProConsultationsIdRoute: typeof ProConsultationsIdRoute
@@ -1051,6 +1142,7 @@ const ProSportRouteWithChildren = ProSportRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   BienvenueRoute: BienvenueRoute,
   CgvRoute: CgvRoute,
   ConfidentialiteRoute: ConfidentialiteRoute,

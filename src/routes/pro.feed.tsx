@@ -6,13 +6,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { FeedView } from "@/components/FeedView";
 import { FeedAttachment } from "@/components/FeedAttachment";
 import {
-  Rss, Plus, X, Video, FileText,
+  Rss, Plus, X, Video, FileText, Pencil, Save,
   Lightbulb, Trophy, ChefHat, Eye, EyeOff,
   Trash2, Upload, Loader2, ShieldAlert, RotateCcw, Check, Ban, ShieldOff
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 
 export const Route = createFileRoute("/pro/feed")({
@@ -72,6 +73,18 @@ const TYPE_CONFIG: Record<FeedType, { label: string; icon: React.ReactNode; colo
   video:     { label: "Vidéo",     icon: <Video className="h-3.5 w-3.5" />,     color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
 };
 
+const PRO_FEED_MAX_FILE_BYTES = 10 * 1024 * 1024;
+const PRO_FEED_IMAGE_EXTENSIONS = new Set([
+  "jpg", "jpeg", "jpe", "jfif", "pjpeg", "pjp", "png", "apng", "webp", "gif",
+  "bmp", "dib", "avif", "avifs", "heic", "heif", "heics", "heifs", "tif", "tiff",
+  "jxl", "ico", "cur", "svg", "svgz",
+]);
+const PRO_FEED_VIDEO_EXTENSIONS = new Set([
+  "mp4", "m4v", "mov", "qt", "webm", "avi", "divx", "xvid", "mpg", "mpeg", "mpe",
+  "m1v", "m2v", "mpv", "mkv", "mk3d", "mks", "3gp", "3g2", "flv", "f4v", "wmv",
+  "asf", "m2ts", "mts", "ts", "vob", "ogv", "ogg", "dv", "rm", "rmvb", "yuv",
+]);
+
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("fr-FR", {
@@ -89,15 +102,43 @@ function storagePathFromUrl(url: string | null) {
 
 // ── Composant carte post ──────────────────────────────────
 function PostCard({
-  post, onTogglePublish, onDelete
+  post, onEdit, onDelete
 }: {
   post: FeedPost;
-  onTogglePublish: (id: string, current: boolean) => void;
-  onDelete: (id: string, imageUrl: string | null) => void;
+  onEdit: (id: string, values: Pick<FeedPost, "type" | "title" | "body" | "tags">) => Promise<boolean>;
+  onDelete: (post: FeedPost) => void;
 }) {
   const cfg = TYPE_CONFIG[post.type];
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [title, setTitle] = useState(post.title);
+  const [body, setBody] = useState(post.body ?? "");
+  const [tags, setTags] = useState((post.tags ?? []).join(", "));
+  const [type, setType] = useState<FeedType>(post.type);
+
+  const startEditing = () => {
+    setTitle(post.title);
+    setBody(post.body ?? "");
+    setTags((post.tags ?? []).join(", "));
+    setType(post.type);
+    setEditing(true);
+  };
+
+  const save = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    const saved = await onEdit(post.id, {
+      title: title.trim(),
+      body: body.trim() || null,
+      tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+      type,
+    });
+    setSaving(false);
+    if (saved) setEditing(false);
+  };
+
   return (
-    <div className={`rounded-xl border bg-card overflow-hidden transition-all ${!post.is_published ? "opacity-60" : ""}`}>
+    <div className="overflow-hidden rounded-2xl border border-[#E2E8DE] bg-white shadow-sm transition-all">
       <FeedAttachment reference={post.image_url} alt={post.title} imageClassName="w-full h-48 object-contain" />
       <FeedAttachment reference={post.video_url} kind="video" />
       <div className="p-4 space-y-3">
@@ -108,23 +149,32 @@ function PostCard({
               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${cfg.color}`}>
                 {cfg.icon}{cfg.label}
               </span>
-              {!post.is_published && (
-                <Badge variant="outline" className="text-xs">Brouillon</Badge>
-              )}
+              <Badge variant="outline" className="text-xs"><Eye className="mr-1 h-3 w-3" />Publié</Badge>
             </div>
-            <h3 className="font-semibold truncate">{post.title}</h3>
+            {editing ? (
+              <div className="space-y-2 pt-2">
+                <Input aria-label="Titre de la publication" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} />
+                <select aria-label="Type de publication" className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={type} onChange={(event) => setType(event.target.value as FeedType)}>
+                  {(Object.keys(TYPE_CONFIG) as FeedType[]).map((option) => <option key={option} value={option}>{TYPE_CONFIG[option].label}</option>)}
+                </select>
+                <textarea aria-label="Texte de la publication" className="w-full rounded-md border bg-background px-3 py-2 text-sm" rows={4} value={body} onChange={(event) => setBody(event.target.value)} maxLength={10000} />
+                <Input aria-label="Tags" value={tags} onChange={(event) => setTags(event.target.value)} placeholder="Tags séparés par des virgules" />
+              </div>
+            ) : (
+              <h3 className="font-semibold truncate">{post.title}</h3>
+            )}
           </div>
         </div>
 
 
         {/* Corps */}
-        {post.body && (
+        {!editing && post.body && (
           <p className="text-sm text-muted-foreground line-clamp-2">{post.body}</p>
         )}
 
 
         {/* Tags */}
-        {post.tags && post.tags.length > 0 && (
+        {!editing && post.tags && post.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {post.tags.map((tag) => (
               <span key={tag} className="text-xs bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
@@ -139,21 +189,21 @@ function PostCard({
         <div className="flex items-center justify-between pt-1 border-t">
           <span className="text-xs text-muted-foreground">{formatDate(post.created_at)}</span>
           <div className="flex items-center gap-2">
+            {editing ? (
+              <>
+                <button type="button" onClick={() => setEditing(false)} disabled={saving} className="rounded-md border px-2 py-1 text-xs">Annuler</button>
+                <button type="button" onClick={() => void save()} disabled={saving || !title.trim()} className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50">
+                  <Save className="h-3.5 w-3.5" />{saving ? "Enregistrement…" : "Enregistrer"}
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={startEditing} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs">
+                <Pencil className="h-3.5 w-3.5" />Modifier
+              </button>
+            )}
             <button
-              onClick={() => onTogglePublish(post.id, post.is_published)}
-              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors ${
-                post.is_published
-                  ? "text-green-600 bg-green-50 hover:bg-green-100 dark:bg-green-900/20"
-                  : "text-muted-foreground bg-muted hover:bg-muted/80"
-              }`}
-            >
-              {post.is_published
-                ? <><Eye className="h-3.5 w-3.5" /> Publié</>
-                : <><EyeOff className="h-3.5 w-3.5" /> Brouillon</>
-              }
-            </button>
-            <button
-              onClick={() => onDelete(post.id, post.image_url)}
+              onClick={() => onDelete(post)}
+              disabled={editing || saving}
               className="text-xs px-2 py-1 rounded-md text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 transition-colors"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -182,6 +232,26 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    const ext = (f.name.split(".").pop() ?? "").toLowerCase();
+    const extensionMatchesType =
+      (f.type.startsWith("image/") && PRO_FEED_IMAGE_EXTENSIONS.has(ext)) ||
+      (f.type.startsWith("video/") && PRO_FEED_VIDEO_EXTENSIONS.has(ext)) ||
+      (f.type === "application/pdf" && ext === "pdf");
+    if (!extensionMatchesType) {
+      setError("Le type du fichier ne correspond pas à une image, une vidéo ou un PDF pris en charge.");
+      setFile(null);
+      setPreview(null);
+      e.target.value = "";
+      return;
+    }
+    if (f.size > PRO_FEED_MAX_FILE_BYTES) {
+      setError("Un professionnel peut joindre un fichier de 10 Mo maximum.");
+      setFile(null);
+      setPreview(null);
+      e.target.value = "";
+      return;
+    }
+    setError(null);
     setFile(f);
     if (f.type.startsWith("image/")) {
       setPreview(URL.createObjectURL(f));
@@ -191,7 +261,7 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
   };
 
 
-  const handleSubmit = async (publish: boolean) => {
+  const handleSubmit = async () => {
     if (!title.trim()) { setError("Le titre est obligatoire."); return; }
     setError(null);
     setUploading(true);
@@ -208,7 +278,7 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
         const path = `${authorId}/${Date.now()}.${ext}`;
         const { error: upErr } = await supabase.storage
           .from("feed")
-          .upload(path, file, { upsert: false });
+          .upload(path, file, { upsert: false, contentType: file.type });
         if (upErr) throw upErr;
 
 
@@ -230,8 +300,8 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
         image_url,
         video_url,
         tags:         tagArray.length > 0 ? tagArray : null,
-        is_published: publish,
-        published_at: publish ? new Date().toISOString() : null,
+        is_published: true,
+        published_at: new Date().toISOString(),
       });
 
 
@@ -253,7 +323,7 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
 
 
   return (
-    <div className="rounded-xl border bg-card p-5 space-y-4">
+    <div className="space-y-4 rounded-2xl border border-[#E2E8DE] bg-white p-5 shadow-sm">
       <h2 className="font-semibold flex items-center gap-2">
         <Plus className="h-4 w-4 text-primary" /> Nouvelle publication
       </h2>
@@ -368,23 +438,13 @@ function NewPostForm({ authorId, onCreated }: { authorId: string; onCreated: () 
       )}
 
 
-      {/* Boutons */}
+      {/* A professional post is published on creation. Hidden general posts are admin-only. */}
       <div className="flex gap-3">
         <Button
           type="button"
-          variant="outline"
           className="flex-1"
           disabled={uploading}
-          onClick={() => handleSubmit(false)}
-        >
-          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <EyeOff className="h-4 w-4" />}
-          Brouillon
-        </Button>
-        <Button
-          type="button"
-          className="flex-1"
-          disabled={uploading}
-          onClick={() => handleSubmit(true)}
+          onClick={() => void handleSubmit()}
         >
           {uploading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
           Publier
@@ -411,6 +471,7 @@ function MyPosts() {
       .select("*")
       .eq("author_id", user.id)
       .eq("source", "coach")
+      .eq("is_published", true)
       .order("created_at", { ascending: false });
     if (!error && data) setPosts(data as FeedPost[]);
     setLoading(false);
@@ -420,26 +481,54 @@ function MyPosts() {
   useEffect(() => { void fetchPosts(); }, [user]);
 
 
-  const togglePublish = async (id: string, current: boolean) => {
-    await supabase.from("feed_content").update({
-      is_published: !current,
-      published_at: !current ? new Date().toISOString() : null,
-    }).eq("id", id);
-    setPosts((prev) => prev.map((p) =>
-      p.id === id ? { ...p, is_published: !current } : p
-    ));
+  const updatePost = async (
+    id: string,
+    values: Pick<FeedPost, "type" | "title" | "body" | "tags">,
+  ) => {
+    const { data, error } = await supabase
+      .from("feed_content")
+      .update(values)
+      .eq("id", id)
+      .eq("author_id", user?.id ?? "")
+      .eq("source", "coach")
+      .eq("is_published", true)
+      .select("id")
+      .maybeSingle();
+    if (error || !data) {
+      toast.error("Modification impossible. La publication a peut-être été masquée ou supprimée.");
+      return false;
+    }
+    setPosts((previous) => previous.map((post) => post.id === id ? { ...post, ...values } : post));
+    toast.success("Publication mise à jour.");
+    return true;
   };
 
 
-  const deletePost = async (id: string, imageUrl: string | null) => {
+  const deletePost = async (post: FeedPost) => {
     if (!confirm("Supprimer cette publication ?")) return;
     // Supprimer le fichier storage si présent
-    if (imageUrl) {
-      const path = imageUrl.split("/feed/")[1];
-      if (path) await supabase.storage.from("feed").remove([path]);
+    const { data, error } = await supabase
+      .from("feed_content")
+      .delete()
+      .eq("id", post.id)
+      .eq("author_id", user?.id ?? "")
+      .eq("source", "coach")
+      .eq("is_published", true)
+      .select("id")
+      .maybeSingle();
+    if (error || !data) {
+      toast.error("Suppression impossible.");
+      return;
     }
-    await supabase.from("feed_content").delete().eq("id", id);
-    setPosts((prev) => prev.filter((p) => p.id !== id));
+    setPosts((previous) => previous.filter((item) => item.id !== post.id));
+    const paths = [post.image_url, post.video_url]
+      .map(storagePathFromUrl)
+      .filter((path): path is string => Boolean(path));
+    if (paths.length > 0) {
+      const { error: storageError } = await supabase.storage.from("feed").remove(paths);
+      if (storageError) toast.error("Publication supprimée; une pièce jointe devra être nettoyée.");
+    }
+    toast.success("Publication supprimée.");
   };
 
 
@@ -447,9 +536,7 @@ function MyPosts() {
     ? posts
     : posts.filter((p) => p.type === filterType);
 
-
-  const published = posts.filter((p) => p.is_published).length;
-  const drafts    = posts.filter((p) => !p.is_published).length;
+  const published = posts.length;
 
 
   return (
@@ -461,7 +548,6 @@ function MyPosts() {
         <h2 className="text-lg font-semibold">Mes publications</h2>
         <div className="ml-auto flex items-center gap-2">
           <Badge variant="secondary">{published} publiés</Badge>
-          {drafts > 0 && <Badge variant="outline">{drafts} brouillons</Badge>}
           <Button size="sm" onClick={() => setShowForm((v) => !v)}>
             {showForm ? <X className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
             {showForm ? "Annuler" : "Nouveau"}
@@ -514,7 +600,7 @@ function MyPosts() {
 
       {/* Liste posts */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {[1, 2, 3].map((i) => (
             <div key={i} className="rounded-xl border bg-card p-4 animate-pulse">
               <div className="h-4 bg-muted rounded w-2/3 mb-3" />
@@ -530,12 +616,12 @@ function MyPosts() {
           <p className="text-sm mt-1">Cliquez sur "Nouveau" pour créer votre premier contenu</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {filtered.map((post) => (
             <PostCard
               key={post.id}
               post={post}
-              onTogglePublish={togglePublish}
+              onEdit={updatePost}
               onDelete={deletePost}
             />
           ))}
@@ -550,7 +636,7 @@ function MyPosts() {
 const COMMENT_COLUMNS = "id, content_id, user_id, body, is_hidden, created_at";
 const POST_COLUMNS = "id, author_id, title, body, image_url, is_published, created_at";
 
-function ModerationPanel({ onChanged }: { onChanged: () => void }) {
+export function ModerationPanel({ onChanged }: { onChanged: () => void }) {
   const [comments, setComments]           = useState<ModComment[]>([]);
   const [posts, setPosts]                 = useState<ModPost[]>([]);
   const [commentReports, setCommentReports] = useState<Record<string, number>>({});
@@ -1038,8 +1124,20 @@ function Content() {
   const { user } = useAuth();
   const [tab, setTab] = useState<PageTab>("mine");
   const [pending, setPending] = useState(0);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    void supabase.rpc("is_current_super_admin").then(({ data }) => {
+      setIsSuperAdmin(data === true);
+    });
+  }, []);
 
   const loadPending = useCallback(async () => {
+    if (!isSuperAdmin) {
+      setPending(0);
+      return;
+    }
+
     const { data: r } = await supabase
       .from("feed_reports")
       .select("target_type, target_id");
@@ -1060,32 +1158,32 @@ function Content() {
     }
 
     setPending(total);
-  }, []);
+  }, [isSuperAdmin]);
 
   useEffect(() => { void loadPending(); }, [loadPending]);
 
   const tabs: { key: PageTab; label: string }[] = [
     { key: "mine", label: "Mes publications" },
     { key: "general", label: "Fil général" },
-    { key: "moderation", label: "Modération" },
+    ...(isSuperAdmin ? [{ key: "moderation" as const, label: "Modération" }] : []),
   ];
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Rss className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Feed</h1>
+    <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 xl:px-10">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#2A4532] bg-[#15251B] px-5 py-4 text-white shadow-[0_8px_22px_rgba(21,37,27,0.08)]">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10"><Rss className="h-5 w-5 text-[#B4E28F]" /></span>
+        <h1 className="text-2xl font-semibold tracking-tight text-white">Feed</h1>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b pb-3">
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-[#E2E8DE] bg-white p-2 shadow-sm">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium border transition-all ${
               tab === t.key
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:border-primary/40"
+                ? "border-[#2D7A1F] bg-[#2D7A1F] text-white shadow-sm"
+                : "border-transparent text-muted-foreground hover:border-[#DCE9D4] hover:bg-[#F5F9F2]"
             }`}
           >
             {t.label}
@@ -1100,7 +1198,7 @@ function Content() {
 
       {tab === "mine" && <MyPosts />}
       {tab === "general" && user && <FeedView userId={user.id} />}
-      {tab === "moderation" && <ModerationPanel onChanged={() => void loadPending()} />}
+      {tab === "moderation" && isSuperAdmin && <ModerationPanel onChanged={() => void loadPending()} />}
     </div>
   );
 }

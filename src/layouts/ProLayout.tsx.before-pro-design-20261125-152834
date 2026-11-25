@@ -1,0 +1,253 @@
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import {
+  LayoutDashboard,
+  Users,
+  Salad,
+  BookOpen,
+  Dumbbell,
+  MessageSquare,
+  MessagesSquare,
+  Video,
+  Bell,
+  UserCheck,
+  Rss,
+  Settings,
+  ShieldCheck,
+  LogOut,
+  Menu,
+  X,
+} from "lucide-react";
+import { Logo } from "@/components/Logo";
+import { NotificationBell } from "@/components/NotificationBell";
+import { UpcomingConsultationReminder } from "@/components/UpcomingConsultationReminder";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { useConversations } from "@/hooks/useMessages";
+import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
+import { useSuperAdminStatus } from "@/hooks/useSuperAdminStatus";
+
+const NAV = [
+  { to: "/pro/dashboard", label: "Dashboard", section: "Vue d'ensemble", icon: LayoutDashboard },
+  { to: "/pro/patients", label: "Mes patients", section: "Accompagnement", icon: Users },
+  { to: "/pro/subscribers", label: "Abonnés", section: "Accompagnement", icon: UserCheck },
+  { to: "/pro/consultations", label: "Consultations", section: "Accompagnement", icon: Video },
+  { to: "/pro/nutrition", label: "Programmes nutrition", section: "Programmes", icon: Salad },
+  { to: "/pro/sport", label: "Programmes sport", section: "Programmes", icon: Dumbbell },
+  { to: "/pro/recipes", label: "Mes recettes", section: "Programmes", icon: BookOpen },
+  { to: "/pro/messages", label: "Messagerie", section: "Communauté", icon: MessageSquare },
+  { to: "/pro/notifications", label: "Notifications", section: "Communauté", icon: Bell },
+  { to: "/pro/feed", label: "Feed", section: "Communauté", icon: Rss },
+  { to: "/groups", label: "Groupes", section: "Communauté", icon: MessagesSquare },
+  { to: "/pro/settings", label: "Paramètres", section: "Préférences", icon: Settings },
+] as const;
+
+export function ProLayout({ children }: { children: ReactNode }) {
+  const { profile, signOut } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [pendingReports, setPendingReports] = useState(0);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const { totalUnread: unreadMessages } = useConversations();
+  const { status: superAdminStatus } = useSuperAdminStatus();
+
+  const navItems = superAdminStatus === "confirmed"
+    ? [...NAV, { to: "/admin" as const, label: "Super Administration", section: "Administration", icon: ShieldCheck }]
+    : NAV;
+
+  // Nombre de contenus signalés en attente (mis à jour à chaque changement de page)
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPending = async () => {
+      const { data: reports } = await supabase
+        .from("feed_reports")
+        .select("target_type, target_id");
+
+      const rows = (reports ?? []) as { target_type: string; target_id: string }[];
+      const commentIds = Array.from(
+        new Set(rows.filter((r) => r.target_type === "comment").map((r) => r.target_id)),
+      );
+      const postIds = Array.from(
+        new Set(rows.filter((r) => r.target_type === "post").map((r) => r.target_id)),
+      );
+
+      let total = 0;
+
+      if (commentIds.length > 0) {
+        const { data: comments } = await supabase
+          .from("feed_comments")
+          .select("id")
+          .in("id", commentIds);
+        total += (comments ?? []).length;
+      }
+
+      if (postIds.length > 0) {
+        const { data: posts } = await supabase
+          .from("feed_content")
+          .select("id")
+          .in("id", postIds);
+        total += (posts ?? []).length;
+      }
+
+      if (!cancelled) setPendingReports(total);
+    };
+
+    void loadPending();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+
+  const initials = (profile?.full_name ?? profile?.email ?? "?")
+    .split(" ")
+    .map((word) => word[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  const handleSignOut = async () => {
+    await signOut();
+    void navigate({ to: "/login" });
+  };
+
+  const SidebarInner = (
+    <div className="flex h-full w-[min(18rem,88vw)] flex-col border-r border-white/10 bg-[#15251B] text-white shadow-2xl shadow-black/20 md:w-64 md:shadow-none">
+      <div className="flex min-h-[84px] items-center justify-between border-b border-white/10 px-5 py-4">
+        <div className="rounded-2xl border border-white/70 bg-[#F8FAF4] px-3.5 py-2.5 shadow-[0_8px_24px_rgba(0,0,0,0.16)]">
+          <Logo className="[&_span]:!text-[#1A1A1A] [&_span:last-child]:!text-[#6DB33F]" />
+        </div>
+
+        <button
+          type="button"
+          className="text-white/70 transition-colors hover:text-white md:hidden"
+          onClick={() => setOpen(false)}
+          aria-label="Fermer le menu"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <nav
+        className="flex-1 overflow-y-auto px-3 py-5"
+        aria-label="Navigation professionnelle"
+      >
+        {navItems.map((item, index) => {
+          const active =
+            pathname === item.to || pathname.startsWith(`${item.to}/`);
+          const Icon = item.icon;
+
+          return (
+            <div key={item.to} className={index === 0 || item.section !== navItems[index - 1]?.section ? "mt-6 first:mt-0" : "mt-0.5"}>
+              {index === 0 || item.section !== navItems[index - 1]?.section ? (
+                <p className="mb-2 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-[#AFC0B2]">
+                  {item.section}
+                </p>
+              ) : null}
+              <Link
+                to={item.to}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  "relative flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-[13px] transition-colors duration-150",
+                  active
+                    ? "bg-[#2E7545] font-semibold text-white shadow-[0_5px_16px_rgba(4,17,9,0.22)] before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-[#B4E28F]"
+                    : "text-[#D3DED4]/80 hover:bg-white/[0.07] hover:text-white",
+                )}
+                aria-current={active ? "page" : undefined}
+              >
+                <Icon className={cn("h-[17px] w-[17px] shrink-0", active ? "text-[#D6F3C1]" : "text-[#A8B8AA]")} />
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+
+                {item.to === "/pro/messages" && unreadMessages > 0 ? (
+                  <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#9AD26E] px-1 text-[10px] font-bold text-[#17331F]">
+                    {unreadMessages > 99 ? "99+" : unreadMessages}
+                  </span>
+                ) : null}
+
+                {item.to === "/pro/feed" && pendingReports > 0 ? (
+                  <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#9AD26E] px-1 text-[10px] font-bold text-[#17331F]">
+                    {pendingReports > 99 ? "99+" : pendingReports}
+                  </span>
+                ) : null}
+              </Link>
+            </div>
+          );
+        })}
+      </nav>
+
+      <div className="m-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-3">
+        <Avatar className="h-9 w-9">
+          <AvatarFallback className="border border-[#B4E28F]/30 bg-[#2E7545] text-xs font-semibold text-[#E7F5DE]">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">
+            {profile?.full_name ?? profile?.email ?? "Professionnel"}
+          </p>
+          <span className="mt-1 inline-block text-[9px] font-semibold uppercase tracking-[0.14em] text-[#A8C5A8]">
+            Professionnel
+          </span>
+        </div>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="text-white/65 hover:bg-white/10 hover:text-white"
+          onClick={() => void handleSignOut()}
+          aria-label="Se déconnecter"
+        >
+          <LogOut className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-background">
+      <UpcomingConsultationReminder />
+
+      <aside className="fixed inset-y-0 left-0 z-40 hidden md:block">
+        {SidebarInner}
+      </aside>
+
+      {open ? (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setOpen(false)}
+            aria-label="Fermer le menu"
+          />
+          <div className="relative h-full">{SidebarInner}</div>
+        </div>
+      ) : null}
+
+      <div className="flex min-w-0 flex-1 flex-col md:ml-64">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border/70 bg-background/95 px-4 backdrop-blur md:hidden">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="Ouvrir le menu"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/70 bg-card text-foreground shadow-sm"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+
+          <div className="rounded-lg bg-white px-2 py-1 shadow-sm">
+            <Logo />
+          </div>
+
+          <NotificationBell to="/pro/notifications" />
+        </header>
+
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
+    </div>
+  );
+}

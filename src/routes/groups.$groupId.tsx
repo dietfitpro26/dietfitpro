@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { GroupsShell } from "@/components/GroupsShell";
 import { FeedView, TierBadge } from "@/components/FeedView";
+import { GroupModerationPanel } from "@/components/GroupModerationPanel";
 import { InviteFromList } from "@/components/InviteFromList";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
@@ -39,7 +40,7 @@ type GroupRow = {
 
 type MemberRow = {
   user_id: string;
-  role: "owner" | "member";
+  role: "owner" | "member" | "participant";
   created_at: string;
 };
 
@@ -68,7 +69,7 @@ function GroupPage() {
 
 function GroupContent() {
   const { groupId } = Route.useParams();
-  const { user, role } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [group, setGroup] = useState<GroupRow | null>(null);
@@ -82,18 +83,20 @@ function GroupContent() {
   const [msg, setMsg] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const userId = user?.id ?? "";
-  const isPro = role === "pro";
-
   const load = useCallback(async () => {
-    const { data: g } = await supabase
-      .from("feed_groups")
-      .select(
-        "id, name, description, owner_id, invite_code, invite_enabled, created_at",
-      )
-      .eq("id", groupId)
-      .maybeSingle();
+    const [groupResult, adminResult] = await Promise.all([
+      supabase
+        .from("feed_groups")
+        .select("id, name, description, owner_id, invite_code, invite_enabled, created_at")
+        .eq("id", groupId)
+        .maybeSingle(),
+      supabase.rpc("is_current_super_admin"),
+    ]);
+    const g = groupResult.data;
+    setIsSuperAdmin(adminResult.data === true);
 
     if (!g) {
       setGroup(null);
@@ -208,7 +211,8 @@ function GroupContent() {
   }
 
   const isOwner = group.owner_id === userId;
-  const canManage = isOwner || isPro;
+  const canManage = isOwner || isSuperAdmin;
+  const canDeleteGroup = isOwner || isSuperAdmin;
   const isMember = members.some((m) => m.user_id === userId);
   const inviteLink = `${window.location.origin}/groups/join?code=${group.invite_code}`;
 
@@ -533,7 +537,7 @@ function GroupContent() {
         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
-        {isPro ? "Tous les groupes" : "Mes groupes"}
+        Mes groupes
       </Link>
 
       <div className="rounded-xl border bg-card p-4 space-y-3">
@@ -555,7 +559,7 @@ function GroupContent() {
             </p>
           </div>
 
-          {isMember && !isOwner && !isPro && (
+          {isMember && !isOwner && (
             <button
               onClick={() => void handleLeave()}
               className={`${smallBtn} border text-muted-foreground hover:bg-muted`}
@@ -614,13 +618,15 @@ function GroupContent() {
                 Nouveau lien
               </button>
 
-              <button
-                onClick={() => void handleDeleteGroup()}
-                className={`${smallBtn} ml-auto text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20`}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Supprimer le groupe
-              </button>
+              {canDeleteGroup && (
+                <button
+                  onClick={() => void handleDeleteGroup()}
+                  className={`${smallBtn} ml-auto text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Supprimer le groupe
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -661,11 +667,13 @@ function GroupContent() {
 
       {tab === "members" && (
         <div className="space-y-5">
-          {isPro && (
+          {canManage && (
             <InviteFromList groupId={group.id} onChanged={load} />
           )}
 
-          {isPro && (
+          {canManage && <GroupModerationPanel groupId={group.id} />}
+
+          {isSuperAdmin && (
             <div className="rounded-xl border bg-muted/40 px-4 py-3 text-xs text-muted-foreground space-y-1">
               <p>
                 <strong className="text-foreground">Bannir du groupe</strong>
@@ -768,7 +776,7 @@ function GroupContent() {
                 m.user_id !== userId;
 
               const canTakeOver =
-                isPro &&
+                isSuperAdmin &&
                 m.role === "owner" &&
                 !memberIsCoach &&
                 m.user_id !== userId;
@@ -827,7 +835,7 @@ function GroupContent() {
                         Bannir du groupe
                       </button>
 
-                      {isPro && (
+                      {isSuperAdmin && (
                         <>
                           <button
                             onClick={() =>
@@ -902,7 +910,7 @@ function GroupContent() {
                 ))
               )}
 
-              {isPro && (
+              {isSuperAdmin && (
                 <p className="text-xs text-muted-foreground">
                   Les bannissements de tous les groupes et de la communauté
                   se gèrent depuis la page « Tous les groupes ».

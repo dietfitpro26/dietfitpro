@@ -86,7 +86,7 @@ function JoinContent() {
       else if (text.includes("pseudo_required")) setMsg("Choisissez d'abord un pseudo.");
       else if (text.includes("charter_required")) setMsg("Vous devez d'abord accepter la charte.");
       else if (text.includes("banned_from_group")) setMsg("Vous n'avez pas accès à ce groupe.");
-      else if (text.includes("not_allowed")) setMsg("Les groupes sont réservés aux membres Premium et aux patients.");
+      else if (text.includes("not_allowed")) setMsg("Votre compte ne peut pas rejoindre ce groupe. Un abonné Basic doit disposer d'une invitation valide.");
       else setMsg("Impossible de rejoindre le groupe pour le moment.");
       setJoining(false);
       return;
@@ -132,7 +132,7 @@ function JoinContent() {
           {!canParticipate ? (
             <div className="flex items-start gap-2 rounded-lg border border-dashed px-3 py-3 text-sm text-muted-foreground">
               <Lock className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>Les groupes sont réservés aux membres Premium et aux patients.</span>
+              <span>Les abonnés Basic peuvent rejoindre avec une invitation valide. Les autres règles d'accès restent applicables.</span>
             </div>
           ) : !pseudo ? (
             <PseudoForm

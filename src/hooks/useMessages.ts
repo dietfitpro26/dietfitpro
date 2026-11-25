@@ -40,6 +40,8 @@ export interface DeleteConversationResult {
   filesRemoved: number;
 }
 
+const MESSAGE_ATTACHMENT_URL_TTL_SECONDS = 30 * 60;
+
 
 const EMPTY_MESSAGE: Message = {
   id: "",
@@ -65,6 +67,36 @@ function extractStoragePath(value: string | null): string | null {
   } catch {
     return match[1];
   }
+}
+
+/** Signs only paths returned by the authorized message query; Storage RLS is checked again. */
+async function signMessageAttachments(rows: Message[]): Promise<Message[]> {
+  const paths = Array.from(new Set(rows
+    .map((message) => extractStoragePath(message.attachment_url))
+    .filter((path): path is string => Boolean(path))));
+  if (paths.length === 0) return rows;
+
+  const { data, error } = await supabase.storage
+    .from("message-attachments")
+    .createSignedUrls(paths, MESSAGE_ATTACHMENT_URL_TTL_SECONDS);
+  if (error) {
+    console.error("[message attachment signing]", error);
+    return rows.map((message) => message.attachment_url
+      ? { ...message, attachment_url: null }
+      : message);
+  }
+
+  const signedByPath = new Map(
+    (data ?? []).flatMap((item) => item.signedUrl
+      ? [[item.path, item.signedUrl] as const]
+      : []),
+  );
+  return rows.map((message) => {
+    const path = extractStoragePath(message.attachment_url);
+    return path
+      ? { ...message, attachment_url: signedByPath.get(path) ?? null }
+      : message;
+  });
 }
 
 
@@ -147,6 +179,11 @@ export function useConversations() {
     }
 
 
+    const signedLastMessages = await signMessageAttachments(
+      Array.from(byPartner.values(), (entry) => entry.last),
+    );
+    const signedByMessageId = new Map(signedLastMessages.map((message) => [message.id, message]));
+
     const list: Conversation[] = ids
       .map((id) => {
         const entry = byPartner.get(id);
@@ -159,7 +196,9 @@ export function useConversations() {
             avatar_url: (p?.avatar_url as string | null | undefined) ?? null,
             role: (p?.role as string | undefined) ?? "patient",
           },
-          lastMessage: entry?.last ?? EMPTY_MESSAGE,
+          lastMessage: entry
+            ? signedByMessageId.get(entry.last.id) ?? entry.last
+            : EMPTY_MESSAGE,
           unreadCount: entry?.unread ?? 0,
           isPlaceholder: !entry,
         };
@@ -266,6 +305,23 @@ export function useConversation(partnerId: string | null) {
   const [loading, setLoading] = useState(true);
   const threadChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
+  const getFreshAttachmentUrl = useCallback(async (messageId: string) => {
+    if (!user) return null;
+    const { data: message, error: messageError } = await supabase
+      .from("messages")
+      .select("attachment_url")
+      .eq("id", messageId)
+      .maybeSingle();
+    if (messageError || !message?.attachment_url) return null;
+    const path = extractStoragePath(message.attachment_url);
+    if (!path) return null;
+
+    const { data, error } = await supabase.storage
+      .from("message-attachments")
+      .createSignedUrl(path, MESSAGE_ATTACHMENT_URL_TTL_SECONDS);
+    return error ? null : data?.signedUrl ?? null;
+  }, [user]);
+
 
   const load = useCallback(async () => {
     if (!user || !partnerId) return;
@@ -283,7 +339,7 @@ export function useConversation(partnerId: string | null) {
       setLoading(false);
       return;
     }
-    setMessages((data ?? []) as Message[]);
+    setMessages(await signMessageAttachments((data ?? []) as Message[]));
     setLoading(false);
     await supabase
       .from("messages")
@@ -317,7 +373,9 @@ export function useConversation(partnerId: string | null) {
             (m.sender_id === user.id && m.recipient_id === partnerId) ||
             (m.sender_id === partnerId && m.recipient_id === user.id);
           if (!inThread) return;
-          setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+          void signMessageAttachments([m]).then(([signedMessage]) => {
+            setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, signedMessage]));
+          });
           if (m.recipient_id === user.id && m.read_at === null) {
             void supabase
               .from("messages")
@@ -331,7 +389,7 @@ export function useConversation(partnerId: string | null) {
         { event: "UPDATE", schema: "public", table: "messages" },
         (payload) => {
           const m = payload.new as Message;
-          setMessages((prev) => prev.map((x) => (x.id === m.id ? m : x)));
+          void load();
         },
       )
       .on(
@@ -351,7 +409,7 @@ export function useConversation(partnerId: string | null) {
         threadChannelRef.current = null;
       }
     };
-  }, [user, partnerId]);
+  }, [user, partnerId, load]);
 
 
   const sendMessage = useCallback(
@@ -370,10 +428,9 @@ export function useConversation(partnerId: string | null) {
           console.error("[sendMessage upload]", up.error);
           throw up.error;
         }
-        const signed = await supabase.storage
-          .from("message-attachments")
-          .createSignedUrl(path, 60 * 60 * 24 * 365);
-        attachment_url = signed.data?.signedUrl ?? path;
+        // Persist the object path, never a bearer URL. Each authorized read
+        // receives a fresh 30-minute URL after message and Storage checks.
+        attachment_url = path;
         attachment_name = file.name;
         attachment_type = file.type;
       }
@@ -398,5 +455,5 @@ export function useConversation(partnerId: string | null) {
   );
 
 
-  return { messages, loading, sendMessage };
+  return { messages, loading, sendMessage, getFreshAttachmentUrl };
 }

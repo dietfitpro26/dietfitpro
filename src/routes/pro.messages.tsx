@@ -12,7 +12,9 @@ function ProMessagesPage() {
   return (
     <ProtectedRoute allow={["pro"]}>
       <ProLayout>
-        <MessagesView />
+        <div className="min-h-full bg-[#F8F9F6]">
+          <MessagesView />
+        </div>
       </ProLayout>
     </ProtectedRoute>
   );

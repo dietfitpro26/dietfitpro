@@ -37,13 +37,13 @@ function Content() {
 
   return (
     <div className="flex flex-col">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-white px-6 py-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#2A4532] bg-[#15251B] px-4 py-5 text-white shadow-[0_8px_22px_rgba(21,37,27,0.08)] sm:px-6 xl:px-10">
         <div>
-          <h1 className="text-xl font-semibold">
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
             Notifications
           </h1>
 
-          <p className="text-xs text-muted-foreground">
+          <p className="mt-1 text-sm text-[#C8D7C9]">
             {unreadCount > 0
               ? `${unreadCount} non lue${unreadCount > 1 ? "s" : ""}`
               : "Tout est à jour"}
@@ -54,6 +54,7 @@ function Content() {
           <Button
             variant="outline"
             size="sm"
+            className="border-white/20 bg-white/[0.08] text-white hover:bg-white/[0.14] hover:text-white"
             onClick={() => void markAllAsRead()}
           >
             <CheckCheck className="mr-2 h-4 w-4" />
@@ -62,7 +63,7 @@ function Content() {
         )}
       </header>
 
-      <div className="w-full max-w-3xl space-y-3 p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-[980px] space-y-3 px-4 py-6 sm:px-6 sm:py-8">
         {items === null ? (
           [1, 2, 3].map((i) => (
             <Skeleton
@@ -71,7 +72,7 @@ function Content() {
             />
           ))
         ) : items.length === 0 ? (
-          <Card>
+          <Card className="rounded-2xl border-[#E2E8DE] shadow-sm">
             <CardContent className="p-10 text-center text-muted-foreground">
               <Bell className="mx-auto mb-2 h-8 w-8 opacity-40" />
               Aucune notification.
@@ -91,10 +92,10 @@ function Content() {
               const inner = (
                 <Card
                   className={cn(
-                    "transition-colors",
+                    "rounded-2xl border-[#E2E8DE] shadow-sm transition-colors",
                     isHighlighted
                       ? "border-amber-300 border-l-4 border-l-amber-500 bg-amber-50 hover:bg-amber-100/70"
-                      : "bg-white hover:bg-muted/40",
+                      : "bg-white hover:bg-[#F7F9F5]",
                     !isCustomProgram &&
                       isUnread &&
                       "border-l-4 border-l-[#6DB33F]",

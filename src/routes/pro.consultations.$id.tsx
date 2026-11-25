@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle2, Video, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { ProLayout } from "@/layouts/ProLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { V2FeatureUnavailable } from "@/components/V2FeatureUnavailable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -48,7 +49,7 @@ interface Consultation {
 function Page() {
   return (
     <ProtectedRoute allow={["pro"]}>
-      <ProLayout><Content /></ProLayout>
+      <ProLayout><V2FeatureUnavailable feature="Consultation" /></ProLayout>
     </ProtectedRoute>
   );
 }

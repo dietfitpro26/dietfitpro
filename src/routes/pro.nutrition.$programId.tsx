@@ -1017,12 +1017,13 @@ function Content() {
   });
 
   return (
-    <div className="flex flex-col">
-      <header className="flex flex-wrap items-center gap-3 border-b bg-white px-6 py-4">
+    <div className="min-h-full bg-[#F8F9F6]">
+      <header className="flex flex-wrap items-center gap-3 border-b border-[#2A4532] bg-[#15251B] px-4 py-5 text-white shadow-[0_8px_22px_rgba(21,37,27,0.08)] sm:px-6 xl:px-10">
         <Button
           type="button"
           variant="ghost"
           size="icon"
+          className="text-white hover:bg-white/10 hover:text-white"
           aria-label="Retour aux programmes"
           onClick={() =>
             navigate({ to: "/pro/nutrition" })
@@ -1032,11 +1033,11 @@ function Content() {
         </Button>
 
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">
+          <h1 className="text-lg font-semibold tracking-tight text-white">
             {program.name}
           </h1>
 
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-[#C8D7C9]">
             {patient
               ? `${patient.first_name} ${patient.last_name}`
               : "—"}
@@ -1049,6 +1050,7 @@ function Content() {
         <Button
           type="button"
           variant="outline"
+          className="border-white/20 bg-white/[0.08] text-white hover:bg-white/[0.14] hover:text-white"
           onClick={() =>
             navigate({
               to: "/pro/patients/$patientId",
@@ -1063,7 +1065,7 @@ function Content() {
         </Button>
       </header>
 
-      <div className="space-y-6 p-6">
+      <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 xl:px-10">
         {loadError ? (
           <p
             role="alert"

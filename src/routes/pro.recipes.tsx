@@ -4,6 +4,7 @@ import { Bell, Plus, Search, Clock, Flame, Drumstick, Trash2 } from "lucide-reac
 import { toast } from "sonner";
 import { ProLayout } from "@/layouts/ProLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { V2FeatureUnavailable } from "@/components/V2FeatureUnavailable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -58,7 +59,7 @@ type Source = "all" | "mine" | "library";
 function Page() {
   return (
     <ProtectedRoute allow={["pro"]}>
-      <ProLayout><Content /></ProLayout>
+      <ProLayout><V2FeatureUnavailable feature="Recettes" /></ProLayout>
     </ProtectedRoute>
   );
 }

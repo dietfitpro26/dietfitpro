@@ -319,14 +319,14 @@ function Content() {
 
   return (
     <div className="flex flex-col">
-      <header className="flex items-center justify-between border-b bg-white px-6 py-4">
-        <h1 className="text-xl font-semibold">Programmes nutrition</h1>
-        <Button variant="ghost" size="icon"><Bell className="h-5 w-5" /></Button>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#2A4532] bg-[#15251B] px-4 py-5 text-white shadow-[0_8px_22px_rgba(21,37,27,0.08)] sm:px-6 xl:px-10">
+        <h1 className="text-2xl font-semibold tracking-tight text-white">Programmes nutrition</h1>
+        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 hover:text-white"><Bell className="h-5 w-5" /></Button>
       </header>
 
-      <div className="p-6">
+      <div className="mx-auto w-full max-w-[1480px] px-4 py-6 sm:px-6 sm:py-8 xl:px-10">
         <Tabs defaultValue="programmes">
-          <TabsList className="mb-4">
+          <TabsList className="mb-5 h-auto rounded-xl border border-[#DCE6D6] bg-[#EEF3EA] p-1">
             <TabsTrigger value="programmes">Programmes patients</TabsTrigger>
             <TabsTrigger value="templates">Templates</TabsTrigger>
           </TabsList>
@@ -342,10 +342,10 @@ function Content() {
                 <Plus className="h-4 w-4" /> Nouveau programme
               </Button>
             </div>
-            <div className="rounded-lg border bg-white overflow-hidden">
+            <div className="overflow-x-auto rounded-2xl border border-[#E2E8DE] bg-white shadow-sm">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="border-[#E6EBE3] bg-[#F6F8F4] hover:bg-[#F6F8F4]">
                     <TableHead>Nom</TableHead><TableHead>Patient</TableHead>
                     <TableHead>Calories/j</TableHead><TableHead>Durée</TableHead>
                     <TableHead>Statut</TableHead><TableHead>Créé le</TableHead>
@@ -421,7 +421,7 @@ function Content() {
             ) : (
               <div className="space-y-3">
                 {templates.map((t) => (
-                  <div key={t.id} className="rounded-lg border bg-white overflow-hidden">
+                  <div key={t.id} className="overflow-hidden rounded-2xl border border-[#E2E8DE] bg-white shadow-sm">
                     <div className="flex items-center justify-between px-4 py-3">
                       <div className="flex items-center gap-3">
                         <button onClick={() => setExpandedTemplate(expandedTemplate === t.id ? null : t.id)}>
@@ -800,7 +800,7 @@ function NewTemplateDialog({
         {step === 2 && (
           <div className="space-y-5">
             <div className="rounded-lg border p-4 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="font-medium text-sm">Répartition des repas</h3>
                 <span className={`text-xs font-medium ${totalPct === 100 ? "text-green-600" : "text-red-500"}`}>Total : {totalPct}% {totalPct !== 100 ? "(doit être 100%)" : "✓"}</span>
               </div>
